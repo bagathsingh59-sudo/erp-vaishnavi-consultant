@@ -1,0 +1,924 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Vaishnavi Consultant{% endblock %}
+{% block page_header %}Dashboard{% endblock %}
+
+{% block content %}
+
+<!-- Dashboard Polish — subtle hover, transitions, typography -->
+<style>
+    /* Card hover lift effect */
+    .dash-stat-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .dash-stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.12) !important;
+    }
+
+    /* Client table row hover */
+    .client-row {
+        transition: background 0.15s ease;
+    }
+    .client-row:hover {
+        background: #f0f4ff !important;
+    }
+    .client-row:hover td a.fw-semibold {
+        text-decoration: underline !important;
+    }
+
+    /* Quick action buttons */
+    .dash-quick-btn {
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .dash-quick-btn:hover {
+        transform: translateX(3px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    /* Overview mini-cards lift */
+    .dash-overview-mini {
+        transition: transform 0.2s ease, box-shadow 0.15s ease;
+    }
+    .dash-overview-mini:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+
+    /* Progress cards subtle glow */
+    .dash-progress-card {
+        transition: box-shadow 0.2s ease;
+    }
+    .dash-progress-card:hover {
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+
+    /* Section headers */
+    .dash-section-header {
+        font-weight: 700;
+        color: #1e293b;
+        font-size: 0.85rem;
+        letter-spacing: 0.2px;
+    }
+
+    /* Accounts summary numbers */
+    .dash-acct-num {
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* Smooth badge animations */
+    .badge {
+        transition: transform 0.15s ease;
+    }
+    .badge:hover {
+        transform: scale(1.05);
+    }
+</style>
+
+<!-- =============================================================== -->
+<!--  FY SELECTOR — Financial Year at top of dashboard               -->
+<!-- =============================================================== -->
+<div class="d-flex justify-content-end mb-2">
+    <div class="d-flex align-items-center gap-2" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:6px 14px;">
+        <i class="bi bi-calendar3" style="color:#4f46e5; font-size:0.85rem;"></i>
+        <span style="font-size:0.72rem; color:#64748b; font-weight:600;">Financial Year:</span>
+        <select id="fySelector" class="form-select form-select-sm" style="width:auto; font-size:0.78rem; font-weight:700; border-radius:8px; padding:4px 28px 4px 10px; border-color:#c7d2fe; color:#4338ca;"
+                onchange="window.location.href='{{ url_for('establishment.dashboard') }}?fy=' + this.value">
+            {% for fy in fy_options %}
+            <option value="{{ fy }}" {% if fy == current_fy %}selected{% endif %}>FY {{ fy }}</option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+
+<!-- =============================================================== -->
+<!--  HERO SEARCH — Quick Open Establishment (Command Center)        -->
+<!-- =============================================================== -->
+<div id="heroSearch" style="
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4338ca 100%);
+    border-radius: 16px;
+    padding: 28px 32px 24px;
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(67,56,202,0.25);
+">
+    <!-- Decorative circles -->
+    <div style="position:absolute; top:-40px; right:-20px; width:160px; height:160px; border-radius:50%; background:rgba(255,255,255,0.04);"></div>
+    <div style="position:absolute; bottom:-50px; left:10%; width:200px; height:200px; border-radius:50%; background:rgba(255,255,255,0.03);"></div>
+
+    <!-- Header Row -->
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; position:relative; z-index:1;">
+        <div>
+            <div style="color:rgba(255,255,255,0.6); font-size:0.7rem; text-transform:uppercase; letter-spacing:1.2px; font-weight:600;">Quick Access</div>
+            <h4 style="color:#fff; font-weight:800; margin:4px 0 0; font-size:1.25rem;">Open Establishment</h4>
+        </div>
+        <div style="display:flex; gap:8px;">
+            <a href="{{ url_for('establishment.establishment_add') }}" class="btn btn-sm"
+               style="background:rgba(255,255,255,0.12); color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:10px; font-size:0.72rem; font-weight:600; padding:6px 14px; backdrop-filter:blur(4px);">
+                <i class="bi bi-plus-lg me-1"></i>New Client
+            </a>
+            <a href="{{ url_for('establishment.establishment_list') }}" class="btn btn-sm"
+               style="background:rgba(255,255,255,0.08); color:rgba(255,255,255,0.8); border:1px solid rgba(255,255,255,0.12); border-radius:10px; font-size:0.72rem; padding:6px 14px;">
+                <i class="bi bi-list-ul me-1"></i>View All
+            </a>
+        </div>
+    </div>
+
+    <!-- BIG Search Input -->
+    <div style="position:relative; z-index:2;">
+        <div style="position:relative;">
+            <i class="bi bi-search" style="position:absolute; left:18px; top:50%; transform:translateY(-50%); color:#a5b4fc; font-size:1.1rem;"></i>
+            <input type="text" id="heroSearchInput" autocomplete="off" spellcheck="false"
+                   placeholder="Type company name, PF code, or ESIC code..."
+                   style="
+                       width:100%;
+                       padding: 16px 16px 16px 50px;
+                       font-size: 1.05rem;
+                       font-weight: 500;
+                       border: 2px solid rgba(255,255,255,0.15);
+                       border-radius: 14px;
+                       background: rgba(255,255,255,0.1);
+                       color: #fff;
+                       backdrop-filter: blur(10px);
+                       outline: none;
+                       transition: all 0.25s ease;
+                   "
+                   onfocus="this.style.borderColor='rgba(165,180,252,0.6)'; this.style.background='rgba(255,255,255,0.15)'; this.style.boxShadow='0 0 0 4px rgba(165,180,252,0.15)';"
+                   onblur="if(!this.value){this.style.borderColor='rgba(255,255,255,0.15)'; this.style.background='rgba(255,255,255,0.1)'; this.style.boxShadow='none';}"
+                   oninput="heroFilter()"
+                   onkeydown="heroKeyNav(event)"
+            >
+            <kbd style="position:absolute; right:16px; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.1); color:rgba(255,255,255,0.4); padding:3px 10px; border-radius:6px; font-size:0.65rem; font-family:inherit; border:1px solid rgba(255,255,255,0.1);">
+                Ctrl+K
+            </kbd>
+        </div>
+
+        <!-- Live Search Results Dropdown -->
+        <div id="heroResults" style="
+            display:none;
+            position:absolute;
+            left:0; right:0; top:calc(100% + 6px);
+            background:#fff;
+            border-radius:14px;
+            box-shadow:0 20px 60px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05);
+            max-height:380px;
+            overflow-y:auto;
+            z-index:100;
+        ">
+            <div id="heroResultsList"></div>
+            <div id="heroEmpty" style="display:none; padding:30px; text-align:center; color:#94a3b8;">
+                <i class="bi bi-search" style="font-size:1.5rem; display:block; margin-bottom:8px; opacity:0.4;"></i>
+                <div style="font-size:0.85rem; font-weight:600;">No matching establishments</div>
+                <div style="font-size:0.72rem; margin-top:4px;">Try a different search term</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats Row inside hero -->
+    <div style="display:flex; gap:12px; margin-top:16px; position:relative; z-index:1; flex-wrap:wrap;">
+        <div style="background:rgba(255,255,255,0.08); border-radius:10px; padding:8px 16px; display:flex; align-items:center; gap:8px; border:1px solid rgba(255,255,255,0.06);">
+            <i class="bi bi-building-fill" style="color:#a5b4fc; font-size:0.9rem;"></i>
+            <div>
+                <div style="color:rgba(255,255,255,0.5); font-size:0.55rem; text-transform:uppercase; letter-spacing:0.5px;">Active</div>
+                <div style="color:#fff; font-size:1rem; font-weight:800;">{{ active_clients }}</div>
+            </div>
+        </div>
+        <div style="background:rgba(255,255,255,0.08); border-radius:10px; padding:8px 16px; display:flex; align-items:center; gap:8px; border:1px solid rgba(255,255,255,0.06);">
+            <i class="bi bi-check-circle-fill" style="color:#6ee7b7; font-size:0.9rem;"></i>
+            <div>
+                <div style="color:rgba(255,255,255,0.5); font-size:0.55rem; text-transform:uppercase; letter-spacing:0.5px;">Filed {{ current_month_name[:3] }}</div>
+                <div style="color:#fff; font-size:1rem; font-weight:800;">{{ total_filed }}<span style="font-size:0.65rem; font-weight:400; opacity:0.5;">/{{ active_clients }}</span></div>
+            </div>
+        </div>
+        <div style="background:rgba(255,255,255,0.08); border-radius:10px; padding:8px 16px; display:flex; align-items:center; gap:8px; border:1px solid rgba(255,255,255,0.06);">
+            <i class="bi bi-clock-fill" style="color:#fca5a5; font-size:0.9rem;"></i>
+            <div>
+                <div style="color:rgba(255,255,255,0.5); font-size:0.55rem; text-transform:uppercase; letter-spacing:0.5px;">Pending</div>
+                <div style="color:#fff; font-size:1rem; font-weight:800;">{{ total_pending }}</div>
+            </div>
+        </div>
+        <div style="background:rgba(255,255,255,0.08); border-radius:10px; padding:8px 16px; display:flex; align-items:center; gap:8px; border:1px solid rgba(255,255,255,0.06);">
+            <i class="bi bi-people-fill" style="color:#93c5fd; font-size:0.9rem;"></i>
+            <div>
+                <div style="color:rgba(255,255,255,0.5); font-size:0.55rem; text-transform:uppercase; letter-spacing:0.5px;">Employees</div>
+                <div style="color:#fff; font-size:1rem; font-weight:800;">{{ total_employees }}</div>
+            </div>
+        </div>
+        <div style="background:rgba(255,255,255,0.08); border-radius:10px; padding:8px 16px; display:flex; align-items:center; gap:8px; border:1px solid rgba(255,255,255,0.06);">
+            <i class="bi bi-currency-rupee" style="color:#fcd34d; font-size:0.9rem;"></i>
+            <div>
+                <div style="color:rgba(255,255,255,0.5); font-size:0.55rem; text-transform:uppercase; letter-spacing:0.5px;">Fees {{ current_month_name[:3] }}</div>
+                <div style="color:#fff; font-size:1rem; font-weight:800;">{{ "{:,.0f}".format(total_fees) }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden data source for search (JSON embedded) -->
+<script id="clientData" type="application/json">
+[
+{% for item in client_list %}
+{
+    "id": {{ item.est.id }},
+    "name": {{ item.est.display_name|tojson }},
+    "company": {{ item.est.company_name|tojson }},
+    "pf": {{ (item.est.pf_code or '')|tojson }},
+    "esic": {{ (item.est.esic_code or '')|tojson }},
+    "emps": {{ item.emp_count }},
+    "status": {{ item.status|tojson }},
+    "fee": {{ item.est.fee_amount|default(0)|tojson }},
+    "feeType": {{ (item.est.fee_type or 'M')|tojson }},
+    "service": {{ (item.est.service_type or '')|tojson }},
+    "url": "{{ url_for('establishment.select_establishment', est_id=item.est.id) }}"
+}{{ ',' if not loop.last }}
+{% endfor %}
+]
+</script>
+
+
+<!-- ==================== LICENSE EXPIRY ALERTS ==================== -->
+{% if license_alerts %}
+<div class="mb-4" style="border-radius:12px; overflow:hidden; border:1px solid #fde68a; box-shadow:0 2px 8px rgba(245,158,11,0.1);">
+    <div style="background:linear-gradient(135deg,#f59e0b,#d97706); padding:10px 18px; color:#fff; display:flex; align-items:center; justify-content:space-between;">
+        <div style="font-weight:700; font-size:0.85rem;"><i class="bi bi-exclamation-triangle-fill me-2"></i>License Expiry Alerts ({{ license_alerts|length }})</div>
+        <button type="button" class="btn btn-sm" style="background:rgba(255,255,255,0.2); color:#fff; font-size:0.65rem; border:none; border-radius:10px; padding:2px 10px;"
+                onclick="this.closest('.mb-4').querySelector('.lic-body').classList.toggle('d-none')">
+            Show/Hide
+        </button>
+    </div>
+    <div class="lic-body d-none" style="background:#fffbeb; padding:10px 18px; max-height:180px; overflow-y:auto;">
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            {% for alert in license_alerts %}
+            <div style="background:{% if alert.status == 'expired' %}#fef2f2; border-color:#fecaca;{% elif alert.status == 'critical' %}#fff7ed; border-color:#fed7aa;{% else %}#fffbeb; border-color:#fde68a;{% endif %}; border:1px solid; border-radius:8px; padding:8px 12px; min-width:220px; flex:1; max-width:320px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-size:0.72rem; font-weight:700; color:{% if alert.status == 'expired' %}#991b1b{% elif alert.status == 'critical' %}#9a3412{% else %}#92400e{% endif %};">
+                        {{ alert.license }}
+                    </div>
+                    {% if alert.status == 'expired' %}
+                    <span style="font-size:0.55rem; background:#dc2626; color:#fff; padding:1px 6px; border-radius:8px; font-weight:700;">EXPIRED</span>
+                    {% elif alert.status == 'critical' %}
+                    <span style="font-size:0.55rem; background:#ea580c; color:#fff; padding:1px 6px; border-radius:8px; font-weight:700;">{{ alert.days_left }}d LEFT</span>
+                    {% else %}
+                    <span style="font-size:0.55rem; background:#d97706; color:#fff; padding:1px 6px; border-radius:8px; font-weight:700;">{{ alert.days_left }}d LEFT</span>
+                    {% endif %}
+                </div>
+                <div style="font-size:0.68rem; color:#78716c; margin-top:2px;">
+                    {{ alert.establishment }} — {{ alert.expiry.strftime('%d-%m-%Y') }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ==================== TOP STATS ROW ==================== -->
+<div class="row g-3 mb-4">
+    <!-- Total Clients Enrolled -->
+    <div class="col-6 col-lg-3">
+        <div class="card border-0 h-100 dash-stat-card" style="background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; border-radius: 12px;">
+            <div class="card-body py-3 px-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div style="font-size: 0.7rem; text-transform: uppercase; opacity: 0.85; letter-spacing: 0.5px;">Total Clients</div>
+                        <div style="font-size: 2rem; font-weight: 700; line-height: 1.1;">{{ total_clients }}</div>
+                        <div style="font-size: 0.72rem; opacity: 0.8; margin-top: 2px;">Enrolled</div>
+                    </div>
+                    <div style="font-size: 2.2rem; opacity: 0.3;"><i class="bi bi-buildings"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filed This Month -->
+    <div class="col-6 col-lg-3">
+        <div class="card border-0 h-100 dash-stat-card" style="background: linear-gradient(135deg, #059669, #10b981); color: white; border-radius: 12px;">
+            <div class="card-body py-3 px-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div style="font-size: 0.7rem; text-transform: uppercase; opacity: 0.85; letter-spacing: 0.5px;">Filed - {{ current_month_name }}</div>
+                        <div style="font-size: 2rem; font-weight: 700; line-height: 1.1;">{{ total_filed }}</div>
+                        <div style="font-size: 0.72rem; opacity: 0.8; margin-top: 2px;">of {{ active_clients }} active</div>
+                    </div>
+                    <div style="font-size: 2.2rem; opacity: 0.3;"><i class="bi bi-check-circle"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pending This Month -->
+    <div class="col-6 col-lg-3">
+        <div class="card border-0 h-100 dash-stat-card" style="background: linear-gradient(135deg, #dc2626, #ef4444); color: white; border-radius: 12px;">
+            <div class="card-body py-3 px-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div style="font-size: 0.7rem; text-transform: uppercase; opacity: 0.85; letter-spacing: 0.5px;">Pending - {{ current_month_name }}</div>
+                        <div style="font-size: 2rem; font-weight: 700; line-height: 1.1;">{{ total_pending }}</div>
+                        <div style="font-size: 0.72rem; opacity: 0.8; margin-top: 2px;">clients remaining</div>
+                    </div>
+                    <div style="font-size: 2.2rem; opacity: 0.3;"><i class="bi bi-exclamation-triangle"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Total Fees & Other Income -->
+    <div class="col-6 col-lg-3">
+        <div class="card border-0 h-100 dash-stat-card" style="background: linear-gradient(135deg, #d97706, #f59e0b); color: white; border-radius: 12px;">
+            <div class="card-body py-3 px-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div style="width:100%;">
+                        <div style="font-size: 0.7rem; text-transform: uppercase; opacity: 0.85; letter-spacing: 0.5px;">Fees Collected</div>
+                        <div style="font-size: 1.6rem; font-weight: 700; line-height: 1.1;">{{ "₹{:,.0f}".format(total_fees) }}</div>
+                        {% if total_other_income > 0 %}
+                        <div style="margin-top:4px; background:rgba(255,255,255,0.18); border-radius:6px; padding:3px 8px; display:inline-block;">
+                            <span style="font-size:0.62rem; opacity:0.85;">Other Income:</span>
+                            <span style="font-size:0.78rem; font-weight:700;"> ₹{{ "{:,.0f}".format(total_other_income) }}</span>
+                        </div>
+                        {% endif %}
+                        <div style="font-size: 0.68rem; opacity: 0.75; margin-top: 2px;">{{ current_month_name }} {{ current_year }}</div>
+                    </div>
+                    <div style="font-size: 2.2rem; opacity: 0.3;"><i class="bi bi-currency-rupee"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== CURRENT VS LAST MONTH + OVERVIEW ==================== -->
+<div class="row g-3 mb-4">
+    <!-- Light Card: Current vs Last Month -->
+    <div class="col-md-5">
+        <div class="card border-0 h-100" style="border-radius: 14px; background: #fff; box-shadow: 0 2px 14px rgba(0,0,0,0.07);">
+            <div class="card-body py-3 px-4">
+                <h6 style="font-weight: 700; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 15px;">
+                    <i class="bi bi-pie-chart-fill text-primary me-2"></i>Current vs Last Month
+                </h6>
+                <div class="d-flex align-items-center">
+                    <!-- Donut Chart -->
+                    <div style="position: relative; width: 140px; height: 140px; flex-shrink: 0;">
+                        <canvas id="filingChart"></canvas>
+                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+                            {% set pct = ((total_filed / active_clients * 100) if active_clients > 0 else 0)|int %}
+                            <div style="font-size: 1.6rem; font-weight: 800; color: #1e293b;">{{ pct }}%</div>
+                            <div style="font-size: 0.62rem; color: #64748b;">Paid</div>
+                        </div>
+                    </div>
+
+                    <!-- Stats -->
+                    <div class="ms-4" style="flex: 1;">
+                        <!-- Current Month -->
+                        <div style="margin-bottom: 12px;">
+                            <div style="font-size: 0.72rem; color: #64748b;">Paid ({{ current_month_name }} {{ current_year }})</div>
+                            <div style="font-size: 1.1rem; font-weight: 700; margin-top: 2px;">
+                                <span style="color: #10b981;">{{ total_filed }}</span>
+                                <span style="color: #cbd5e1; font-weight: 400;"> / </span>
+                                <span style="color: #1e293b;">{{ active_clients }}</span>
+                            </div>
+                        </div>
+
+                        <hr style="border-color: #e2e8f0; margin: 8px 0;">
+
+                        <!-- vs Last Month -->
+                        <div style="margin-bottom: 10px;">
+                            <div style="font-size: 0.72rem; color: #64748b;">vs Last Month ({{ prev_month_name }} {{ prev_year }})</div>
+                            <div style="font-size: 1rem; font-weight: 700; margin-top: 2px;">
+                                <span style="color: #3b82f6;">{{ prev_filed }}</span>
+                                {% set diff = total_filed - prev_filed %}
+                                {% if diff > 0 %}
+                                    <span style="color: #10b981; font-size: 0.78rem; margin-left: 6px;"><i class="bi bi-arrow-up"></i>+{{ diff }}</span>
+                                {% elif diff < 0 %}
+                                    <span style="color: #ef4444; font-size: 0.78rem; margin-left: 6px;"><i class="bi bi-arrow-down"></i>{{ diff }}</span>
+                                {% else %}
+                                    <span style="color: #94a3b8; font-size: 0.78rem; margin-left: 6px;">+0</span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Fee Collection Change -->
+                        <div>
+                            <div style="font-size: 0.72rem; color: #64748b;">Fee Collection</div>
+                            <div style="font-size: 1rem; font-weight: 700; margin-top: 2px;">
+                                <span style="color: #d97706;">{{ "₹{:,.0f}".format(total_fees) }}</span>
+                                {% set fee_diff = total_fees - prev_fees %}
+                                {% if fee_diff > 0 %}
+                                    <span style="color: #10b981; font-size: 0.75rem; margin-left: 6px;">+₹{{ "{:,.0f}".format(fee_diff) }}</span>
+                                {% elif fee_diff < 0 %}
+                                    <span style="color: #ef4444; font-size: 0.75rem; margin-left: 6px;">-₹{{ "{:,.0f}".format(fee_diff|abs) }}</span>
+                                {% else %}
+                                    <span style="color: #94a3b8; font-size: 0.75rem; margin-left: 6px;">+₹0</span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Other Income (if any) -->
+                        {% if total_other_income > 0 or prev_other_income > 0 %}
+                        <div style="margin-top:6px;">
+                            <div style="font-size: 0.72rem; color: #64748b;">Other Income</div>
+                            <div style="font-size: 0.92rem; font-weight: 700; margin-top: 2px;">
+                                <span style="color: #7c3aed;">{{ "₹{:,.0f}".format(total_other_income) }}</span>
+                                {% set oi_diff = total_other_income - prev_other_income %}
+                                {% if oi_diff > 0 %}
+                                    <span style="color: #10b981; font-size: 0.72rem; margin-left: 6px;">+₹{{ "{:,.0f}".format(oi_diff) }}</span>
+                                {% elif oi_diff < 0 %}
+                                    <span style="color: #ef4444; font-size: 0.72rem; margin-left: 6px;">-₹{{ "{:,.0f}".format(oi_diff|abs) }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active / Inactive + Quick Actions -->
+    <div class="col-md-7">
+        <div class="card border-0 h-100" style="border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06);">
+            <div class="card-body">
+                <h6 style="font-weight: 600; color: #334155; font-size: 0.85rem; margin-bottom: 15px;">
+                    <i class="bi bi-bar-chart-fill text-primary me-2"></i>Client Overview
+                </h6>
+                <div class="row g-3 mb-3">
+                    <div class="col-4">
+                        <div class="dash-overview-mini" style="padding: 14px; background: #ecfdf5; border-radius: 10px; border-left: 4px solid #10b981;">
+                            <div style="font-size: 0.68rem; color: #065f46; text-transform: uppercase; letter-spacing: 0.5px;">Active</div>
+                            <div style="font-size: 1.6rem; font-weight: 700; color: #059669;">{{ active_clients }}</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="dash-overview-mini" style="padding: 14px; background: #fef2f2; border-radius: 10px; border-left: 4px solid #ef4444;">
+                            <div style="font-size: 0.68rem; color: #991b1b; text-transform: uppercase; letter-spacing: 0.5px;">Inactive</div>
+                            <div style="font-size: 1.6rem; font-weight: 700; color: #dc2626;">{{ inactive_clients }}</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="dash-overview-mini" style="padding: 14px; background: #eff6ff; border-radius: 10px; border-left: 4px solid #3b82f6;">
+                            <div style="font-size: 0.68rem; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px;">Employees</div>
+                            <div style="font-size: 1.6rem; font-weight: 700; color: #2563eb;">{{ total_employees }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="{{ url_for('employee.employee_add') }}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-person-plus me-1"></i>Add Employee
+                    </a>
+                    <a href="{{ url_for('employee.employee_list') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-people me-1"></i>All Employees
+                    </a>
+                    <a href="{{ url_for('accounts.accounts_home') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-book-half me-1"></i>Accounts
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== CURRENT MONTH WORK PROGRESS ==================== -->
+{% if cur_month_draft > 0 or cur_month_processing > 0 or cur_month_finalized > 0 %}
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card border-0 dash-progress-card" style="border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,0.06); overflow:hidden;">
+            <div class="card-body py-3 px-4">
+                <h6 class="dash-section-header" style="margin-bottom:12px;">
+                    <i class="bi bi-clipboard2-pulse text-primary me-2"></i>Current Month Progress — {{ cur_month_name }} {{ cur_year }}
+                </h6>
+                <div class="row g-3">
+                    <div class="col-4">
+                        <div style="padding:12px; background:#fefce8; border-radius:10px; border-left:4px solid #eab308; text-align:center;">
+                            <div style="font-size:0.65rem; color:#854d0e; text-transform:uppercase; font-weight:600; letter-spacing:0.5px;">Draft</div>
+                            <div style="font-size:1.8rem; font-weight:800; color:#ca8a04;">{{ cur_month_draft }}</div>
+                            <div style="font-size:0.62rem; color:#a16207;">salary sheets created</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div style="padding:12px; background:#fff7ed; border-radius:10px; border-left:4px solid #f97316; text-align:center;">
+                            <div style="font-size:0.65rem; color:#9a3412; text-transform:uppercase; font-weight:600; letter-spacing:0.5px;">Processing</div>
+                            <div style="font-size:1.8rem; font-weight:800; color:#ea580c;">{{ cur_month_processing }}</div>
+                            <div style="font-size:0.62rem; color:#c2410c;">being calculated</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div style="padding:12px; background:#ecfdf5; border-radius:10px; border-left:4px solid #10b981; text-align:center;">
+                            <div style="font-size:0.65rem; color:#065f46; text-transform:uppercase; font-weight:600; letter-spacing:0.5px;">Finalized</div>
+                            <div style="font-size:1.8rem; font-weight:800; color:#059669;">{{ cur_month_finalized }}</div>
+                            <div style="font-size:0.62rem; color:#047857;">ready for filing</div>
+                        </div>
+                    </div>
+                </div>
+                {% set cur_total = cur_month_draft + cur_month_processing + cur_month_finalized %}
+                {% if cur_total > 0 %}
+                <div style="margin-top:10px; background:#f1f5f9; border-radius:8px; height:8px; overflow:hidden;">
+                    {% set fin_pct = (cur_month_finalized / cur_total * 100)|int %}
+                    {% set proc_pct = (cur_month_processing / cur_total * 100)|int %}
+                    {% set draft_pct = 100 - fin_pct - proc_pct %}
+                    <div style="display:flex; height:100%;">
+                        {% if fin_pct > 0 %}<div style="width:{{ fin_pct }}%; background:#10b981;"></div>{% endif %}
+                        {% if proc_pct > 0 %}<div style="width:{{ proc_pct }}%; background:#f97316;"></div>{% endif %}
+                        {% if draft_pct > 0 %}<div style="width:{{ draft_pct }}%; background:#eab308;"></div>{% endif %}
+                    </div>
+                </div>
+                <div style="font-size:0.62rem; color:#64748b; margin-top:4px; text-align:right;">
+                    {{ cur_total }} payroll(s) started for {{ cur_month_name }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ==================== ACCOUNTS SUMMARY ==================== -->
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card border-0 dash-progress-card" style="border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,0.06); overflow:hidden;">
+            <div class="card-header bg-white py-2 px-4 d-flex justify-content-between align-items-center" style="border-bottom:2px solid #e2e8f0;">
+                <h6 class="dash-section-header" style="margin:0;">
+                    <i class="bi bi-journal-bookmark-fill text-primary me-2"></i>Accounts Summary (FY {{ accounts_fy }})
+                </h6>
+                <a href="{{ url_for('accounts.accounts_home') }}" class="btn btn-sm btn-outline-primary" style="font-size:0.68rem;">
+                    <i class="bi bi-arrow-right me-1"></i>Open Accounts
+                </a>
+            </div>
+            <div class="card-body py-3 px-4">
+                <div class="row g-3">
+                    <div class="col-6 col-md-2">
+                        <div style="text-align:center;">
+                            <div style="font-size:0.58rem; color:#64748b; text-transform:uppercase; font-weight:600;">Total Income</div>
+                            <div style="font-size:1.1rem; font-weight:800; color:#059669;">{{ "{:,.0f}".format(acc_total_income) }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <div style="text-align:center;">
+                            <div style="font-size:0.58rem; color:#64748b; text-transform:uppercase; font-weight:600;">Net Profit</div>
+                            <div style="font-size:1.1rem; font-weight:800; color:{% if acc_net_profit >= 0 %}#16a34a{% else %}#dc2626{% endif %};">{{ "{:,.0f}".format(acc_net_profit) }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <div style="text-align:center;">
+                            <div style="font-size:0.58rem; color:#64748b; text-transform:uppercase; font-weight:600;">Bank Balance</div>
+                            <div style="font-size:1.1rem; font-weight:800; color:#2563eb;">{{ "{:,.0f}".format(acc_bank_balance) }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <div style="text-align:center;">
+                            <div style="font-size:0.58rem; color:#64748b; text-transform:uppercase; font-weight:600;">EPF Pending</div>
+                            <div style="font-size:1.1rem; font-weight:800; color:#dc2626;">{{ "{:,.0f}".format(acc_epf_pending) }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <div style="text-align:center;">
+                            <div style="font-size:0.58rem; color:#64748b; text-transform:uppercase; font-weight:600;">ESIC Pending</div>
+                            <div style="font-size:1.1rem; font-weight:800; color:#dc2626;">{{ "{:,.0f}".format(acc_esic_pending) }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <div style="text-align:center;">
+                            <div style="font-size:0.58rem; color:#64748b; text-transform:uppercase; font-weight:600;">TDS Receivable</div>
+                            <div style="font-size:1.1rem; font-weight:800; color:#92400e;">{{ "{:,.0f}".format(acc_tds_balance) }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== CLIENT LIST (Compact — hero search is primary) ==================== -->
+<div class="card border-0 mb-4" style="border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06);">
+    <div class="card-header bg-white py-2 px-4 d-flex align-items-center justify-content-between" style="border-radius:12px 12px 0 0; border-bottom:2px solid #e2e8f0;">
+        <h6 class="dash-section-header" style="margin:0;">
+            <i class="bi bi-list-columns-reverse text-primary me-2"></i>All Clients — {{ current_month_name }} {{ current_year }}
+        </h6>
+        <div class="d-flex align-items-center gap-2">
+            <div class="input-group input-group-sm" style="width:260px;">
+                <span class="input-group-text bg-white border-end-0" style="border-radius:8px 0 0 8px;"><i class="bi bi-filter"></i></span>
+                <input type="text" id="clientSearch" class="form-control border-start-0" placeholder="Filter table..." onkeyup="filterClients()" style="border-radius:0 8px 8px 0;">
+            </div>
+            <span class="badge bg-primary bg-opacity-10 text-primary" style="font-size:0.72rem; border-radius:20px; padding:4px 12px;">{{ client_list|length }}</span>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        {% if client_list %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" style="font-size: 0.82rem;">
+                <thead style="background: #f8fafc;">
+                    <tr>
+                        <th style="min-width: 200px;">Client Name</th>
+                        <th>EPF / ESIC Code</th>
+                        <th>Employees</th>
+                        <th>EPF Login</th>
+                        <th>ESIC Login</th>
+                        <th class="text-center">{{ current_month_name }} Status</th>
+                        <th>Fee</th>
+                        <th class="text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="clientTableBody">
+                    {% for item in client_list %}
+                    <tr class="client-row"
+                        data-name="{{ item.est.display_name|lower }}"
+                        data-pf="{{ (item.est.pf_code or '')|lower }}"
+                        data-esic="{{ (item.est.esic_code or '')|lower }}">
+                        <td>
+                            <a href="{{ url_for('establishment.select_establishment', est_id=item.est.id) }}"
+                               class="text-decoration-none fw-semibold" style="color: #4f46e5;">
+                                {{ item.est.display_name }}
+                            </a>
+                            {% if item.est.service_type == 'With Records' %}
+                                <span class="badge bg-primary ms-1" style="font-size: 0.6rem; vertical-align: middle;">REC</span>
+                            {% else %}
+                                <span class="badge bg-secondary ms-1" style="font-size: 0.6rem; vertical-align: middle;">RET</span>
+                            {% endif %}
+                        </td>
+                        <td style="font-size: 0.75rem; color: #64748b;">
+                            {% if item.est.pf_code %}
+                                {{ item.est.pf_code }}
+                            {% elif item.est.esic_code %}
+                                {{ item.est.esic_code }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-light text-dark">{{ item.emp_count }}</span>
+                        </td>
+                        <td style="font-size: 0.72rem;">
+                            {% if item.epf_cred %}
+                                <span class="text-muted" title="{{ item.epf_cred.username }}">{{ item.epf_cred.username[:20] }}{% if item.epf_cred.username|length > 20 %}...{% endif %}</span>
+                                <br><span class="text-muted" style="font-size: 0.65rem;">{{ item.epf_cred.password }}</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td style="font-size: 0.72rem;">
+                            {% if item.esic_cred %}
+                                <span class="text-muted" title="{{ item.esic_cred.username }}">{{ item.esic_cred.username[:20] }}{% if item.esic_cred.username|length > 20 %}...{% endif %}</span>
+                                <br><span class="text-muted" style="font-size: 0.65rem;">{{ item.esic_cred.password }}</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if item.status == 'filed' %}
+                                <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Filed</span>
+                            {% elif item.status == 'processing' %}
+                                <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split me-1"></i>In Progress</span>
+                            {% else %}
+                                <span class="badge bg-danger"><i class="bi bi-clock me-1"></i>Pending</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.est.fee_amount %}
+                                {{ "₹{:,.0f}".format(item.est.fee_amount) }}
+                                <span style="font-size: 0.6rem; color: #94a3b8;">/{{ (item.est.fee_type or 'M')[:1] }}</span>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <a href="{{ url_for('establishment.select_establishment', est_id=item.est.id) }}"
+                               class="btn btn-sm btn-primary" style="font-size: 0.72rem; padding: 3px 10px;">
+                                Open <i class="bi bi-arrow-right ms-1"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <div style="font-size: 3rem; color: #cbd5e1;"><i class="bi bi-buildings"></i></div>
+            <h5 class="mt-3">No Active Clients</h5>
+            <p class="text-muted">Add your first establishment to get started.</p>
+            <a href="{{ url_for('establishment.establishment_add') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-2"></i>Add Client
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Chart.js for donut chart -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// Donut Chart — Light Theme
+const ctx = document.getElementById('filingChart');
+if (ctx) {
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Filed', 'Pending'],
+            datasets: [{
+                data: [{{ total_filed }}, {{ total_pending if total_pending > 0 else (1 if total_filed == 0 else 0) }}],
+                backgroundColor: ['#10b981', '#fca5a5'],
+                borderWidth: 3,
+                borderColor: '#fff',
+                cutout: '70%'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: { legend: { display: false }, tooltip: { enabled: true } },
+            animation: { animateRotate: true, duration: 1200 }
+        }
+    });
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  HERO SEARCH — Dynamic instant search for establishments
+// ════════════════════════════════════════════════════════════════════
+var _heroClients = [];
+try { _heroClients = JSON.parse(document.getElementById('clientData').textContent); } catch(e){}
+
+var _heroIdx = -1;  // Keyboard navigation index
+
+function heroFilter() {
+    var input = document.getElementById('heroSearchInput');
+    var q = input.value.trim().toLowerCase();
+    var resultsBox = document.getElementById('heroResults');
+    var listEl = document.getElementById('heroResultsList');
+    var emptyEl = document.getElementById('heroEmpty');
+
+    _heroIdx = -1;
+
+    if (!q) {
+        resultsBox.style.display = 'none';
+        return;
+    }
+
+    // Filter clients
+    var matches = _heroClients.filter(function(c) {
+        return c.name.toLowerCase().indexOf(q) >= 0 ||
+               c.pf.toLowerCase().indexOf(q) >= 0 ||
+               c.esic.toLowerCase().indexOf(q) >= 0 ||
+               c.company.toLowerCase().indexOf(q) >= 0;
+    });
+
+    resultsBox.style.display = 'block';
+
+    if (matches.length === 0) {
+        listEl.innerHTML = '';
+        emptyEl.style.display = 'block';
+        return;
+    }
+
+    emptyEl.style.display = 'none';
+
+    // Build result items
+    var html = '';
+    matches.forEach(function(c, i) {
+        var statusBadge = '';
+        if (c.status === 'filed') {
+            statusBadge = '<span style="background:#dcfce7; color:#16a34a; padding:2px 8px; border-radius:6px; font-size:0.62rem; font-weight:700;">FILED</span>';
+        } else if (c.status === 'processing') {
+            statusBadge = '<span style="background:#fef3c7; color:#b45309; padding:2px 8px; border-radius:6px; font-size:0.62rem; font-weight:700;">IN PROGRESS</span>';
+        } else {
+            statusBadge = '<span style="background:#fee2e2; color:#dc2626; padding:2px 8px; border-radius:6px; font-size:0.62rem; font-weight:700;">PENDING</span>';
+        }
+
+        var serviceBadge = c.service === 'With Records'
+            ? '<span style="background:#ede9fe; color:#7c3aed; padding:1px 6px; border-radius:4px; font-size:0.58rem; font-weight:600;">REC</span>'
+            : '<span style="background:#f1f5f9; color:#64748b; padding:1px 6px; border-radius:4px; font-size:0.58rem; font-weight:600;">RET</span>';
+
+        var branchBadge = '';
+
+        var feeText = c.fee ? String.fromCharCode(8377) + Number(c.fee).toLocaleString('en-IN') + '/' + c.feeType.charAt(0) : '';
+
+        // Highlight matching text
+        var displayName = c.name.replace(new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi'), '<mark style="background:#c7d2fe; padding:0 2px; border-radius:2px;">$1</mark>');
+
+        html += '<a href="' + c.url + '" class="hero-result-item" data-index="' + i + '" style="' +
+            'display:flex; align-items:center; padding:12px 20px; text-decoration:none; color:inherit;' +
+            'border-bottom:1px solid #f1f5f9; transition:background 0.15s;' +
+            'cursor:pointer;' +
+        '">' +
+            '<div style="width:40px; height:40px; border-radius:10px; background:linear-gradient(135deg,#4f46e5,#7c3aed); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.85rem; flex-shrink:0;">' +
+                c.name.charAt(0).toUpperCase() +
+            '</div>' +
+            '<div style="flex:1; margin-left:14px; min-width:0;">' +
+                '<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">' +
+                    '<span style="font-weight:700; font-size:0.88rem; color:#1e293b;">' + displayName + '</span>' +
+                    serviceBadge + branchBadge +
+                '</div>' +
+                '<div style="display:flex; align-items:center; gap:10px; margin-top:3px; font-size:0.72rem; color:#94a3b8;">' +
+                    (c.pf ? '<span><i class="bi bi-shield-check me-1"></i>' + c.pf + '</span>' : '') +
+                    (c.esic ? '<span><i class="bi bi-heart-pulse me-1"></i>' + c.esic + '</span>' : '') +
+                    '<span><i class="bi bi-people me-1"></i>' + c.emps + ' emp</span>' +
+                    (feeText ? '<span><i class="bi bi-currency-rupee me-1"></i>' + feeText + '</span>' : '') +
+                '</div>' +
+            '</div>' +
+            '<div style="display:flex; align-items:center; gap:10px; flex-shrink:0; margin-left:12px;">' +
+                statusBadge +
+                '<i class="bi bi-arrow-right" style="color:#cbd5e1; font-size:1rem;"></i>' +
+            '</div>' +
+        '</a>';
+    });
+
+    listEl.innerHTML = html;
+
+    // Add hover effects
+    listEl.querySelectorAll('.hero-result-item').forEach(function(el) {
+        el.addEventListener('mouseenter', function() {
+            el.style.background = '#f8fafc';
+            _heroIdx = parseInt(el.dataset.index);
+            _heroHighlight();
+        });
+        el.addEventListener('mouseleave', function() {
+            el.style.background = '';
+        });
+    });
+}
+
+// Keyboard navigation: Up/Down arrows + Enter
+function heroKeyNav(e) {
+    var resultsBox = document.getElementById('heroResults');
+    if (resultsBox.style.display === 'none') return;
+
+    var items = resultsBox.querySelectorAll('.hero-result-item');
+    if (!items.length) return;
+
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        _heroIdx = Math.min(_heroIdx + 1, items.length - 1);
+        _heroHighlight();
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        _heroIdx = Math.max(_heroIdx - 1, 0);
+        _heroHighlight();
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (_heroIdx >= 0 && _heroIdx < items.length) {
+            window.location.href = items[_heroIdx].getAttribute('href');
+        } else if (items.length === 1) {
+            // Auto-select if only one match
+            window.location.href = items[0].getAttribute('href');
+        }
+    } else if (e.key === 'Escape') {
+        resultsBox.style.display = 'none';
+        document.getElementById('heroSearchInput').blur();
+    }
+}
+
+function _heroHighlight() {
+    var items = document.querySelectorAll('#heroResultsList .hero-result-item');
+    items.forEach(function(el, i) {
+        if (i === _heroIdx) {
+            el.style.background = '#eef2ff';
+            el.scrollIntoView({block:'nearest'});
+        } else {
+            el.style.background = '';
+        }
+    });
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    var hero = document.getElementById('heroSearch');
+    if (hero && !hero.contains(e.target)) {
+        document.getElementById('heroResults').style.display = 'none';
+    }
+});
+
+// Ctrl+K keyboard shortcut to focus search
+document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        var inp = document.getElementById('heroSearchInput');
+        if (inp) {
+            inp.focus();
+            inp.select();
+            window.scrollTo({top:0, behavior:'smooth'});
+        }
+    }
+});
+
+// Auto-focus search on page load
+document.addEventListener('DOMContentLoaded', function() {
+    var inp = document.getElementById('heroSearchInput');
+    if (inp) {
+        // Small delay so page renders first
+        setTimeout(function(){ inp.focus(); }, 300);
+    }
+});
+
+// ════════════════════════════════════════════════════════════════════
+//  TABLE FILTER — for the bottom client table
+// ════════════════════════════════════════════════════════════════════
+function filterClients() {
+    var search = document.getElementById('clientSearch').value.toLowerCase();
+    document.querySelectorAll('.client-row').forEach(function(row) {
+        var name = row.dataset.name;
+        var pf = row.dataset.pf;
+        var esic = row.dataset.esic;
+        row.style.display = (name.indexOf(search) >= 0 || pf.indexOf(search) >= 0 || esic.indexOf(search) >= 0) ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}

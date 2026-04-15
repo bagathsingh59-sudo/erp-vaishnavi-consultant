@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Income Register — {{ fy_label }}{% endblock %}
+{% block page_header %}Income Register{% endblock %}
+
+{% block content %}
+<div style="max-width:1100px; margin:0 auto;">
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb" style="font-size:0.78rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('accounts.accounts_home') }}" class="text-decoration-none">Accounts</a></li>
+        <li class="breadcrumb-item active">Income Register — {{ fy_label }}</li>
+    </ol>
+</nav>
+<div class="table-container">
+    <div class="table-header" style="background:#059669;">
+        <div class="table-title" style="color:#fff;"><i class="bi bi-currency-rupee"></i> Income Register (Month-wise) <span style="font-size:0.65rem; opacity:0.8; margin-left:8px;">FY {{ fy_label }}</span></div>
+        <button onclick="window.print()" class="btn btn-sm btn-light no-print" style="font-size:0.68rem;"><i class="bi bi-printer me-1"></i>Print</button>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" style="font-size:0.72rem;">
+            <thead>
+                <tr style="background:#f8fafc;">
+                    <th style="width:90px;">Month</th>
+                    {% for acct in income_accounts %}
+                    <th style="text-align:right; font-size:0.65rem;">{{ acct.name }}</th>
+                    {% endfor %}
+                    <th style="text-align:right; font-weight:700; width:100px;">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td style="font-weight:600;">{{ row.month }}</td>
+                    {% for acct in income_accounts %}
+                    <td style="text-align:right;">{% if row.amounts[acct.id] %}{{ "{:,.0f}".format(row.amounts[acct.id]) }}{% else %}—{% endif %}</td>
+                    {% endfor %}
+                    <td style="text-align:right; font-weight:700;">{% if row.total %}{{ "{:,.0f}".format(row.total) }}{% else %}—{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="background:#dcfce7; font-weight:700; border-top:2px solid #059669; font-size:0.78rem;">
+                    <td>Grand Total</td>
+                    {% for acct in income_accounts %}
+                    <td style="text-align:right;">{{ "{:,.0f}".format(grand_totals[acct.id]) }}</td>
+                    {% endfor %}
+                    <td style="text-align:right; font-size:0.88rem;">{{ "{:,.0f}".format(grand_total) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+</div>
+{% endblock %}

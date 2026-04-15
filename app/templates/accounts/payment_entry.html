@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}{% if edit_mode is defined and edit_mode %}Edit {{ voucher.voucher_number }}{% else %}Payment Entry{% endif %}{% endblock %}
+{% block page_header %}{% if edit_mode is defined and edit_mode %}Edit Payment — {{ voucher.voucher_number }}{% else %}Payment Entry{% endif %}{% endblock %}
+
+{% block content %}
+<div style="max-width:650px; margin:0 auto;">
+
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb" style="font-size:0.78rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('accounts.accounts_home') }}" class="text-decoration-none">Accounts</a></li>
+        <li class="breadcrumb-item active">Payment Entry</li>
+    </ol>
+</nav>
+
+<!-- Pending Liability Cards -->
+<div class="d-flex gap-3 mb-3 flex-wrap">
+    {% if pending_epf > 0 %}
+    <div style="flex:1; min-width:200px; background:linear-gradient(135deg,#fef3c7,#fde68a); border-radius:8px; padding:12px 16px; border-left:4px solid #f59e0b;">
+        <div style="font-size:0.62rem; font-weight:600; color:#92400e; text-transform:uppercase;">EPF Payable — Pending</div>
+        <div style="font-size:1.3rem; font-weight:800; color:#92400e;">{{ "{:,.0f}".format(pending_epf) }}</div>
+        <div style="font-size:0.58rem; color:#a16207;">Collected but not yet paid to EPFO</div>
+    </div>
+    {% elif pending_epf < 0 %}
+    <div style="flex:1; min-width:200px; background:linear-gradient(135deg,#fef2f2,#fecaca); border-radius:8px; padding:12px 16px; border-left:4px solid #dc2626;">
+        <div style="font-size:0.62rem; font-weight:600; color:#991b1b; text-transform:uppercase;">EPF Payable — OVERPAID</div>
+        <div style="font-size:1.3rem; font-weight:800; color:#dc2626;">{{ "{:,.0f}".format(pending_epf|abs) }} <span style="font-size:0.65rem;">Excess</span></div>
+        <div style="font-size:0.58rem; color:#b91c1c;">Paid more than collected — please verify entries</div>
+    </div>
+    {% else %}
+    <div style="flex:1; min-width:200px; background:linear-gradient(135deg,#f0fdf4,#dcfce7); border-radius:8px; padding:12px 16px; border-left:4px solid #16a34a;">
+        <div style="font-size:0.62rem; font-weight:600; color:#166534; text-transform:uppercase;">EPF Payable</div>
+        <div style="font-size:1.3rem; font-weight:800; color:#16a34a;">NIL</div>
+        <div style="font-size:0.58rem; color:#15803d;">All EPF payments cleared</div>
+    </div>
+    {% endif %}
+
+    {% if pending_esic > 0 %}
+    <div style="flex:1; min-width:200px; background:linear-gradient(135deg,#fce7f3,#fbcfe8); border-radius:8px; padding:12px 16px; border-left:4px solid #ec4899;">
+        <div style="font-size:0.62rem; font-weight:600; color:#9d174d; text-transform:uppercase;">ESIC Payable — Pending</div>
+        <div style="font-size:1.3rem; font-weight:800; color:#9d174d;">{{ "{:,.0f}".format(pending_esic) }}</div>
+        <div style="font-size:0.58rem; color:#be185d;">Collected but not yet paid to ESIC</div>
+    </div>
+    {% elif pending_esic < 0 %}
+    <div style="flex:1; min-width:200px; background:linear-gradient(135deg,#fef2f2,#fecaca); border-radius:8px; padding:12px 16px; border-left:4px solid #dc2626;">
+        <div style="font-size:0.62rem; font-weight:600; color:#991b1b; text-transform:uppercase;">ESIC Payable — OVERPAID</div>
+        <div style="font-size:1.3rem; font-weight:800; color:#dc2626;">{{ "{:,.0f}".format(pending_esic|abs) }} <span style="font-size:0.65rem;">Excess</span></div>
+        <div style="font-size:0.58rem; color:#b91c1c;">Paid more than collected — please verify entries</div>
+    </div>
+    {% else %}
+    <div style="flex:1; min-width:200px; background:linear-gradient(135deg,#f0fdf4,#dcfce7); border-radius:8px; padding:12px 16px; border-left:4px solid #16a34a;">
+        <div style="font-size:0.62rem; font-weight:600; color:#166534; text-transform:uppercase;">ESIC Payable</div>
+        <div style="font-size:1.3rem; font-weight:800; color:#16a34a;">NIL</div>
+        <div style="font-size:0.58rem; color:#15803d;">All ESIC payments cleared</div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="table-container">
+    <div class="table-header" style="background:linear-gradient(135deg,#dc2626,#ef4444);">
+        <div class="table-title" style="color:#fff;"><i class="bi bi-send"></i> Payment — EPF / ESIC / Other</div>
+    </div>
+    <form method="POST" action="{% if edit_mode is defined and edit_mode %}{{ url_for('accounts.edit_voucher', voucher_id=voucher.id) }}{% endif %}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div style="padding:16px 20px;">
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">Date</label>
+                    <input type="date" name="voucher_date" class="form-control form-control-sm" value="{{ (ed.voucher_date if edit_mode is defined and edit_mode else today).strftime('%Y-%m-%d') if (ed is defined and ed.voucher_date) or today else '' }}" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">Pay From (Bank)</label>
+                    <select name="bank_account_id" class="form-select form-select-sm" required>
+                        {% for bank in bank_accounts %}
+                        <option value="{{ bank.id }}" {% if ed is defined and ed.bank_id == bank.id %}selected{% endif %}>{{ bank.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">Pay To (Account)</label>
+                    <select name="pay_to_account_id" class="form-select form-select-sm" required>
+                        {% for acct in pay_to_accounts %}
+                        <option value="{{ acct.id }}" {% if ed is defined and ed.pay_to_id == acct.id %}selected{% endif %}>{{ acct.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:700; color:#dc2626;">Amount (₹)</label>
+                    <input type="number" name="amount" class="form-control" required min="1" step="1" placeholder="0" style="font-size:1.1rem; font-weight:700;" value="{% if ed is defined %}{{ ed.amount|int }}{% endif %}">
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">Wage Month</label>
+                    <select id="pv_month" class="form-select form-select-sm" onchange="pvNarration()">
+                        <option value="">—</option>
+                        {% for m in range(1,13) %}
+                        <option value="{{ m }}">{{ ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">Year</label>
+                    <input type="number" id="pv_year" class="form-control form-control-sm" value="2026" min="2024" max="2030" onchange="pvNarration()">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">TRRN / Challan / Reference</label>
+                    <input type="text" name="reference" class="form-control form-control-sm" placeholder="e.g., TRRN2026031500123" value="{% if ed is defined %}{{ ed.reference }}{% endif %}">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label" style="font-size:0.72rem; font-weight:600;">Narration</label>
+                <input type="text" name="narration" id="pv_narration" class="form-control form-control-sm" placeholder="e.g., Feb 2026 EPF Payment" value="{% if ed is defined %}{{ ed.narration }}{% endif %}">
+            </div>
+
+            <div class="d-flex justify-content-between mt-4">
+                <a href="{{ url_for('accounts.accounts_home') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i>Back
+                </a>
+                {% if edit_mode is defined and edit_mode %}
+                <button type="submit" class="btn btn-warning">
+                    <i class="bi bi-pencil-square me-1"></i> Update Payment
+                </button>
+                {% else %}
+                <button type="submit" class="btn btn-danger">
+                    <i class="bi bi-send me-1"></i> Record Payment
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var monthNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function pvNarration(){
+    var month = document.getElementById('pv_month').value;
+    var year = document.getElementById('pv_year').value;
+    var acctSel = document.querySelector('[name="pay_to_account_id"]');
+    var acctName = acctSel.options[acctSel.selectedIndex] ? acctSel.options[acctSel.selectedIndex].text : '';
+    if(month && year){
+        document.getElementById('pv_narration').value = monthNames[parseInt(month)] + '-' + year + ' ' + acctName + ' Payment';
+    }
+}
+document.querySelector('[name="pay_to_account_id"]').addEventListener('change', pvNarration);
+</script>
+{% endblock %}

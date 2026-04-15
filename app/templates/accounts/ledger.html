@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}{{ account.name }} — Ledger{% endblock %}
+{% block page_header %}Account Ledger{% endblock %}
+
+{% block content %}
+<div style="max-width:1000px; margin:0 auto;">
+
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb" style="font-size:0.78rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('accounts.accounts_home') }}" class="text-decoration-none">Accounts</a></li>
+        <li class="breadcrumb-item active">{{ account.name }}</li>
+    </ol>
+</nav>
+
+<div class="table-container">
+    <div class="table-header">
+        <div class="table-title"><i class="bi bi-journal-bookmark"></i> {{ account.name }}
+            <span style="font-size:0.65rem; color:#94a3b8; font-weight:400; margin-left:8px;">{{ account.group.name }} | {{ fy_label }}</span>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" style="font-size:0.75rem;">
+            <thead>
+                <tr style="background:#f8fafc;">
+                    <th style="width:90px;">Date</th>
+                    <th style="width:75px;">Voucher</th>
+                    <th>Particulars</th>
+                    <th style="width:100px; text-align:right;">Debit (₹)</th>
+                    <th style="width:100px; text-align:right;">Credit (₹)</th>
+                    <th style="width:120px; text-align:right;">Balance (₹)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Opening Balance -->
+                <tr style="background:#f0fdf4; font-weight:600;">
+                    <td></td>
+                    <td></td>
+                    <td>Opening Balance</td>
+                    <td style="text-align:right;">{% if opening_type == 'Dr' and opening_balance > 0 %}{{ "{:,.0f}".format(opening_balance) }}{% endif %}</td>
+                    <td style="text-align:right;">{% if opening_type == 'Cr' and opening_balance > 0 %}{{ "{:,.0f}".format(opening_balance) }}{% endif %}</td>
+                    <td style="text-align:right;">{{ "{:,.0f}".format(opening_balance) }} {{ opening_type }}</td>
+                </tr>
+                {% for row in ledger_rows %}
+                <tr>
+                    <td>{{ row.date.strftime('%d-%m-%Y') }}</td>
+                    <td>
+                        {% if row.voucher.voucher_type in ('receipt', 'part_payment') %}
+                        <span class="badge bg-success bg-opacity-10 text-success" style="font-size:0.6rem;">{{ row.voucher.voucher_number }}{% if row.voucher.voucher_type == 'part_payment' %} <small>(Part)</small>{% endif %}</span>
+                        {% elif row.voucher.voucher_type == 'payment' %}
+                        <span class="badge bg-danger bg-opacity-10 text-danger" style="font-size:0.6rem;">{{ row.voucher.voucher_number }}</span>
+                        {% else %}
+                        <span class="badge bg-info bg-opacity-10 text-info" style="font-size:0.6rem;">{{ row.voucher.voucher_number }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ row.particulars or '—' }}</td>
+                    <td style="text-align:right; {% if row.debit %}font-weight:600;{% endif %}">{% if row.debit %}{{ "{:,.0f}".format(row.debit) }}{% endif %}</td>
+                    <td style="text-align:right; {% if row.credit %}font-weight:600;{% endif %}">{% if row.credit %}{{ "{:,.0f}".format(row.credit) }}{% endif %}</td>
+                    <td style="text-align:right; font-weight:600;">{{ "{:,.0f}".format(row.balance) }} {{ row.balance_type }}</td>
+                </tr>
+                {% endfor %}
+                {% if not ledger_rows %}
+                <tr><td colspan="6" class="text-center text-muted py-3">No transactions in this period.</td></tr>
+                {% endif %}
+            </tbody>
+            <tfoot>
+                <tr style="background:#f1f5f9; font-weight:700; border-top:2px solid #1e293b;">
+                    <td colspan="3" style="text-align:right;">Closing Balance</td>
+                    <td></td>
+                    <td></td>
+                    <td style="text-align:right; font-size:0.88rem; color:#1e293b;">{{ "{:,.0f}".format(closing_balance) }} {{ closing_type }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+</div>
+{% endblock %}

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pay Slips — Professional | {{ est.company_name }} | {{ payroll.period_display }}</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 10mm 12mm;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 11px;
+            color: #1a1a2e;
+            background: #fff;
+        }
+
+        .slip {
+            width: 100%;
+            border: 1.5px solid #2c3e7a;
+            border-radius: 6px;
+            overflow: hidden;
+            page-break-inside: avoid;
+            margin-bottom: 14px;
+        }
+        /* 2 slips per page */
+        .slip:nth-child(2n) { page-break-after: always; }
+        .slip:last-child { page-break-after: avoid; }
+
+        /* Header band */
+        .slip-top {
+            background: linear-gradient(135deg, #1e3a6e, #2c5aa0);
+            color: #fff;
+            padding: 8px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .slip-top .company-name {
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+        .slip-top .month-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 3px 12px;
+            border-radius: 12px;
+            font-size: 10.5px;
+            font-weight: 600;
+        }
+        .slip-subtitle {
+            background: #eef2f9;
+            padding: 3px 14px;
+            font-size: 9px;
+            color: #4a5568;
+            border-bottom: 1px solid #d0d8e8;
+        }
+
+        /* Employee info grid */
+        .emp-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+            padding: 0;
+            border-bottom: 1.5px solid #2c3e7a;
+        }
+        .emp-info .info-item {
+            padding: 4px 14px;
+            border-bottom: 1px solid #e8ecf2;
+            font-size: 10.5px;
+            display: flex;
+        }
+        .emp-info .info-item:nth-child(odd) {
+            border-right: 1px solid #e8ecf2;
+        }
+        .emp-info .lbl {
+            color: #6b7280;
+            font-size: 9.5px;
+            min-width: 100px;
+            text-transform: uppercase;
+        }
+        .emp-info .val {
+            font-weight: 600;
+            color: #1a1a2e;
+        }
+
+        /* Earnings & Deductions side-by-side */
+        .salary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+        .salary-col {
+            padding: 0;
+        }
+        .salary-col:first-child {
+            border-right: 1.5px solid #2c3e7a;
+        }
+        .col-header {
+            font-weight: 700;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 5px 12px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .col-header.earnings {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border-bottom: 1px solid #c8e6c9;
+        }
+        .col-header.deductions {
+            background: #fce4ec;
+            color: #c62828;
+            border-bottom: 1px solid #f8bbd0;
+        }
+
+        .salary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 12px;
+            font-size: 10.5px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .salary-row:last-child {
+            border-bottom: none;
+        }
+        .salary-row .amt {
+            font-weight: 600;
+            font-family: 'Consolas', monospace;
+        }
+
+        /* Totals row */
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 12px;
+            font-weight: 700;
+            font-size: 11px;
+            border-top: 1.5px solid #2c3e7a;
+            background: #f8f9fc;
+        }
+        .total-row.earning-total { color: #2e7d32; }
+        .total-row.deduction-total { color: #c62828; }
+
+        /* Net pay bar */
+        .net-pay-bar {
+            background: linear-gradient(135deg, #1b5e20, #2e7d32);
+            color: #fff;
+            padding: 7px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            font-weight: 700;
+        }
+        .net-pay-bar .net-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Signature section */
+        .sig-section {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 14px 4px;
+            font-size: 9px;
+            color: #6b7280;
+            border-top: 1px solid #e8ecf2;
+        }
+
+        /* Print styles */
+        @media print {
+            body { background: #fff; }
+            .no-print { display: none !important; }
+            .slip { border-color: #333; }
+        }
+
+        .print-bar {
+            background: #1e3a6e;
+            color: #fff;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-radius: 6px;
+        }
+        .print-bar button {
+            background: #fff;
+            color: #1e3a6e;
+            border: none;
+            padding: 6px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <!-- Print Bar -->
+    <div class="print-bar no-print">
+        <div>
+            <strong>Pay Slips — Professional Format</strong> |
+            {{ est.company_name }} | {{ payroll.period_display }} |
+            {{ slips|length }} Employee(s)
+        </div>
+        <div>
+            <button onclick="window.print()">🖨 Print / Save PDF</button>
+            <button onclick="window.close()" style="margin-left:8px; background:#e5e7eb; color:#333;">✕ Close</button>
+        </div>
+    </div>
+
+    {% for slip in slips %}
+    <div class="slip">
+        <!-- Company Header -->
+        <div class="slip-top">
+            <div class="company-name">{{ est.company_name }}</div>
+            <div class="month-badge">{{ payroll.period_display }}</div>
+        </div>
+        <div class="slip-subtitle">
+            {% if est.address %}{{ est.address }} | {% endif %}
+            {% if est.pf_code %}PF: {{ est.pf_code }} | {% endif %}
+            {% if est.esic_code %}ESIC: {{ est.esic_code }}{% endif %}
+            <span style="float:right;">PAY SLIP</span>
+        </div>
+
+        <!-- Employee Info -->
+        <div class="emp-info">
+            <div class="info-item">
+                <span class="lbl">Employee</span>
+                <span class="val">{{ slip.emp.name }}</span>
+            </div>
+            <div class="info-item">
+                <span class="lbl">Father/Husband</span>
+                <span class="val">{{ slip.emp.father_husband_name }}</span>
+            </div>
+            {% set uan = slip.emp.uan_number or '' %}
+            {% set uan_bad = uan and (uan|length != 12 or not uan.isdigit()) %}
+            <div class="info-item">
+                <span class="lbl">UAN</span>
+                <span class="val" style="{% if uan_bad %}color:#dc2626; font-weight:700;{% endif %}"{% if uan_bad %} title="UAN must be 12 digits"{% endif %}>{{ uan or '—' }}{% if uan_bad %} <i class="bi bi-exclamation-triangle-fill" style="font-size:0.55rem; color:#dc2626;"></i>{% endif %}</span>
+            </div>
+            {% set ip = slip.emp.esic_ip_number or '' %}
+            {% set ip_bad = ip and (ip|length != 10 or not ip.isdigit()) %}
+            <div class="info-item">
+                <span class="lbl">ESIC IP No.</span>
+                <span class="val" style="{% if ip_bad %}color:#dc2626; font-weight:700;{% endif %}"{% if ip_bad %} title="ESIC IP must be 10 digits"{% endif %}>{{ ip or '—' }}{% if ip_bad %} <i class="bi bi-exclamation-triangle-fill" style="font-size:0.55rem; color:#dc2626;"></i>{% endif %}</span>
+            </div>
+            <div class="info-item">
+                <span class="lbl">Designation</span>
+                <span class="val">{{ slip.emp.designation or '—' }}</span>
+            </div>
+            <div class="info-item">
+                <span class="lbl">Department</span>
+                <span class="val">{{ slip.emp.department or '—' }}</span>
+            </div>
+            <div class="info-item">
+                <span class="lbl">Days Worked</span>
+                <span class="val">{{ slip.entry.days_present|int }} / {{ payroll.working_days or 26 }}</span>
+            </div>
+            <div class="info-item">
+                <span class="lbl">Paid Holidays</span>
+                <span class="val">{{ slip.entry.paid_holidays|int if slip.entry.paid_holidays else '—' }}</span>
+            </div>
+            <div class="info-item">
+                <span class="lbl">Payable Days</span>
+                <span class="val">{{ slip.entry.total_payable_days|int if slip.entry.total_payable_days == slip.entry.total_payable_days|int else slip.entry.total_payable_days }}</span>
+            </div>
+            <div class="info-item">
+                <span class="lbl">OT Hours</span>
+                <span class="val">{{ slip.entry.ot_hours|int if slip.entry.ot_hours else '—' }}</span>
+            </div>
+        </div>
+
+        <!-- Earnings & Deductions -->
+        <div class="salary-grid">
+            <!-- Earnings Column -->
+            <div class="salary-col">
+                <div class="col-header earnings">
+                    <span>Earnings</span>
+                    <span>Amount (₹)</span>
+                </div>
+                {% for e in slip.earnings %}
+                <div class="salary-row">
+                    <span>{{ e.name }}</span>
+                    <span class="amt">{{ "{:,.0f}".format(e.amount) }}</span>
+                </div>
+                {% endfor %}
+                {% if slip.entry.ot_amount > 0 %}
+                <div class="salary-row">
+                    <span>Overtime</span>
+                    <span class="amt">{{ "{:,.0f}".format(slip.entry.ot_amount) }}</span>
+                </div>
+                {% endif %}
+                <!-- Spacer rows to balance columns -->
+                {% set earn_count = slip.earnings|length + (1 if slip.entry.ot_amount > 0 else 0) %}
+                {% set ded_count = slip.deductions|length %}
+                {% if earn_count < ded_count %}
+                    {% for _ in range(ded_count - earn_count) %}
+                    <div class="salary-row" style="visibility:hidden;"><span>&nbsp;</span></div>
+                    {% endfor %}
+                {% endif %}
+                <div class="total-row earning-total">
+                    <span>Total Earnings</span>
+                    <span>{{ "{:,.0f}".format(slip.entry.total_earnings) }}</span>
+                </div>
+            </div>
+
+            <!-- Deductions Column -->
+            <div class="salary-col">
+                <div class="col-header deductions">
+                    <span>Deductions</span>
+                    <span>Amount (₹)</span>
+                </div>
+                {% for d in slip.deductions %}
+                <div class="salary-row">
+                    <span>{{ d.name }}</span>
+                    <span class="amt">{{ "{:,.0f}".format(d.amount) }}</span>
+                </div>
+                {% endfor %}
+                {% if ded_count < earn_count %}
+                    {% for _ in range(earn_count - ded_count) %}
+                    <div class="salary-row" style="visibility:hidden;"><span>&nbsp;</span></div>
+                    {% endfor %}
+                {% endif %}
+                <div class="total-row deduction-total">
+                    <span>Total Deductions</span>
+                    <span>{{ "{:,.0f}".format(slip.entry.total_deductions) }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Net Pay -->
+        <div class="net-pay-bar">
+            <span class="net-label">Net Pay</span>
+            <span>₹ {{ "{:,.0f}".format(slip.entry.net_pay) }}</span>
+        </div>
+
+        <!-- Signature -->
+        <div class="sig-section">
+            <div>Employee Signature</div>
+            <div style="text-align:center; font-size:8px; color:#9ca3af;">
+                Generated: {{ generated_on }}
+            </div>
+            <div>Authorized Signatory</div>
+        </div>
+    </div>
+    {% endfor %}
+</body>
+</html>

@@ -1,0 +1,511 @@
+{% extends "base.html" %}
+
+{% block title %}{{ est.company_name }} - Vaishnavi Consultant{% endblock %}
+{% block page_header %}Establishment Details{% endblock %}
+
+{% block content %}
+<style>
+    .view-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+    .view-section { padding:20px 24px; border-bottom:1px solid #f1f5f9; }
+    .view-section:last-child { border-bottom:none; }
+    .section-num { display:inline-flex; width:28px; height:28px; align-items:center; justify-content:center; background:var(--primary); color:#fff; border-radius:8px; font-size:0.72rem; font-weight:700; margin-right:10px; }
+    .section-title { font-size:0.92rem; font-weight:700; color:#1e293b; display:flex; align-items:center; }
+    .info-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:16px; margin-top:14px; }
+    .info-item .label { font-size:0.7rem; font-weight:600; color:#94a3b8; text-transform:uppercase; letter-spacing:0.3px; margin-bottom:2px; }
+    .info-item .value { font-size:0.88rem; font-weight:500; color:#1e293b; word-break:break-word; }
+    .info-item .value.empty { color:#cbd5e1; font-style:italic; }
+    .stat-badge { display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:20px; font-size:0.75rem; font-weight:600; margin:4px; }
+    .stat-badge.on { background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; }
+    .stat-badge.off { background:#f8fafc; color:#cbd5e1; border:1px solid #e2e8f0; text-decoration:line-through; }
+    .license-item { display:flex; align-items:center; gap:12px; padding:8px 14px; margin-bottom:6px; border-radius:8px; font-size:0.85rem; }
+    .license-item.ok { background:#f0fdf4; border:1px solid #bbf7d0; }
+    .license-item.warning { background:#fffbeb; border:1px solid #fde68a; }
+    .license-item.critical { background:#fff1f2; border:1px solid #fecdd3; }
+    .license-item.expired { background:#fef2f2; border:1px solid #fecaca; }
+    .cred-table { width:100%; border-collapse:separate; border-spacing:0; }
+    .cred-table th { font-size:0.7rem; font-weight:700; color:#64748b; text-transform:uppercase; padding:8px 12px; border-bottom:2px solid #e2e8f0; }
+    .cred-table td { padding:10px 12px; border-bottom:1px solid #f1f5f9; font-size:0.85rem; }
+    .cred-table tr:last-child td { border-bottom:none; }
+    .rate-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:10px; }
+    .rate-item { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; text-align:center; }
+    .rate-item .rate-label { font-size:0.65rem; color:#64748b; font-weight:600; text-transform:uppercase; }
+    .rate-item .rate-value { font-size:1.05rem; font-weight:700; color:#1e293b; margin-top:2px; }
+    .bottom-bar { position:sticky; bottom:0; background:#fff; border-top:2px solid #e2e8f0; padding:14px 24px; display:flex; justify-content:space-between; align-items:center; z-index:10; box-shadow:0 -2px 10px rgba(0,0,0,0.05); border-radius:0 0 12px 12px; }
+</style>
+
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb" style="font-size:0.85rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('establishment.dashboard') }}" class="text-decoration-none">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('establishment.establishment_list') }}" class="text-decoration-none">Establishments</a></li>
+        <li class="breadcrumb-item active">{{ est.company_name }}</li>
+    </ol>
+</nav>
+
+<!-- Header Card -->
+<div style="background:linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color:#fff; border-radius:12px; padding:20px 24px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
+    <div>
+        <div style="font-size:1.2rem; font-weight:700;">{{ est.company_name }}</div>
+        <div style="opacity:0.85; font-size:0.8rem; margin-top:4px;">
+            {% if est.type_of_industry %}<i class="bi bi-tag me-1"></i>{{ est.type_of_industry }}{% endif %}
+            {% if est.date_of_registration %}
+                <span class="ms-3"><i class="bi bi-calendar3 me-1"></i>Reg: {{ est.date_of_registration.strftime('%d %b %Y') }}</span>
+            {% endif %}
+            {% if est.pan_number %}
+                <span class="ms-3"><i class="bi bi-credit-card me-1"></i>PAN: {{ est.pan_number }}</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        {% if est.is_active %}
+            <span class="badge bg-success bg-opacity-25 text-white px-3 py-2" style="border-radius:20px; font-size:0.8rem;">
+                <i class="bi bi-circle-fill" style="font-size:0.4rem"></i> Active
+            </span>
+        {% else %}
+            <span class="badge bg-danger bg-opacity-25 text-white px-3 py-2" style="border-radius:20px; font-size:0.8rem;">
+                <i class="bi bi-circle-fill" style="font-size:0.4rem"></i> Inactive
+            </span>
+        {% endif %}
+        <a href="{{ url_for('establishment.establishment_edit', id=est.id) }}" class="btn btn-light btn-sm" style="font-weight:600;">
+            <i class="bi bi-pencil me-1"></i> Edit
+        </a>
+        {# Documents Vault button — disabled for now #}
+    </div>
+</div>
+
+<div class="view-card">
+
+    <!-- ===== SECTION 1: Company Details ===== -->
+    <div class="view-section">
+        <div class="section-title"><span class="section-num">1</span> Company Details</div>
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="label">Company Name</div>
+                <div class="value">{{ est.company_name }}</div>
+            </div>
+            <div class="info-item">
+                <div class="label">PAN Number</div>
+                <div class="value {{ 'empty' if not est.pan_number }}">{{ est.pan_number or 'Not provided' }}</div>
+            </div>
+            <div class="info-item">
+                <div class="label">Date of Registration</div>
+                <div class="value {{ 'empty' if not est.date_of_registration }}">
+                    {{ est.date_of_registration.strftime('%d %b %Y') if est.date_of_registration else 'Not provided' }}
+                </div>
+            </div>
+            <div class="info-item">
+                <div class="label">Type of Industry</div>
+                <div class="value {{ 'empty' if not est.type_of_industry }}">{{ est.type_of_industry or 'Not set' }}</div>
+            </div>
+            <div class="info-item" style="grid-column:span 2;">
+                <div class="label">Address</div>
+                <div class="value {{ 'empty' if not est.address }}">{{ est.address or 'Not provided' }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== SECTION 2: Contact Information ===== -->
+    <div class="view-section">
+        <div class="section-title"><span class="section-num">2</span> Contact Information</div>
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="label">Contact Person</div>
+                <div class="value {{ 'empty' if not est.contact_person }}">{{ est.contact_person or 'Not provided' }}</div>
+            </div>
+            <div class="info-item">
+                <div class="label">Phone Number</div>
+                <div class="value {{ 'empty' if not est.contact_phone }}">{{ est.contact_phone or 'Not provided' }}</div>
+            </div>
+            <div class="info-item">
+                <div class="label">Email Address</div>
+                <div class="value {{ 'empty' if not est.contact_email }}">{{ est.contact_email or 'Not provided' }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== SECTION 3: Registration Details ===== -->
+    <div class="view-section">
+        <div class="section-title"><span class="section-num">3</span> Registration Details</div>
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="label">EPF Registration</div>
+                <div class="value">
+                    {% if est.pf_code %}
+                        <span style="color:#16a34a; font-weight:600;"><i class="bi bi-check-circle-fill me-1"></i>{{ est.pf_code }}</span>
+                    {% else %}
+                        <span class="empty">Not Registered</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="info-item">
+                <div class="label">ESIC Registration</div>
+                <div class="value">
+                    {% if est.esic_code %}
+                        <span style="color:#2563eb; font-weight:600;"><i class="bi bi-check-circle-fill me-1"></i>{{ est.esic_code }}</span>
+                    {% else %}
+                        <span class="empty">Not Registered</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="info-item">
+                <div class="label">GST Number</div>
+                <div class="value {{ 'empty' if not est.gst_number }}">{{ est.gst_number or 'Not provided' }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== SECTION 4: Service & Fee Details ===== -->
+    <div class="view-section">
+        <div class="section-title"><span class="section-num">4</span> Service & Fee Details</div>
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="label">Service Type</div>
+                <div class="value">
+                    {% if est.service_type %}
+                        <span class="badge" style="background:{% if est.service_type == 'With Records' %}#dbeafe; color:#1d4ed8;{% else %}#fef3c7; color:#92400e;{% endif %} font-size:0.78rem; padding:4px 12px; border-radius:12px;">
+                            {{ est.service_type }}
+                        </span>
+                    {% else %}
+                        <span class="empty">Not set</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="info-item">
+                <div class="label">Fee Cycle</div>
+                <div class="value {{ 'empty' if not est.fee_type }}">{{ est.fee_type or 'Not set' }}</div>
+            </div>
+            <div class="info-item">
+                <div class="label">Fee Amount</div>
+                <div class="value">
+                    {% if est.fee_amount %}
+                        <span style="font-size:1.05rem; color:#059669; font-weight:700;">₹{{ "{:,.0f}".format(est.fee_amount) }}</span>
+                        {% if est.fee_type %}<small style="color:#94a3b8;"> / {{ est.fee_type }}</small>{% endif %}
+                    {% else %}
+                        <span class="empty">Not set</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="info-item">
+                <div class="label">TDS</div>
+                <div class="value">
+                    {% if est.tds_applicable %}
+                        <span class="badge" style="background:#fef3c7; color:#92400e; font-size:0.78rem; padding:4px 12px; border-radius:12px;">
+                            <i class="bi bi-percent me-1"></i>Yes — {{ est.tds_rate or 10 }}%
+                        </span>
+                    {% else %}
+                        <span style="color:#94a3b8;">Not Applicable</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== SECTION 5: Registration Expiry Alerts ===== -->
+    <div class="view-section" style="background:#fffef5;">
+        <div class="section-title"><span class="section-num" style="background:#d97706;">5</span> Registration Expiry Alerts</div>
+        {% if est.license_expiries %}
+            <div class="mt-3">
+                {% for lic in est.license_expiries %}
+                    {% set days_left = (lic.expiry_date - today).days if today else 999 %}
+                    {% set status = 'expired' if days_left < 0 else ('critical' if days_left <= 15 else ('warning' if days_left <= 60 else 'ok')) %}
+                    <div class="license-item {{ status }}">
+                        <i class="bi bi-{% if status == 'expired' %}x-circle-fill text-danger{% elif status == 'critical' %}exclamation-triangle-fill text-danger{% elif status == 'warning' %}exclamation-circle-fill text-warning{% else %}check-circle-fill text-success{% endif %}" style="font-size:1rem;"></i>
+                        <div style="flex:1;">
+                            <div style="font-weight:600;">{{ lic.license_name }}</div>
+                            <div style="font-size:0.75rem; color:#64748b;">Expiry: {{ lic.expiry_date.strftime('%d %b %Y') }}</div>
+                        </div>
+                        <div style="font-weight:700; font-size:0.8rem;">
+                            {% if days_left < 0 %}
+                                <span style="color:#dc2626;">Expired {{ (-days_left) }} days ago</span>
+                            {% elif days_left == 0 %}
+                                <span style="color:#dc2626;">Expires today!</span>
+                            {% elif days_left <= 60 %}
+                                <span style="color:{% if days_left <= 15 %}#dc2626{% else %}#d97706{% endif %};">{{ days_left }} days left</span>
+                            {% else %}
+                                <span style="color:#16a34a;">{{ days_left }} days left</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div style="text-align:center; padding:24px; color:#94a3b8; font-size:0.85rem;">
+                <i class="bi bi-calendar-x" style="font-size:1.5rem; display:block; margin-bottom:6px; opacity:0.4;"></i>
+                No licence/registration expiry dates added.
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- ===== SECTION 6: Statutory Applicability ===== -->
+    <div class="view-section">
+        <div class="section-title"><span class="section-num" style="background:#2563eb;">6</span> Statutory Applicability</div>
+        {% if config %}
+        <div style="margin-top:12px; display:flex; flex-wrap:wrap;">
+            {% set checks = [
+                ('epf_applicable', 'EPF', 'bi-shield-check', '#16a34a'),
+                ('esic_applicable', 'ESIC', 'bi-hospital', '#2563eb'),
+                ('pt_applicable', 'Prof. Tax', 'bi-bank', '#7c3aed'),
+                ('ot_applicable', 'Overtime', 'bi-clock-history', '#ea580c'),
+                ('paid_holiday_type_check', 'Paid Holiday', 'bi-calendar-heart', '#dc2626'),
+                ('bonus_applicable', 'Bonus', 'bi-gift', '#d97706'),
+                ('gratuity_applicable', 'Gratuity', 'bi-award', '#0891b2'),
+                ('paid_leave_applicable', 'Paid Leave', 'bi-calendar-check', '#059669'),
+                ('tds_salary_applicable', 'TDS', 'bi-percent', '#475569'),
+                ('advance_applicable', 'Advance', 'bi-cash-stack', '#be185d'),
+                ('lwf_applicable', 'LWF', 'bi-people', '#6d28d9'),
+            ] %}
+            {% for name, label, icon, color in checks %}
+                {% set is_on = sf.get(name, false) %}
+                <span class="stat-badge {{ 'on' if is_on else 'off' }}">
+                    <i class="bi {{ icon }}" style="{% if is_on %}color:{{ color }};{% endif %}"></i>
+                    {{ label }}
+                </span>
+            {% endfor %}
+        </div>
+        {% if sf.get('pt_applicable') and config.pt_state %}
+        <div style="margin-top:10px; font-size:0.8rem; color:#64748b;">
+            <i class="bi bi-geo-alt me-1"></i> PT State: <strong>{{ config.pt_state.replace('_', ' ').title() }}</strong>
+        </div>
+        {% endif %}
+        {% else %}
+        <div style="text-align:center; padding:24px; color:#94a3b8; font-size:0.85rem;">
+            <i class="bi bi-gear" style="font-size:1.5rem; display:block; margin-bottom:6px; opacity:0.4;"></i>
+            No payroll config set up yet. Click Edit to configure.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ===== SECTION 7: Portal Login Details ===== -->
+    <div class="view-section" style="background:#f0f9ff;">
+        <div class="section-title"><span class="section-num" style="background:#0284c7;">7</span> Portal Login Details</div>
+        {% if est.credentials %}
+        <div class="table-responsive mt-3">
+            <table class="cred-table">
+                <thead>
+                    <tr>
+                        <th>Portal</th>
+                        <th>Username / Login ID</th>
+                        <th>Password</th>
+                        <th>Remarks</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cred in est.credentials %}
+                    <tr>
+                        <td>
+                            <span style="font-weight:600; color:#1e293b;">
+                                <i class="bi bi-globe2 me-1" style="color:#0284c7; font-size:0.85rem;"></i>
+                                {{ cred.portal_name }}
+                            </span>
+                        </td>
+                        <td>
+                            <code style="font-size:0.82rem; background:#e0f2fe; padding:3px 8px; border-radius:4px; color:#0c4a6e;">{{ cred.username }}</code>
+                        </td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <code class="pwd-text" style="font-size:0.82rem; background:#f1f5f9; padding:3px 8px; border-radius:4px;"
+                                      data-password="{{ cred.password }}">••••••••</code>
+                                <button type="button" class="btn btn-sm btn-outline-secondary toggle-pwd" title="Show/Hide" style="padding:1px 6px; font-size:0.7rem;">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </td>
+                        <td style="color:#64748b; font-size:0.82rem;">{{ cred.remarks or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div style="text-align:center; padding:24px; color:#94a3b8; font-size:0.85rem;">
+            <i class="bi bi-shield-lock" style="font-size:1.5rem; display:block; margin-bottom:6px; opacity:0.4;"></i>
+            No portal credentials added. Click Edit to add logins.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ===== SECTION 8: Statutory Rate Settings ===== -->
+    {% if config %}
+    <div class="view-section">
+        <div class="section-title"><span class="section-num" style="background:#7c3aed;">8</span> Statutory Rate Settings</div>
+
+        {% if sf.get('epf_applicable') %}
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px; margin-top:14px;">
+            <h6 style="font-size:0.78rem; font-weight:700; color:var(--primary); margin-bottom:12px;">
+                <i class="bi bi-shield-check me-1"></i> EPF Configuration
+                {% if config.epf_contribution_type == 'higher' %}
+                    <span class="badge bg-warning text-dark ms-2" style="font-size:0.68rem;">Higher Deduction</span>
+                {% else %}
+                    <span class="badge bg-info text-dark ms-2" style="font-size:0.68rem;">Ceiling Slab</span>
+                {% endif %}
+            </h6>
+            <div class="rate-grid">
+                {% if config.epf_contribution_type != 'higher' %}
+                <div class="rate-item">
+                    <div class="rate-label">Wage Ceiling</div>
+                    <div class="rate-value">₹{{ "{:,.0f}".format(config.epf_wage_ceiling or 15000) }}</div>
+                </div>
+                {% endif %}
+                <div class="rate-item">
+                    <div class="rate-label">Employee</div>
+                    <div class="rate-value">{{ config.epf_employee_rate }}%</div>
+                </div>
+                <div class="rate-item">
+                    <div class="rate-label">ER A/c 01</div>
+                    <div class="rate-value">{{ config.epf_ac01_rate }}%</div>
+                </div>
+                <div class="rate-item">
+                    <div class="rate-label">EPS 8.33</div>
+                    <div class="rate-value">{{ config.epf_eps_rate }}%</div>
+                </div>
+                <div class="rate-item">
+                    <div class="rate-label">Admin</div>
+                    <div class="rate-value">{{ config.epf_admin_rate }}%</div>
+                </div>
+                <div class="rate-item">
+                    <div class="rate-label">EDLI</div>
+                    <div class="rate-value">{{ config.epf_edli_rate }}%</div>
+                </div>
+                <div class="rate-item">
+                    <div class="rate-label">Admin Min</div>
+                    <div class="rate-value">₹{{ "{:,.0f}".format(config.epf_admin_min or 500) }}</div>
+                </div>
+                {% if config.epf_employer_in_ctc %}
+                <div class="rate-item" style="border-color:#16a34a;">
+                    <div class="rate-label">ER in CTC</div>
+                    <div class="rate-value" style="color:#16a34a;">Yes</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if sf.get('esic_applicable') %}
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px; margin-top:14px;">
+            <h6 style="font-size:0.78rem; font-weight:700; color:#2563eb; margin-bottom:12px;">
+                <i class="bi bi-hospital me-1"></i> ESIC Configuration
+            </h6>
+            <div class="rate-grid">
+                <div class="rate-item">
+                    <div class="rate-label">Employee Rate</div>
+                    <div class="rate-value">{{ config.esic_employee_rate }}%</div>
+                </div>
+                <div class="rate-item">
+                    <div class="rate-label">Employer Rate</div>
+                    <div class="rate-value">{{ config.esic_employer_rate }}%</div>
+                </div>
+                <div class="rate-item">
+                    <div class="rate-label">Wage Ceiling</div>
+                    <div class="rate-value">₹{{ "{:,.0f}".format(config.esic_wage_ceiling or 21000) }}</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+</div>
+
+<!-- Bottom Action Bar -->
+<div class="view-card" style="margin-bottom:0;">
+    <div style="padding:14px 24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{{ url_for('establishment.establishment_edit', id=est.id) }}" class="btn btn-primary btn-sm" style="font-weight:600;">
+                <i class="bi bi-pencil me-1"></i> Edit Establishment
+            </a>
+            <a href="{{ url_for('establishment.establishment_list') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i> Back to List
+            </a>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <form method="POST" action="{{ url_for('establishment.establishment_toggle_status', id=est.id) }}" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if est.is_active %}
+                    <button type="submit" class="btn btn-outline-warning btn-sm">
+                        <i class="bi bi-pause-circle me-1"></i> Deactivate
+                    </button>
+                {% else %}
+                    <button type="submit" class="btn btn-outline-success btn-sm">
+                        <i class="bi bi-play-circle me-1"></i> Activate
+                    </button>
+                {% endif %}
+            </form>
+            <form method="POST" action="{{ url_for('employee.establishment_rebuild_all_salary_history', est_id=est.id) }}" style="display:inline;"
+                  onsubmit="return confirm('Rebuild salary revision history for ALL employees of {{ est.company_name }}? This scans every payroll upload and adds any missing rate history rows.')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-arrow-repeat me-1"></i> Rebuild Salary History
+                </button>
+            </form>
+            <button type="button" class="btn btn-outline-warning btn-sm" data-bs-toggle="modal" data-bs-target="#resetPayrollModal">
+                <i class="bi bi-arrow-counterclockwise me-1"></i> Reset Payroll Data
+            </button>
+            <form method="POST" action="{{ url_for('establishment.establishment_delete', id=est.id) }}"
+                  style="display:inline;"
+                  onsubmit="return confirm('Are you sure you want to permanently delete {{ est.company_name }}? This action cannot be undone.')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-outline-danger btn-sm">
+                    <i class="bi bi-trash3 me-1"></i> Delete
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Record Info -->
+<div class="text-center mt-3 mb-4" style="font-size:0.72rem; color:#94a3b8;">
+    Created: {{ est.created_at.strftime('%d %b %Y, %I:%M %p') }}
+    {% if est.updated_at %}
+     | Last Updated: {{ est.updated_at.strftime('%d %b %Y, %I:%M %p') }}
+    {% endif %}
+</div>
+
+<!-- Reset Payroll Data Modal -->
+<div class="modal fade" id="resetPayrollModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('establishment.establishment_reset_payroll', id=est.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header bg-warning bg-opacity-25">
+          <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2 text-warning"></i>Reset Payroll Data</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p>This will <strong>permanently delete ALL payroll batches</strong> (draft and finalized) for <strong>{{ est.company_name }}</strong>, including attendance, entries and salary heads.</p>
+          <div class="alert alert-success py-2" style="font-size:0.85rem;">
+            <i class="bi bi-check-circle me-1"></i> <strong>Preserved:</strong> Employees, Salary Configuration, Salary Heads, Establishment Settings.
+          </div>
+          <div class="alert alert-danger py-2" style="font-size:0.85rem;">
+            <i class="bi bi-x-circle me-1"></i> <strong>Deleted:</strong> All Monthly Payrolls, Attendance, Payslips (cannot be undone).
+          </div>
+          <label class="form-label mt-2"><strong>Enter password to confirm:</strong></label>
+          <input type="password" name="password" class="form-control" required autocomplete="off" placeholder="Password">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-warning"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset Payroll Data</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Toggle password visibility
+    document.querySelectorAll('.toggle-pwd').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var codeEl = this.parentElement.querySelector('.pwd-text');
+            var icon = this.querySelector('i');
+            if (codeEl.textContent === '••••••••') {
+                codeEl.textContent = codeEl.getAttribute('data-password');
+                icon.className = 'bi bi-eye-slash';
+            } else {
+                codeEl.textContent = '••••••••';
+                icon.className = 'bi bi-eye';
+            }
+        });
+    });
+</script>
+{% endblock %}

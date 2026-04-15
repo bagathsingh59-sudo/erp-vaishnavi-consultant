@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Upload to Vault{% endblock %}
+{% block page_header %}Upload Documents to Vault{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm" style="max-width:900px;">
+    <div class="card-body">
+        <div class="alert alert-info py-2 px-3" style="font-size:0.82rem;">
+            <i class="bi bi-info-circle-fill me-1"></i>
+            Select the financial year and month the documents belong to, then choose one or more files.
+            Files are saved with their original names. Allowed: PDF, TXT, CSV, XLS/XLSX, DOC/DOCX, JPG/PNG, ZIP. Max 25 MB per file.
+        </div>
+
+        <form method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+            <div class="row g-3">
+                <div class="col-md-12">
+                    <label class="form-label fw-bold">Establishment <span class="text-danger">*</span></label>
+                    {% if preselect_est %}
+                        {% set locked_est = establishments|selectattr('id','equalto',preselect_est)|first %}
+                        <input type="hidden" name="establishment_id" value="{{ preselect_est }}"/>
+                        <input type="text" class="form-control" value="{{ locked_est.company_name if locked_est else '' }}" disabled/>
+                    {% else %}
+                        <select name="establishment_id" class="form-select" required>
+                            <option value="">-- Select --</option>
+                            {% for e in establishments %}
+                            <option value="{{ e.id }}">{{ e.company_name }}</option>
+                            {% endfor %}
+                        </select>
+                    {% endif %}
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Financial Year <span class="text-danger">*</span></label>
+                    <select name="fy_start_year" class="form-select" required>
+                        {% for y in years|reverse %}
+                        <option value="{{ y }}" {% if preselect_fy == y %}selected{% endif %}>
+                            FY {{ y }}-{{ (y+1)|string|slice(2) }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Month <span class="text-danger">*</span></label>
+                    <select name="month" class="form-select" required>
+                        {% for m, nm in [(4,'April'),(5,'May'),(6,'June'),(7,'July'),(8,'August'),(9,'September'),(10,'October'),(11,'November'),(12,'December'),(1,'January'),(2,'February'),(3,'March')] %}
+                        <option value="{{ m }}" {% if preselect_month == m %}selected{% endif %}>{{ nm }}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="text-muted">Defaults to the previous month (currently pending filing).</small>
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label">Description <small class="text-muted">(optional)</small></label>
+                    <input type="text" name="description" class="form-control" placeholder="e.g. EPF ECR, TRRN 1234567890"/>
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label fw-bold">Files <span class="text-danger">*</span></label>
+                    <input type="file" name="files" class="form-control" multiple required/>
+                    <small class="text-muted">Tip: hold Ctrl (or Shift) to select multiple files at once.</small>
+                </div>
+            </div>
+
+            <div class="mt-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-cloud-upload"></i> Upload
+                </button>
+                {% if preselect_est %}
+                <a href="{{ url_for('vault.vault_browse', est_id=preselect_est) }}" class="btn btn-outline-secondary">Cancel</a>
+                {% else %}
+                <a href="{{ url_for('vault.vault_home') }}" class="btn btn-outline-secondary">Cancel</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

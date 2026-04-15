@@ -1,0 +1,1181 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if mode == 'edit' else 'Add New' }} Employee - Vaishnavi Consultant{% endblock %}
+{% block page_header %}{{ 'Edit' if mode == 'edit' else 'Add New' }} Employee{% endblock %}
+
+{% block content %}
+<style>
+    .setup-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+    .setup-section { padding:20px 24px; border-bottom:1px solid #f1f5f9; }
+    .setup-section:last-child { border-bottom:none; }
+    .section-num { display:inline-flex; width:28px; height:28px; align-items:center; justify-content:center; background:var(--primary); color:#fff; border-radius:8px; font-size:0.72rem; font-weight:700; margin-right:10px; }
+    .section-title { font-size:0.92rem; font-weight:700; color:#1e293b; display:flex; align-items:center; }
+    .section-desc { font-size:0.72rem; color:#94a3b8; margin-top:2px; margin-left:38px; }
+
+    .slab-card { border:2px solid #e2e8f0; border-radius:10px; padding:16px 18px; cursor:pointer; transition:all 0.15s; text-align:center; position:relative; }
+    .slab-card:hover { border-color:var(--primary); background:#f0f4ff; }
+    .slab-card.active { border-color:var(--primary); background:#eff6ff; box-shadow:0 0 0 3px rgba(79,70,229,0.15); }
+    .slab-card .slab-tick { position:absolute; top:8px; right:8px; width:22px; height:22px; border-radius:50%; background:#e2e8f0; display:flex; align-items:center; justify-content:center; font-size:0.65rem; color:#fff; }
+    .slab-card.active .slab-tick { background:#4f46e5; }
+    .slab-card .slab-icon { font-size:1.4rem; margin-bottom:4px; }
+    .slab-card .slab-name { font-size:0.78rem; font-weight:700; color:#1e293b; }
+    .slab-card .slab-desc { font-size:0.62rem; color:#94a3b8; margin-top:2px; }
+
+    .stat-card { display:inline-flex; align-items:center; gap:8px; padding:10px 16px; border:2px solid #e2e8f0; border-radius:10px; margin:4px; cursor:pointer; font-size:0.8rem; font-weight:600; background:#fff; }
+    .stat-card:hover { border-color:var(--primary); background:#f0f4ff; }
+    .stat-card.checked { border-color:#16a34a; background:#f0fdf4; color:#15803d; }
+    .stat-card .stat-tick { width:20px; height:20px; border-radius:50%; background:#e2e8f0; display:flex; align-items:center; justify-content:center; font-size:0.6rem; color:#fff; }
+    .stat-card.checked .stat-tick { background:#16a34a; }
+
+    .config-sub { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px; margin-top:10px; }
+    .exit-section { background:#fef2f2; }
+    #ctcAmountInput::placeholder { color:rgba(255,255,255,0.5); }
+    #ctcAmountInput:focus { background:rgba(255,255,255,0.25); outline:none; box-shadow:0 0 0 3px rgba(255,255,255,0.3); }
+    .bottom-bar { position:sticky; bottom:0; background:#fff; border-top:2px solid #e2e8f0; padding:14px 24px; display:flex; justify-content:space-between; align-items:center; z-index:10; box-shadow:0 -2px 10px rgba(0,0,0,0.05); }
+</style>
+
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb" style="font-size:0.85rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('establishment.dashboard') }}" class="text-decoration-none">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('employee.employee_list') }}" class="text-decoration-none">Employees</a></li>
+        {% if mode == 'edit' %}
+        <li class="breadcrumb-item"><a href="{{ url_for('employee.employee_view', id=emp.id) }}" class="text-decoration-none">{{ emp.name }}</a></li>
+        {% endif %}
+        <li class="breadcrumb-item active">{{ 'Edit' if mode == 'edit' else 'Add New' }}</li>
+    </ol>
+</nav>
+
+{% if mode == 'add' %}
+<div id="rejoinBanner" style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:14px 20px; margin-bottom:16px; display:none;">
+    <div style="display:flex; align-items:center; gap:12px;">
+        <i class="bi bi-arrow-repeat" style="font-size:1.4rem; color:#d97706;"></i>
+        <div>
+            <div style="font-weight:700; font-size:0.88rem; color:#92400e;">Re-Joining Employee Detected</div>
+            <div style="font-size:0.78rem; color:#a16207;" id="rejoinMsg"></div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if from_enrollment %}
+<div style="background:#eef2ff; border:1px solid #c7d2fe; border-radius:10px; padding:12px 16px; margin-bottom:12px; display:flex; align-items:center; gap:12px;">
+    <i class="bi bi-person-vcard" style="font-size:1.3rem; color:#4f46e5;"></i>
+    <div>
+        <div style="font-weight:700; font-size:0.82rem; color:#3730a3;">Linked from UAN & ESIC Tracker</div>
+        <div style="font-size:0.72rem; color:#6366f1;">Employee details pre-filled from enrollment record. Fill salary & other details, then save.</div>
+    </div>
+</div>
+{% endif %}
+
+<form method="POST" autocomplete="off" id="empForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="salary_type" id="salaryTypeHidden" value="{{ salary.salary_type if salary else 'daily_wages' }}">
+    {% if from_enrollment %}<input type="hidden" name="from_enrollment" value="{{ from_enrollment }}">{% endif %}
+    {% if mode == 'add' %}
+    <input type="hidden" name="is_rejoin" id="isRejoin" value="0">
+    {% endif %}
+
+    <div class="setup-card">
+
+        <!-- ===== SECTION 1: Select Establishment ===== -->
+        {% if mode == 'add' %}
+        <div class="setup-section">
+            <div class="section-title"><span class="section-num">1</span> Select Establishment</div>
+            <div class="section-desc">Which company is this employee working in?</div>
+            <div class="row g-3 mt-2">
+                <div class="col-md-6">
+                    <label class="form-label">Establishment / Company <span class="text-danger">*</span></label>
+                    <select name="establishment_id" class="form-select" required id="estSelect"
+                            onchange="if(this.value) window.location.href='{{ url_for('employee.employee_add') }}?establishment_id=' + this.value;">
+                        <option value="">-- Select --</option>
+                        {% for est in establishments %}
+                        <option value="{{ est.id }}" {% if preselect_est and preselect_est|string == est.id|string %}selected{% endif %}>
+                            {{ est.company_name }}{% if est.pf_code %} ({{ est.pf_code }}){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="setup-section" style="background:linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color:#fff; padding:16px 24px;">
+            <div style="font-size:1.1rem; font-weight:700;">{{ emp.name }}
+                <code style="background:rgba(255,255,255,0.2); padding:1px 8px; border-radius:10px; font-size:0.72rem;">{{ emp.primary_id }}</code>
+            </div>
+            <div style="opacity:0.8; font-size:0.78rem;">{{ emp.establishment.company_name }}</div>
+        </div>
+        {% endif %}
+
+        <!-- ===== SECTION 2: Employee Identity ===== -->
+        <div class="setup-section">
+            <div class="section-title"><span class="section-num">{% if mode == 'add' %}2{% else %}1{% endif %}</span> Employee Identity <small style="color:#dc2626; font-size:0.68rem; margin-left:8px;">Mandatory</small></div>
+            <div class="section-desc">Core identification — UAN or ESIC IP is used to prevent duplicates</div>
+            <div class="row g-3 mt-2">
+                <div class="col-md-3">
+                    <label class="form-label">UAN Number</label>
+                    <input type="text" name="uan_number" class="form-control" maxlength="12" id="uanInput"
+                           placeholder="12-digit UAN" value="{{ emp.uan_number or '' if emp else '' }}"
+                           {% if mode == 'add' %}onblur="checkDuplicate()"{% endif %}>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">ESIC IP Number</label>
+                    <input type="text" name="esic_ip_number" class="form-control" maxlength="17" id="esicInput"
+                           placeholder="ESIC IP Number" value="{{ emp.esic_ip_number or '' if emp else '' }}"
+                           {% if mode == 'add' %}onblur="checkDuplicate()"{% endif %}>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Employee Name (as per Aadhaar) <span class="text-danger">*</span></label>
+                    <input type="text" name="name" class="form-control" required style="text-transform:uppercase;"
+                           placeholder="Full name" value="{{ emp.name if emp else '' }}">
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label">Father's / Husband Name <span class="text-danger">*</span></label>
+                    <input type="text" name="father_husband_name" class="form-control" required style="text-transform:uppercase;"
+                           placeholder="Father's or husband's name" value="{{ emp.father_husband_name if emp else '' }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Gender <span class="text-danger">*</span></label>
+                    <select name="gender" class="form-select" required>
+                        <option value="">Select</option>
+                        <option value="Male" {% if emp and emp.gender == 'Male' %}selected{% endif %}>Male</option>
+                        <option value="Female" {% if emp and emp.gender == 'Female' %}selected{% endif %}>Female</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Date of Birth <span class="text-danger">*</span></label>
+                    <input type="date" name="date_of_birth" class="form-control" required id="dobInput"
+                           value="{{ emp.date_of_birth.strftime('%Y-%m-%d') if emp and emp.date_of_birth else '' }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Date of Joining <span class="text-danger">*</span></label>
+                    <input type="date" name="date_of_joining" class="form-control" required
+                           value="{{ emp.date_of_joining.strftime('%Y-%m-%d') if emp and emp.date_of_joining else '' }}"
+                           onchange="syncDojToEffective(this.value)">
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label">Age</label>
+                    <input type="text" class="form-control" id="ageDisplay" readonly style="background:#f8fafc; font-weight:600; font-size:0.85rem;"
+                           value="{% if emp and emp.date_of_birth %}{{ ((today - emp.date_of_birth).days / 365.25)|int }}{% endif %}">
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== SECTION 3: Salary Configuration ===== -->
+        <div class="setup-section">
+            <div class="section-title"><span class="section-num" style="background:#059669;">{% if mode == 'add' %}3{% else %}2{% endif %}</span> Salary Configuration</div>
+            <div class="section-desc">Select salary type and enter amounts. Quick Fill from template for fast setup.</div>
+
+            <!-- Quick Fill Template -->
+            {% if salary_templates %}
+            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:10px 16px; margin:12px 0; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                <i class="bi bi-lightning" style="color:#4f46e5; font-size:1rem;"></i>
+                <span style="font-size:0.8rem; font-weight:600; color:#1e40af;">Quick Fill:</span>
+                <select id="templateSelector" class="form-select form-select-sm" style="max-width:240px; font-size:0.8rem;" onchange="applyTemplate(this.value)">
+                    <option value="">-- Select Template --</option>
+                    {% for tmpl in salary_templates %}
+                    <option value="{{ tmpl.id }}">{{ tmpl.name }} ({% if tmpl.salary_type == 'daily_wages' %}₹{{ "{:,.0f}".format(tmpl.daily_rate) }}/day{% else %}₹{{ "{:,.0f}".format(tmpl.gross_salary) }}{% endif %})</option>
+                    {% endfor %}
+                </select>
+                <input type="hidden" name="salary_template_id" id="salaryTemplateId" value="">
+            </div>
+            {% endif %}
+
+            <!-- Salary Slab Cards -->
+            {% set cur_type = salary.salary_type if salary else 'daily_wages' %}
+            {% set is_heads = (cur_type == 'monthly_fixed' and config and config.salary_structure == 'with_heads' and heads) %}
+            <div class="row g-3 mt-2">
+                {% set slabs = [
+                    ('daily_wages', 'Daily Wages', 'bi-calendar-day', '#ea580c', 'Rate × days worked'),
+                    ('monthly_fixed', 'Monthly Fixed', 'bi-cash-coin', '#2563eb', 'Single gross amount'),
+                    ('monthly_heads', 'Monthly (Heads)', 'bi-list-columns-reverse', '#7c3aed', 'Basic + DA + HRA + etc'),
+                    ('monthly_package', 'CTC Package', 'bi-box-seam', '#059669', 'Annual CTC monthly'),
+                ] %}
+                {% for val, label, icon, color, desc in slabs %}
+                <div class="col-md-3">
+                    <div class="slab-card {% if (cur_type == val) or (val == 'monthly_heads' and is_heads) %}active{% endif %}" id="slab_{{ val }}" onclick="selectSlab('{{ val }}')">
+                        <div class="slab-tick"><i class="bi bi-check-lg"></i></div>
+                        <div class="slab-icon" style="color:{{ color }};"><i class="bi {{ icon }}"></i></div>
+                        <div class="slab-name">{{ label }}</div>
+                        <div class="slab-desc">{{ desc }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Salary Input Panels (toggled by JS) -->
+            {% set eff_default = salary.effective_from.strftime('%Y-%m-%d') if salary else (emp.date_of_joining.strftime('%Y-%m-%d') if emp and emp.date_of_joining else '') %}
+            <div id="salaryPanels" class="mt-3">
+
+                <!-- Daily Wages -->
+                <div id="panel_daily" class="config-sub" style="display:none;">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Daily Rate (₹) <span class="text-danger">*</span></label>
+                            <input type="number" name="daily_rate" id="dailyRateInput" class="form-control" step="0.01" min="0"
+                                   value="{{ salary.daily_rate if salary and salary.daily_rate else '' }}" placeholder="Rate per day"
+                                   style="font-size:1.05rem; font-weight:600;">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Effective From <span class="text-danger">*</span></label>
+                            <input type="date" name="effective_from" id="effectiveFrom" class="form-control"
+                                   value="{{ eff_default }}">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Monthly Fixed: Single gross amount -->
+                <div id="panel_gross" class="config-sub" style="display:none;">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Gross Salary (₹) <span class="text-danger">*</span></label>
+                            <input type="number" name="gross_salary" id="grossSalaryInput" class="form-control" step="0.01" min="0"
+                                   value="{{ salary.gross_salary if salary else '' }}" placeholder="Monthly amount"
+                                   style="font-size:1.05rem; font-weight:600;">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Effective From <span class="text-danger">*</span></label>
+                            <input type="date" name="effective_from_gross" class="form-control eff-from"
+                                   value="{{ eff_default }}">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Fixed Salary (No Deduction) — visible for all non-daily-wages types ── -->
+                <div id="panel_no_deduction" class="config-sub" style="display:none; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:12px 16px; margin-top:10px;">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="no_absence_deduction" id="noAbsenceDeduction"
+                               {% if salary and salary.no_absence_deduction %}checked{% endif %}
+                               style="width:1.2em; height:1.2em; margin-top:3px;"
+                               onchange="toggleFixedSalary()">
+                        <label class="form-check-label" for="noAbsenceDeduction" style="margin-left:4px;">
+                            <strong style="color:#92400e;"><i class="bi bi-shield-check me-1"></i>Fixed Salary (No Deduction)</strong><br>
+                            <small class="text-muted">Pay same fixed salary every month — No absence deduction, No OT extra, No holiday extra. Just flat salary.</small>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Head-wise Breakup (Monthly Heads + CTC) -->
+                <div id="panel_heads" class="config-sub" style="display:none;">
+
+                    <!-- CTC Input (visible only in CTC mode) -->
+                    <div id="ctcInputRow" style="display:none; margin-bottom:16px;">
+                        <div style="background:linear-gradient(135deg, #059669 0%, #10b981 100%); border-radius:10px; padding:16px 20px; color:#fff;">
+                            <div class="row g-3 align-items-center">
+                                <div class="col-md-4">
+                                    <label style="font-size:0.78rem; font-weight:600; opacity:0.9; display:block; margin-bottom:4px;">Monthly CTC Amount (₹)</label>
+                                    <input type="number" id="ctcAmountInput" class="form-control" step="1" min="0"
+                                           placeholder="Enter monthly CTC e.g. 15000"
+                                           style="font-size:1.2rem; font-weight:700; border:2px solid rgba(255,255,255,0.3); background:rgba(255,255,255,0.15); color:#fff;"
+                                           oninput="calcCtcBreakup()"
+                                           value="{{ salary.gross_salary|int if salary and salary.salary_type == 'monthly_package' else '' }}">
+                                </div>
+                                <div class="col-md-5">
+                                    <div style="font-size:0.75rem; opacity:0.9; line-height:1.6;">
+                                        <i class="bi bi-magic me-1"></i> <strong>Auto-Split:</strong> Enter CTC and the system will calculate Basic, DA, HRA & Other Allowance automatically.<br>
+                                        <i class="bi bi-pencil me-1"></i> You can manually edit any head — only the balance head adjusts.
+                                    </div>
+                                </div>
+                                <div class="col-md-3" style="text-align:right;">
+                                    <div style="font-size:0.68rem; opacity:0.7;">Annual CTC</div>
+                                    <div id="ctcAnnualDisplay" style="font-size:1.1rem; font-weight:700;">₹0</div>
+                                </div>
+                            </div>
+                            <!-- Employer contribution breakdown (populated by JS) -->
+                            <div id="ctcEmployerContrib" style="display:none; margin-top:10px; padding:8px 14px; background:rgba(255,255,255,0.15); border-radius:8px; font-size:0.75rem; line-height:1.6;"></div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label">Effective From <span class="text-danger">*</span></label>
+                            <input type="date" name="effective_from_heads" class="form-control eff-from"
+                                   value="{{ eff_default }}">
+                        </div>
+                        <div class="col-md-6">
+                            <div id="headsPanelLabel" style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:8px 14px; font-size:0.75rem; color:#1e40af;">
+                                <i class="bi bi-info-circle me-1"></i> Enter amount for each salary head. Gross is auto-calculated from earnings.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table" style="margin:0;" id="headsTable">
+                            <thead>
+                                <tr style="background:#f1f5f9;">
+                                    <th style="font-size:0.78rem;">Salary Head</th>
+                                    <th style="font-size:0.78rem;">Code</th>
+                                    <th style="font-size:0.78rem;">Type</th>
+                                    <th style="width:180px; font-size:0.78rem;">Amount (₹)</th>
+                                    <th style="width:60px; font-size:0.78rem;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="headsBody">
+                                {% for head in heads %}
+                                <tr data-head-id="{{ head.id }}" data-code="{{ head.short_code }}" data-head-type="{{ head.head_type }}" data-in-gross="{{ head.is_in_gross|int }}">
+                                    <td style="font-weight:600; font-size:0.85rem;">{{ head.name }}
+                                        {% if head.is_for_compliance %}<span class="badge bg-info bg-opacity-10 text-info" style="font-size:0.55rem; padding:1px 5px; border-radius:8px;">EPF/ESIC</span>{% endif %}
+                                    </td>
+                                    <td><code style="font-size:0.75rem; background:#f1f5f9; padding:2px 6px; border-radius:4px;">{{ head.short_code }}</code></td>
+                                    <td style="font-size:0.78rem;">
+                                        {% if head.head_type == 'earning' %}
+                                            <span style="color:#059669;">+ Earning</span>
+                                        {% else %}
+                                            <span style="color:#dc2626;">- Deduction</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <input type="number" name="head_{{ head.id }}" class="form-control form-control-sm head-amount"
+                                               step="0.01" min="0" value="{{ head_values.get(head.id, '') if head_values.get(head.id) else '' }}"
+                                               placeholder="0" data-type="{{ head.head_type }}" data-in-gross="{{ head.is_in_gross|int }}"
+                                               data-code="{{ head.short_code }}"
+                                               oninput="onHeadManualEdit(this); calcGross()">
+                                    </td>
+                                    <td>
+                                        <span class="ctc-auto-badge" style="display:none; font-size:0.6rem; color:#059669; white-space:nowrap;"><i class="bi bi-lightning-fill"></i> Auto</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tbody id="customHeadsBody">
+                                <!-- Dynamic custom heads added by JS -->
+                            </tbody>
+                            <tfoot>
+                                <tr style="border-top:2px solid #e2e8f0;">
+                                    <td colspan="3" style="font-weight:700; font-size:0.9rem;">Gross Salary (Auto-Calculated)</td>
+                                    <td><div id="grossDisplay" style="font-size:1.15rem; font-weight:700; color:#059669; padding:4px 8px;">₹0</div></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <!-- Add Custom Head -->
+                    <div style="margin-top:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addCustomHead()" style="font-size:0.78rem;">
+                            <i class="bi bi-plus-lg me-1"></i> Add Custom Head
+                        </button>
+                        <span style="font-size:0.7rem; color:#94a3b8;">Add extra earning/deduction heads not in the standard list</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- WO Policy (shown for all salary types, inside salary config section) -->
+            <div id="woOverrideSection" class="mt-3" style="display:none;">
+                <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:16px 20px;">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="bi bi-calendar2-week" style="color:#059669; font-size:1.1rem;"></i>
+                        <strong style="font-size:0.85rem;">Weekly Off (WO) Policy</strong>
+                        <span style="font-size:0.7rem; color:#64748b; margin-left:auto;">
+                            Est. Default: {{ config.wo_type|title if config and config.wo_applicable else 'N/A' }}
+                            {% if config and config.wo_applicable %} | {{ config.wo_day|title }} | Sandwich: {{ 'Yes' if config.wo_sandwich_rule else 'No' }}{% endif %}
+                        </span>
+                    </div>
+                    {% set sal_wo_type = salary.wo_type if salary and salary.wo_type else '' %}
+                    {% set sal_wo_day = salary.wo_day if salary and salary.wo_day else '' %}
+                    {% set sal_wo_sandwich = salary.wo_sandwich_rule if salary and salary.wo_sandwich_rule is not none else None %}
+                    {% set sal_absence_div = salary.absence_divisor if salary and salary.absence_divisor else '' %}
+                    {% set sal_wo_ot = salary.wo_ot_rate if salary and salary.wo_ot_rate else None %}
+                    {# Detect ADD mode (no salary yet) — apply standard defaults #}
+                    {% set is_add_mode = (salary is none) %}
+                    <div class="row g-3">
+                        <div class="col-md-2">
+                            <label class="form-label" style="font-size:0.78rem;">WO Applicable</label>
+                            <select name="emp_wo_applicable" class="form-select form-select-sm" id="empWoApplicable" onchange="toggleEmpWo()">
+                                <option value="">Use Est. Default</option>
+                                <option value="1" {% if (salary and salary.wo_applicable == True) or is_add_mode %}selected{% endif %}>Yes</option>
+                                <option value="0" {% if salary and salary.wo_applicable == False %}selected{% endif %}>No</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 emp-wo-field">
+                            <label class="form-label" style="font-size:0.78rem;">WO Pay Type</label>
+                            <select name="emp_wo_type" class="form-select form-select-sm">
+                                <option value="">Use Default</option>
+                                <option value="paid" {% if sal_wo_type == 'paid' %}selected{% endif %}>Paid</option>
+                                <option value="unpaid" {% if sal_wo_type == 'unpaid' or is_add_mode %}selected{% endif %}>Unpaid</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 emp-wo-field">
+                            <label class="form-label" style="font-size:0.78rem;">WO Day</label>
+                            <select name="emp_wo_day" class="form-select form-select-sm">
+                                <option value="">Use Default</option>
+                                <option value="sunday" {% if sal_wo_day == 'sunday' or is_add_mode %}selected{% endif %}>Sunday</option>
+                                <option value="monday" {% if sal_wo_day == 'monday' %}selected{% endif %}>Monday</option>
+                                <option value="tuesday" {% if sal_wo_day == 'tuesday' %}selected{% endif %}>Tuesday</option>
+                                <option value="wednesday" {% if sal_wo_day == 'wednesday' %}selected{% endif %}>Wednesday</option>
+                                <option value="thursday" {% if sal_wo_day == 'thursday' %}selected{% endif %}>Thursday</option>
+                                <option value="friday" {% if sal_wo_day == 'friday' %}selected{% endif %}>Friday</option>
+                                <option value="saturday" {% if sal_wo_day == 'saturday' %}selected{% endif %}>Saturday</option>
+                                <option value="rotational" {% if sal_wo_day == 'rotational' %}selected{% endif %}>Rotational</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 emp-wo-field">
+                            <label class="form-label" style="font-size:0.78rem;">Sandwich Rule</label>
+                            <select name="emp_wo_sandwich" class="form-select form-select-sm">
+                                <option value="">Use Default</option>
+                                <option value="0" {% if (sal_wo_sandwich == False and salary) or is_add_mode %}selected{% endif %}>No</option>
+                                <option value="1" {% if sal_wo_sandwich == True %}selected{% endif %}>Yes</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 emp-wo-field">
+                            <label class="form-label" style="font-size:0.78rem;">Absence Divisor</label>
+                            <select name="emp_absence_divisor" class="form-select form-select-sm">
+                                <option value="">Use Default</option>
+                                <option value="30" {% if sal_absence_div == '30' %}selected{% endif %}>÷ 30</option>
+                                <option value="26" {% if sal_absence_div == '26' %}selected{% endif %}>÷ 26</option>
+                                <option value="calendar" {% if sal_absence_div == 'calendar' or is_add_mode %}selected{% endif %}>÷ Calendar</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 emp-wo-field">
+                            <label class="form-label" style="font-size:0.78rem;">WO OT Rate</label>
+                            <select name="emp_wo_ot_rate" class="form-select form-select-sm">
+                                <option value="">Use Default</option>
+                                <option value="1.0" {% if sal_wo_ot == 1.0 or is_add_mode %}selected{% endif %}>1x</option>
+                                <option value="1.5" {% if sal_wo_ot == 1.5 %}selected{% endif %}>1.5x</option>
+                                <option value="2.0" {% if sal_wo_ot == 2.0 %}selected{% endif %}>2x</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== SECTION 4: Payroll Parameters ===== -->
+        <div class="setup-section" style="background:#f8fafc;">
+            <div class="section-title"><span class="section-num" style="background:#2563eb;">{% if mode == 'add' %}4{% else %}3{% endif %}</span> Payroll Parameters</div>
+            <div class="section-desc">EPF/ESIC/OT applicability and overtime settings for this employee</div>
+
+            <div style="margin-top:12px; display:flex; flex-wrap:wrap; gap:6px;">
+                {% if config and config.epf_applicable %}
+                <label class="stat-card checked" id="chkEpf" onclick="toggleStat('epf')">
+                    <input type="checkbox" name="epf_for_employee" value="1" checked style="display:none;">
+                    <div class="stat-tick"><i class="bi bi-check-lg"></i></div>
+                    <i class="bi bi-shield-check"></i> EPF
+                </label>
+                {% endif %}
+                {% if config and config.esic_applicable %}
+                <label class="stat-card {% if not (emp and emp.esic_exempt) %}checked{% endif %}" id="chkEsic" onclick="toggleStat('esic')">
+                    <input type="checkbox" name="esic_for_employee" value="1" {% if not (emp and emp.esic_exempt) %}checked{% endif %} style="display:none;">
+                    <div class="stat-tick"><i class="bi bi-check-lg"></i></div>
+                    <i class="bi bi-hospital"></i> ESIC
+                </label>
+                {% endif %}
+                {% if config and config.ot_applicable %}
+                <label class="stat-card checked" id="chkOt" onclick="toggleStat('ot')">
+                    <input type="checkbox" name="ot_for_employee" value="1" checked style="display:none;">
+                    <div class="stat-tick"><i class="bi bi-check-lg"></i></div>
+                    <i class="bi bi-clock-history"></i> Overtime
+                </label>
+                {% endif %}
+            </div>
+
+            <!-- ESIC Exemption -->
+            {% if config and config.esic_applicable %}
+            <div id="esicExemptDiv" style="display:{% if emp and emp.esic_exempt %}block{% else %}none{% endif %}; margin-top:10px;">
+                <div class="config-sub" style="border-color:#fecaca; background:#fef2f2;">
+                    <label class="form-label" style="font-size:0.78rem; color:#dc2626;">ESIC Exemption Reason</label>
+                    <input type="text" name="esic_exemption_reason" class="form-control form-control-sm" style="max-width:400px;"
+                           placeholder="e.g., Salary above ceiling, Special request"
+                           value="{{ emp.esic_exemption_reason or '' if emp else '' }}">
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- OT Configuration -->
+            {% if config and config.ot_applicable %}
+            <div id="otConfigDiv" style="margin-top:10px;">
+                <div class="config-sub">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label" style="font-size:0.78rem;">OT Unit</label>
+                            <select name="ot_unit" class="form-select form-select-sm">
+                                <option value="hours" {% if config.ot_unit == 'hours' %}selected{% endif %}>Hours</option>
+                                <option value="days" {% if config.ot_unit == 'days' %}selected{% endif %}>Days</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label" style="font-size:0.78rem;">OT Rate</label>
+                            <select name="ot_rate_type" class="form-select form-select-sm">
+                                <option value="single" {% if config.ot_rate_type == 'single' %}selected{% endif %}>Single Wages (1×)</option>
+                                <option value="double" {% if config.ot_rate_type == 'double' %}selected{% endif %}>Double Wages (2×)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- EPS Age Warning -->
+            <div id="epsWarn" style="display:none; margin-top:10px;">
+                <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:8px 14px; font-size:0.78rem; color:#92400e;">
+                    <i class="bi bi-exclamation-triangle me-1"></i> <strong>EPS Not Applicable:</strong> Employee age is 58+ years. EPS (8.33%) goes to EPF A/c 01.
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== SECTION 5: Personal & KYC (Optional) ===== -->
+        <div class="setup-section">
+            <div class="section-title" style="cursor:pointer;" onclick="toggleSection('personalFields')">
+                <span class="section-num" style="background:#94a3b8;">{% if mode == 'add' %}5{% else %}4{% endif %}</span> Personal & KYC Details
+                <small style="color:#94a3b8; font-size:0.68rem; margin-left:8px;">(Optional — fill now or later)</small>
+                <i class="bi bi-chevron-down ms-auto" id="personalFieldsChev" style="font-size:0.8rem; transition:transform 0.2s; {% if mode == 'edit' %}transform:rotate(180deg);{% endif %}"></i>
+            </div>
+            <div id="personalFields" style="display:{% if mode == 'edit' %}block{% else %}none{% endif %}; margin-top:14px;">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Aadhaar Number</label>
+                        <input type="text" name="aadhaar_number" class="form-control" maxlength="12" placeholder="12-digit"
+                               value="{{ emp.aadhaar_number or '' if emp else '' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">PAN Number</label>
+                        <input type="text" name="pan_number" class="form-control" maxlength="10" style="text-transform:uppercase;" placeholder="ABCDE1234F"
+                               value="{{ emp.pan_number or '' if emp else '' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Mobile Number</label>
+                        <input type="tel" name="mobile_number" class="form-control" placeholder="10-digit"
+                               value="{{ emp.mobile_number or '' if emp else '' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-control" placeholder="Email"
+                               value="{{ emp.email or '' if emp else '' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Marital Status</label>
+                        <select name="marital_status" class="form-select">
+                            <option value="">Select</option>
+                            {% for ms in ['Single', 'Married', 'Widowed', 'Divorced'] %}
+                            <option value="{{ ms }}" {% if emp and emp.marital_status == ms %}selected{% endif %}>{{ ms }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Designation</label>
+                        <input type="text" name="designation" class="form-control" placeholder="e.g., Helper, Supervisor"
+                               value="{{ emp.designation or '' if emp else '' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Department</label>
+                        <input type="text" name="department" class="form-control" placeholder="e.g., Production"
+                               value="{{ emp.department or '' if emp else '' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Internal Emp Code</label>
+                        <input type="text" name="internal_emp_code" class="form-control" placeholder="Client's own code"
+                               value="{{ emp.internal_emp_code or '' if emp else '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Address</label>
+                        <textarea name="address" class="form-control" rows="2" placeholder="Full address">{{ emp.address or '' if emp else '' }}</textarea>
+                    </div>
+                </div>
+
+                <!-- Bank Details -->
+                <hr style="margin:16px 0; border-color:#e2e8f0;">
+                <div style="font-size:0.8rem; font-weight:700; color:#64748b; margin-bottom:10px;"><i class="bi bi-bank me-1"></i> Bank Details</div>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Bank Name</label>
+                        <input type="text" name="bank_name" class="form-control" placeholder="e.g., State Bank of India"
+                               value="{{ emp.bank_name or '' if emp else '' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Account Number</label>
+                        <input type="text" name="bank_account_number" class="form-control" placeholder="Account number"
+                               value="{{ emp.bank_account_number or '' if emp else '' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">IFSC Code</label>
+                        <input type="text" name="bank_ifsc_code" class="form-control" maxlength="11" style="text-transform:uppercase;" placeholder="e.g., SBIN0001234"
+                               value="{{ emp.bank_ifsc_code or '' if emp else '' }}">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== SECTION 6: Exit Particulars ===== -->
+        <div class="setup-section exit-section">
+            <div class="section-title" style="cursor:pointer;" onclick="toggleSection('exitFields')">
+                <span class="section-num" style="background:#dc2626;"><i class="bi bi-box-arrow-right"></i></span> Exit Particulars
+                <small style="color:#94a3b8; font-size:0.68rem; margin-left:8px;">(Only if employee has left)</small>
+                <i class="bi bi-chevron-down ms-auto" id="exitFieldsChev" style="font-size:0.8rem; transition:transform 0.2s; {% if emp and emp.date_of_exit %}transform:rotate(180deg);{% endif %}"></i>
+            </div>
+            <div id="exitFields" style="display:{% if emp and emp.date_of_exit %}block{% else %}none{% endif %}; margin-top:14px;">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Date of Exit</label>
+                        <input type="date" name="date_of_exit" class="form-control"
+                               value="{{ emp.date_of_exit.strftime('%Y-%m-%d') if emp and emp.date_of_exit else '' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Exit Reason</label>
+                        <select name="exit_reason" class="form-select">
+                            <option value="">Select</option>
+                            {% for r in ['Resigned', 'Terminated', 'Absconded', 'Retired', 'Deceased', 'Contract Ended'] %}
+                            <option value="{{ r }}" {% if emp and emp.exit_reason == r %}selected{% endif %}>{{ r }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Bottom Action Bar -->
+    <div class="setup-card" style="margin-bottom:0;">
+        <div class="bottom-bar">
+            <a href="{{ url_for('employee.employee_list') }}" class="btn btn-light px-3">
+                <i class="bi bi-x-lg me-1"></i> Cancel
+            </a>
+            <div class="d-flex gap-2">
+                {% if mode == 'add' %}
+                <a href="{{ url_for('employee_bulk.import_employees') }}" class="btn btn-outline-warning px-3" style="font-weight:600;">
+                    <i class="bi bi-upload me-1"></i> Bulk Upload
+                </a>
+                {% endif %}
+                {% if mode == 'edit' %}
+                <form method="POST" action="{{ url_for('employee.employee_delete', id=emp.id) }}" style="display:inline;"
+                      onsubmit="return confirm('Delete {{ emp.name }}? This cannot be undone.')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline-danger px-3"><i class="bi bi-trash3 me-1"></i> Delete</button>
+                </form>
+                {% endif %}
+                <button type="submit" class="btn btn-primary px-4" style="font-weight:600;">
+                    <i class="bi bi-check-lg me-1"></i> {{ 'Update Employee' if mode == 'edit' else 'Save Employee' }}
+                </button>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    var customHeadCounter = 0;
+    var currentSlab = '';
+    var manualOverrides = {};
+
+    // ── Establishment Config (from PayrollConfig) ──
+    var CFG = {
+        epfApplicable:    {{ 'true' if config and config.epf_applicable else 'false' }},
+        esicApplicable:   {{ 'true' if config and config.esic_applicable else 'false' }},
+        // EPF employer: A/c01 (3.67%) + EPS (8.33%) = 12% typically
+        epfEmployerRate:  {{ (config.epf_ac01_rate + config.epf_eps_rate) if config and config.epf_applicable else 0 }},
+        // EPF admin + EDLI charges on employer side
+        epfAdminRate:     {{ (config.epf_admin_rate + config.epf_edli_rate) if config and config.epf_applicable else 0 }},
+        epfWageCeiling:   {{ config.epf_wage_ceiling if config and config.epf_applicable else 15000 }},
+        esicEmployerRate: {{ config.esic_employer_rate if config and config.esic_applicable else 3.25 }},
+        esicWageCeiling:  {{ config.esic_wage_ceiling if config and config.esic_applicable else 21000 }},
+        // Is the employee ESIC exempt?
+        esicExempt:       {{ 'true' if emp and emp.esic_exempt else 'false' }}
+    };
+
+    // ── CTC Head Split Ratios (% of Gross, not CTC) ──
+    // Basic=40% of Gross, HRA=50% of Basic, balance = last earning head
+    var BASIC_PCT = 0.40;
+    var HRA_OF_BASIC = 0.50;
+
+    // ── Fixed Salary Toggle: hide OT card and WO section when fixed salary is checked ──
+    function toggleFixedSalary() {
+        var checked = document.getElementById('noAbsenceDeduction').checked;
+        var otCard = document.getElementById('chkOt');
+        var otConfigDiv = document.getElementById('otConfigDiv');
+        var woSection = document.getElementById('woOverrideSection');
+        if (checked) {
+            // Hide OT card and uncheck it
+            if (otCard) { otCard.style.display = 'none'; var cb = otCard.querySelector('input'); if (cb) cb.checked = false; otCard.classList.remove('checked'); }
+            if (otConfigDiv) otConfigDiv.style.display = 'none';
+            // Hide WO section (not relevant for fixed salary)
+            if (woSection) woSection.style.display = 'none';
+        } else {
+            // Show OT card and re-check it
+            if (otCard) { otCard.style.display = ''; var cb = otCard.querySelector('input'); if (cb) cb.checked = true; otCard.classList.add('checked'); }
+            if (otConfigDiv) otConfigDiv.style.display = 'block';
+            // Show WO section
+            if (woSection) woSection.style.display = 'block';
+        }
+    }
+
+    // ── Sync DOJ → Effective Date fields (only if currently empty) ──
+    function syncDojToEffective(val) {
+        if (!val) return;
+        var effFields = [
+            document.getElementById('effectiveFrom'),
+            document.querySelector('input[name="effective_from_gross"]'),
+            document.querySelector('input[name="effective_from_heads"]')
+        ];
+        effFields.forEach(function(el) {
+            if (el) el.value = val;
+        });
+    }
+
+    // ── Employee WO Override Toggle ──
+    function toggleEmpWo() {
+        var val = document.getElementById('empWoApplicable').value;
+        // If "No" selected, hide detail fields; if "" or "1", show them
+        var show = (val !== '0');
+        document.querySelectorAll('.emp-wo-field').forEach(function(el) {
+            el.style.display = show ? '' : 'none';
+        });
+    }
+    // Init on load
+    setTimeout(function() { var el = document.getElementById('empWoApplicable'); if (el) toggleEmpWo(); }, 100);
+
+    // ── Slab Selection ──
+    function selectSlab(slab) {
+        currentSlab = slab;
+        document.querySelectorAll('.slab-card').forEach(function(c) { c.classList.remove('active'); });
+        var card = document.getElementById('slab_' + slab);
+        if (card) card.classList.add('active');
+
+        document.getElementById('salaryTypeHidden').value = (slab === 'monthly_heads') ? 'monthly_heads' : slab;
+
+        // Hide all panels
+        document.getElementById('panel_daily').style.display = 'none';
+        document.getElementById('panel_gross').style.display = 'none';
+        document.getElementById('panel_heads').style.display = 'none';
+
+        // CTC input row and auto-badges
+        var ctcRow = document.getElementById('ctcInputRow');
+        if (ctcRow) ctcRow.style.display = 'none';
+        document.querySelectorAll('.ctc-auto-badge').forEach(function(b) { b.style.display = 'none'; });
+
+        // Show WO override for all salary types
+        var woSec = document.getElementById('woOverrideSection');
+        if (woSec) woSec.style.display = 'block';
+
+        // No Deduction panel: show for all non-daily-wages types
+        var panelNoDed = document.getElementById('panel_no_deduction');
+        if (panelNoDed) panelNoDed.style.display = (slab !== 'daily_wages') ? 'block' : 'none';
+
+        if (slab === 'daily_wages') {
+            document.getElementById('panel_daily').style.display = 'block';
+        } else if (slab === 'monthly_fixed') {
+            document.getElementById('panel_gross').style.display = 'block';
+        } else if (slab === 'monthly_heads' || slab === 'monthly_package') {
+            document.getElementById('panel_heads').style.display = 'block';
+            var lbl = document.getElementById('headsPanelLabel');
+
+            if (slab === 'monthly_package') {
+                // CTC mode: show CTC input, hide manual info label
+                if (ctcRow) ctcRow.style.display = 'block';
+                if (lbl) lbl.style.display = 'none';
+                // Reset overrides when switching to CTC
+                manualOverrides = {};
+                // Trigger auto-calc if CTC value exists
+                var ctcInp = document.getElementById('ctcAmountInput');
+                if (ctcInp && ctcInp.value) calcCtcBreakup();
+            } else {
+                // Monthly Heads mode: manual entry
+                if (lbl) {
+                    lbl.style.display = 'block';
+                    lbl.innerHTML = '<i class="bi bi-info-circle me-1"></i> Enter amount for each salary head. Gross is auto-calculated from earnings.';
+                }
+            }
+        }
+    }
+
+    // ── When user manually edits a head in CTC mode ──
+    function onHeadManualEdit(inp) {
+        if (currentSlab !== 'monthly_package') return;
+        var code = inp.getAttribute('data-code');
+        if (code) {
+            manualOverrides[code] = true;
+            // Hide auto badge for this head
+            var badge = inp.closest('tr').querySelector('.ctc-auto-badge');
+            if (badge) badge.style.display = 'none';
+        }
+        // Recalc balance
+        calcCtcBreakup();
+    }
+
+    // ── CTC Auto-Breakup Calculator ──
+    // CTC = Gross + Employer EPF + Employer ESIC + EPF Admin/EDLI
+    // So: Gross = CTC - Employer Contributions
+    // Then split Gross into heads: Basic (40%), HRA (50% of Basic), Balance
+    function calcCtcBreakup() {
+        var ctcInp = document.getElementById('ctcAmountInput');
+        if (!ctcInp) return;
+        var ctc = parseFloat(ctcInp.value) || 0;
+
+        // Update annual display
+        var annualEl = document.getElementById('ctcAnnualDisplay');
+        if (annualEl) annualEl.textContent = '₹' + (ctc * 12).toLocaleString('en-IN');
+
+        // Update employer contribution display
+        var empContribEl = document.getElementById('ctcEmployerContrib');
+
+        if (ctc <= 0) {
+            if (empContribEl) { empContribEl.innerHTML = ''; empContribEl.style.display = 'none'; }
+            calcGross();
+            return;
+        }
+
+        // ── Step 1: Calculate Gross from CTC ──
+        // We need to solve: CTC = Gross + EPF_employer(Basic) + ESIC_employer(Gross) + Admin
+        // Basic = BASIC_PCT × Gross
+        // EPF_employer = epfEmployerRate% × min(Basic, ceiling)
+        // ESIC_employer = esicEmployerRate% × Gross (if Gross <= esicCeiling)
+        // Admin = epfAdminRate% × min(Basic, ceiling)
+
+        var epfRate = CFG.epfApplicable ? (CFG.epfEmployerRate / 100) : 0;
+        var epfAdmin = CFG.epfApplicable ? (CFG.epfAdminRate / 100) : 0;
+        var esicRate = (CFG.esicApplicable && !CFG.esicExempt) ? (CFG.esicEmployerRate / 100) : 0;
+
+        // Check ESIC exemption checkbox state live
+        var esicCb = document.querySelector('input[name="esic_for_employee"]');
+        if (CFG.esicApplicable && esicCb && !esicCb.checked) {
+            esicRate = 0; // ESIC unchecked = exempt
+        }
+
+        // Iterative solve (converges in 2-3 rounds)
+        var gross = ctc; // start with gross = ctc, then subtract
+        for (var iter = 0; iter < 5; iter++) {
+            var basic = Math.round(gross * BASIC_PCT);
+            var epfWages = Math.min(basic, CFG.epfWageCeiling);
+            var employerEpf = Math.round(epfWages * epfRate);
+            var employerAdmin = Math.round(epfWages * epfAdmin);
+            var employerEsic = 0;
+            if (esicRate > 0 && gross <= CFG.esicWageCeiling) {
+                employerEsic = Math.round(gross * esicRate);
+            }
+            var totalEmployer = employerEpf + employerAdmin + employerEsic;
+            gross = ctc - totalEmployer;
+        }
+
+        // Final employer amounts for display
+        var finalBasic = Math.round(gross * BASIC_PCT);
+        var finalEpfWages = Math.min(finalBasic, CFG.epfWageCeiling);
+        var finalEmployerEpf = Math.round(finalEpfWages * epfRate);
+        var finalEmployerAdmin = Math.round(finalEpfWages * epfAdmin);
+        var finalEmployerEsic = 0;
+        if (esicRate > 0 && gross <= CFG.esicWageCeiling) {
+            finalEmployerEsic = Math.round(gross * esicRate);
+        }
+        var finalTotalEmployer = finalEmployerEpf + finalEmployerAdmin + finalEmployerEsic;
+
+        // Show employer contribution breakdown
+        if (empContribEl) {
+            var parts = [];
+            if (finalEmployerEpf > 0) parts.push('EPF ₹' + finalEmployerEpf.toLocaleString('en-IN'));
+            if (finalEmployerAdmin > 0) parts.push('Admin/EDLI ₹' + finalEmployerAdmin.toLocaleString('en-IN'));
+            if (finalEmployerEsic > 0) parts.push('ESIC ₹' + finalEmployerEsic.toLocaleString('en-IN'));
+            if (parts.length > 0) {
+                empContribEl.innerHTML = '<i class="bi bi-arrow-down me-1"></i>Employer: ' + parts.join(' + ') + ' = <strong>₹' + finalTotalEmployer.toLocaleString('en-IN') + '</strong> | <strong>Gross = ₹' + gross.toLocaleString('en-IN') + '</strong>';
+                empContribEl.style.display = 'block';
+            } else {
+                empContribEl.innerHTML = 'No employer deductions — Gross = CTC';
+                empContribEl.style.display = 'block';
+            }
+        }
+
+        // ── Step 2: Split Gross into salary heads ──
+        var rows = document.querySelectorAll('#headsBody tr');
+        var earningRows = [];
+        rows.forEach(function(row) {
+            if (row.getAttribute('data-head-type') === 'earning' && row.getAttribute('data-in-gross') === '1') {
+                earningRows.push(row);
+            }
+        });
+
+        // Find balance head: prefer OTH_ALW, else last earning not BASIC/HRA/DA/WASH
+        var balanceRow = null, balanceCode = '';
+        var fallbackRow = null, fallbackCode = '';
+        for (var i = 0; i < earningRows.length; i++) {
+            var c = earningRows[i].getAttribute('data-code');
+            if (c === 'OTH_ALW') { balanceRow = earningRows[i]; balanceCode = c; break; }
+            if (c !== 'BASIC' && c !== 'DA' && c !== 'HRA' && c !== 'WASH') {
+                fallbackRow = earningRows[i]; fallbackCode = c;
+            }
+        }
+        if (!balanceRow && fallbackRow) { balanceRow = fallbackRow; balanceCode = fallbackCode; }
+
+        var hra = Math.round(finalBasic * HRA_OF_BASIC);
+        var totalAllocated = 0;
+
+        rows.forEach(function(row) {
+            var code = row.getAttribute('data-code');
+            var htype = row.getAttribute('data-head-type');
+            var inGross = row.getAttribute('data-in-gross') === '1';
+            var inp = row.querySelector('.head-amount');
+            var badge = row.querySelector('.ctc-auto-badge');
+            if (!inp) return;
+
+            // Skip balance head (calculated last)
+            if (row === balanceRow) return;
+
+            // Skip manually overridden heads
+            if (manualOverrides[code]) {
+                var val = parseFloat(inp.value) || 0;
+                if (inGross && htype === 'earning') totalAllocated += val;
+                return;
+            }
+
+            var amount = 0;
+            if (code === 'BASIC') {
+                amount = finalBasic;
+            } else if (code === 'HRA') {
+                amount = hra;
+            } else if (code === 'DA') {
+                amount = 0; // DA typically 0 in CTC breakup
+            } else if (code === 'WASH') {
+                amount = 0; // Washing not included in ESIC, skip in CTC auto-split
+            } else if (htype === 'earning' && inGross) {
+                amount = 0; // CONV, etc. = 0 by default
+            }
+
+            if (!manualOverrides[code]) {
+                inp.value = amount || '';
+                if (badge) badge.style.display = amount > 0 ? 'inline' : 'none';
+            }
+            if (inGross && htype === 'earning') totalAllocated += (parseFloat(inp.value) || 0);
+        });
+
+        // Balance head = Gross - all other earnings
+        if (balanceRow) {
+            var balInp = balanceRow.querySelector('.head-amount');
+            var balBadge = balanceRow.querySelector('.ctc-auto-badge');
+            if (balInp && !manualOverrides[balanceCode]) {
+                var balance = Math.max(0, gross - totalAllocated);
+                balInp.value = balance;
+                if (balBadge) balBadge.style.display = 'inline';
+            }
+        }
+
+        calcGross();
+    }
+
+    // ── Add Custom Head (dynamic row) ──
+    function addCustomHead() {
+        customHeadCounter++;
+        var tbody = document.getElementById('customHeadsBody');
+        var tr = document.createElement('tr');
+        tr.id = 'customRow_' + customHeadCounter;
+        tr.innerHTML =
+            '<td><input type="text" name="custom_head_name_' + customHeadCounter + '" class="form-control form-control-sm" placeholder="Head name e.g. Special Allowance" style="font-weight:600; font-size:0.85rem;" required></td>' +
+            '<td><input type="text" name="custom_head_code_' + customHeadCounter + '" class="form-control form-control-sm" placeholder="Code" style="font-size:0.75rem; text-transform:uppercase;" maxlength="15"></td>' +
+            '<td><select name="custom_head_type_' + customHeadCounter + '" class="form-select form-select-sm" style="font-size:0.78rem;" onchange="updateCustomRow(' + customHeadCounter + ')">' +
+                '<option value="earning">+ Earning</option>' +
+                '<option value="deduction">- Deduction</option>' +
+            '</select></td>' +
+            '<td><input type="number" name="custom_head_amount_' + customHeadCounter + '" class="form-control form-control-sm head-amount" step="0.01" min="0" placeholder="0" data-type="earning" data-in-gross="1" oninput="calcGross()"></td>' +
+            '<td><button type="button" class="btn btn-sm btn-outline-danger" style="padding:2px 6px; font-size:0.7rem;" onclick="removeCustomHead(' + customHeadCounter + ')" title="Remove"><i class="bi bi-x-lg"></i></button></td>';
+        tbody.appendChild(tr);
+        // Update hidden counter
+        var counter = document.getElementById('customHeadCount');
+        if (!counter) {
+            counter = document.createElement('input');
+            counter.type = 'hidden';
+            counter.name = 'custom_head_count';
+            counter.id = 'customHeadCount';
+            document.getElementById('empForm').appendChild(counter);
+        }
+        counter.value = customHeadCounter;
+    }
+
+    function updateCustomRow(idx) {
+        var sel = document.querySelector('select[name="custom_head_type_' + idx + '"]');
+        var inp = document.querySelector('input[name="custom_head_amount_' + idx + '"]');
+        if (sel && inp) {
+            inp.setAttribute('data-type', sel.value);
+            calcGross();
+        }
+    }
+
+    function removeCustomHead(idx) {
+        var row = document.getElementById('customRow_' + idx);
+        if (row) row.remove();
+        calcGross();
+    }
+
+    // ── Stat Toggle ──
+    function toggleStat(type) {
+        var el = document.getElementById('chk' + type.charAt(0).toUpperCase() + type.slice(1));
+        if (!el) return;
+        var cb = el.querySelector('input[type=checkbox]');
+        cb.checked = !cb.checked;
+        el.classList.toggle('checked', cb.checked);
+        if (type === 'esic') {
+            var d = document.getElementById('esicExemptDiv');
+            if (d) d.style.display = cb.checked ? 'none' : 'block';
+        }
+        if (type === 'ot') {
+            var d = document.getElementById('otConfigDiv');
+            if (d) d.style.display = cb.checked ? 'block' : 'none';
+        }
+    }
+
+    // ── Collapsible Sections ──
+    function toggleSection(id) {
+        var el = document.getElementById(id);
+        var chev = document.getElementById(id + 'Chev');
+        if (el.style.display === 'none') {
+            el.style.display = 'block';
+            if (chev) chev.style.transform = 'rotate(180deg)';
+        } else {
+            el.style.display = 'none';
+            if (chev) chev.style.transform = 'rotate(0deg)';
+        }
+    }
+
+    // ── Gross Calculator ──
+    function calcGross() {
+        var inputs = document.querySelectorAll('.head-amount');
+        var total = 0;
+        inputs.forEach(function(inp) {
+            var val = parseFloat(inp.value) || 0;
+            if (inp.getAttribute('data-in-gross') === '1') {
+                total += (inp.getAttribute('data-type') === 'earning') ? val : -val;
+            }
+        });
+        var el = document.getElementById('grossDisplay');
+        if (el) el.textContent = '₹' + total.toLocaleString('en-IN');
+    }
+
+    // ── Age Calculator ──
+    function calcAge() {
+        var dob = document.getElementById('dobInput').value;
+        var display = document.getElementById('ageDisplay');
+        var warn = document.getElementById('epsWarn');
+        if (!dob) { display.value = ''; if (warn) warn.style.display = 'none'; return; }
+        var bd = new Date(dob), today = new Date();
+        var age = today.getFullYear() - bd.getFullYear();
+        var m = today.getMonth() - bd.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) age--;
+        display.value = age;
+        if (warn) warn.style.display = (age >= 58) ? 'block' : 'none';
+    }
+    document.getElementById('dobInput').addEventListener('change', calcAge);
+
+    // ── Template API ──
+    function applyTemplate(tmplId) {
+        if (!tmplId) { document.getElementById('salaryTemplateId').value = ''; return; }
+        fetch('/api/salary-template/' + tmplId + '/data')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                document.getElementById('salaryTemplateId').value = tmplId;
+                var slab = data.salary_type || 'monthly_fixed';
+                if (slab === 'monthly_fixed' && data.head_values && Object.keys(data.head_values).length > 0) slab = 'monthly_heads';
+                selectSlab(slab);
+                var dr = document.getElementById('dailyRateInput');
+                if (dr && data.daily_rate) dr.value = data.daily_rate;
+                var gs = document.getElementById('grossSalaryInput');
+                if (gs && data.gross_salary) gs.value = data.gross_salary;
+                if (data.head_values) {
+                    for (var hid in data.head_values) {
+                        var inp = document.querySelector('input[name="head_' + hid + '"]');
+                        if (inp) inp.value = data.head_values[hid];
+                    }
+                }
+                if (data.weekly_off_policy) {
+                    var wo = document.getElementById('empWoPolicy');
+                    if (wo) wo.value = data.weekly_off_policy;
+                }
+                calcGross();
+            })
+            .catch(function() { alert('Failed to load template.'); });
+    }
+
+    // ── Re-join Duplicate Check (Add mode only) ──
+    function checkDuplicate() {
+        var uanEl = document.getElementById('uanInput');
+        var esicEl = document.getElementById('esicInput');
+        if (!uanEl || !esicEl) return;
+        var uan = uanEl.value.trim();
+        var esic = esicEl.value.trim();
+        if (!uan && !esic) return;
+
+        var params = new URLSearchParams();
+        if (uan) params.append('uan', uan);
+        if (esic) params.append('esic', esic);
+
+        fetch('/api/employee/check-duplicate?' + params.toString())
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var banner = document.getElementById('rejoinBanner');
+                var rejoinField = document.getElementById('isRejoin');
+                if (!banner || !rejoinField) return;
+                if (data.exists && data.has_exit) {
+                    banner.style.display = 'block';
+                    rejoinField.value = '1';
+                    document.getElementById('rejoinMsg').innerHTML =
+                        '<strong>' + data.name + '</strong> (exited ' + data.exit_date + ' from ' + data.establishment + '). ' +
+                        'Enter the new Date of Joining — system will record as re-join.';
+                } else if (data.exists && !data.has_exit) {
+                    banner.style.display = 'block';
+                    rejoinField.value = '0';
+                    document.getElementById('rejoinMsg').innerHTML =
+                        '<span style="color:#dc2626;"><strong>' + data.name + '</strong> is currently active in <strong>' + data.establishment + '</strong>. ' +
+                        'Cannot add duplicate. Use Transfer if employee moved.</span>';
+                } else {
+                    banner.style.display = 'none';
+                    rejoinField.value = '0';
+                }
+            })
+            .catch(function() {});
+    }
+
+    // ── Form Validation ──
+    document.getElementById('empForm').addEventListener('submit', function(e) {
+        var uan = document.querySelector('input[name="uan_number"]').value.trim();
+        var esic = document.querySelector('input[name="esic_ip_number"]').value.trim();
+        if (!uan && !esic) {
+            e.preventDefault();
+            alert('Please enter at least one: UAN Number or ESIC IP Number.');
+        }
+    });
+
+    // ── Init ──
+    (function() {
+        var st = document.getElementById('salaryTypeHidden').value;
+        // If salary is monthly_fixed but has head values saved, treat as monthly_heads
+        {% if salary and salary.salary_type == 'monthly_fixed' and salary.head_values and salary.head_values|length > 0 %}
+        st = 'monthly_heads';
+        {% endif %}
+        {% if salary and salary.salary_type == 'monthly_package' and salary.head_values and salary.head_values|length > 0 %}
+        // CTC with existing head values — mark all as manual override so they don't get recalculated
+        document.querySelectorAll('#headsBody tr').forEach(function(row) {
+            var code = row.getAttribute('data-code');
+            var inp = row.querySelector('.head-amount');
+            if (code && inp && inp.value) manualOverrides[code] = true;
+        });
+        {% endif %}
+        selectSlab(st);
+        calcGross();
+        calcAge();
+        // Apply fixed salary toggle on page load
+        if (document.getElementById('noAbsenceDeduction')) toggleFixedSalary();
+    })();
+
+    // ── Pre-fill from Enrollment Tracker (quick_link) ──
+    {% if prefill %}
+    (function(){
+        var pf = {{ prefill | tojson }};
+        var fieldMap = {
+            'name': 'input[name="name"]',
+            'father_husband_name': 'input[name="father_husband_name"]',
+            'date_of_birth': 'input[name="date_of_birth"]',
+            'date_of_joining': 'input[name="date_of_joining"]',
+            'uan_number': 'input[name="uan_number"]',
+            'esic_ip_number': 'input[name="esic_ip_number"]',
+            'aadhaar_number': 'input[name="aadhaar_number"]',
+            'mobile_number': 'input[name="mobile_number"]',
+            'designation': 'input[name="designation"]'
+        };
+        for (var key in pf) {
+            if (pf[key] && fieldMap[key]) {
+                var el = document.querySelector(fieldMap[key]);
+                if (el) el.value = pf[key];
+            }
+        }
+        // Gender select
+        if (pf.gender) {
+            var gSel = document.querySelector('select[name="gender"]');
+            if (gSel) gSel.value = pf.gender;
+        }
+        // Re-calculate age after DOB prefill
+        calcAge();
+    })();
+    {% endif %}
+</script>
+{% endblock %}

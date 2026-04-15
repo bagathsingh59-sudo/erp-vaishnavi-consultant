@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+{% block title %}{% if edit_mode is defined and edit_mode %}Edit {{ voucher.voucher_number }}{% else %}Client Payment Entry{% endif %}{% endblock %}
+{% block page_header %}{% if edit_mode is defined and edit_mode %}Edit Client Payment — {{ voucher.voucher_number }}{% else %}Client Payment Entry{% endif %}{% endblock %}
+
+{% block content %}
+<div style="max-width:800px; margin:0 auto;">
+
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb" style="font-size:0.78rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('accounts.accounts_home') }}" class="text-decoration-none">Accounts</a></li>
+        <li class="breadcrumb-item active">Client Payment Entry</li>
+    </ol>
+</nav>
+
+<div class="table-container">
+    <div class="table-header" style="background:linear-gradient(135deg,#059669,#10b981);">
+        <div class="table-title" style="color:#fff;"><i class="bi bi-cash-stack"></i> Receipt — Client Payment (Combined Receipt + Journal)</div>
+    </div>
+    <form method="POST" id="paymentForm" action="{% if edit_mode is defined and edit_mode %}{{ url_for('accounts.edit_voucher', voucher_id=voucher.id) }}{% endif %}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="payroll_id" id="payroll_id" value="{% if edit_mode is defined and edit_mode %}{{ voucher.payroll_id or '' }}{% endif %}">
+        <div style="padding:16px 20px;">
+
+            <!-- Row 1: Client + Date -->
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">Client (Establishment)</label>
+                    <select name="establishment_id" id="est_select" class="form-select form-select-sm" required onchange="onClientChange()">
+                        <option value="">— Select Client —</option>
+                        {% for est in establishments %}
+                        <option value="{{ est.id }}" {% if ed is defined and ed.est_id == est.id %}selected{% endif %}>{{ est.display_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">Date</label>
+                    <input type="date" name="voucher_date" class="form-control form-control-sm" value="{{ today.strftime('%Y-%m-%d') }}" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">Received In</label>
+                    <select name="bank_account_id" class="form-select form-select-sm" required>
+                        {% for bank in bank_accounts %}
+                        <option value="{{ bank.id }}">{{ bank.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Row 2: Payroll Month Selector (for auto-suggest) -->
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">Payroll Month</label>
+                    <select id="suggest_month" class="form-select form-select-sm" onchange="fetchSuggestion()">
+                        <option value="">—</option>
+                        {% for m in range(1,13) %}
+                        <option value="{{ m }}">{{ ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">Year</label>
+                    <input type="number" id="suggest_year" class="form-control form-control-sm" value="2026" min="2024" max="2030" onchange="fetchSuggestion()">
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                    <div id="suggest_status" style="font-size:0.68rem; color:#94a3b8; padding-bottom:6px;">
+                        <i class="bi bi-info-circle me-1"></i>Select client + month to auto-fill from payroll
+                    </div>
+                </div>
+            </div>
+
+            <!-- Excess Balance Banner -->
+            <div id="excess_banner" style="display:none; background:#fefce8; border:1px solid #fde68a; border-radius:6px; padding:8px 14px; margin-bottom:12px; font-size:0.72rem;">
+                <i class="bi bi-wallet2 me-1 text-warning"></i>
+                <strong>Previous Excess Balance:</strong> <span id="excess_display">0</span>
+                <span style="color:#92400e; margin-left:8px;">This will be adjusted from the current entry.</span>
+            </div>
+
+            <hr style="margin:8px 0 14px;">
+
+            <!-- Total Received -->
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:700; color:#059669;">Total Amount Received in Bank (₹)</label>
+                    <input type="number" name="total_received" id="total_received" class="form-control" required min="0" step="1" placeholder="0" style="font-size:1.1rem; font-weight:700;" oninput="calcBalance()">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">UTR / Reference</label>
+                    <input type="text" name="reference" class="form-control form-control-sm" placeholder="UTR number">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">TDS Deducted (₹)</label>
+                    <input type="number" name="tds_amount" id="tds_amount" class="form-control form-control-sm" value="0" min="0" step="1" style="font-weight:600;" oninput="calcBalance()">
+                    <div id="tds_hint" style="font-size:0.55rem; color:#94a3b8;">Default 0. Enter only if client deducted TDS.</div>
+                </div>
+            </div>
+
+            <!-- Breakup Section -->
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px; margin-bottom:14px;">
+                <div style="font-size:0.72rem; font-weight:700; color:#1e293b; margin-bottom:10px;">
+                    <i class="bi bi-diagram-3 me-1"></i> Breakup (Allocate the Received Amount)
+                </div>
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <label class="form-label" style="font-size:0.68rem; font-weight:600; color:#475569;">EPF Payable (₹)</label>
+                        <input type="number" name="epf_amount" id="epf_amount" class="form-control form-control-sm breakup-input" value="0" min="0" step="1" oninput="calcBalance()">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" style="font-size:0.68rem; font-weight:600; color:#475569;">ESIC Payable (₹)</label>
+                        <input type="number" name="esic_amount" id="esic_amount" class="form-control form-control-sm breakup-input" value="0" min="0" step="1" oninput="calcBalance()">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" style="font-size:0.68rem; font-weight:600; color:#475569;">Professional Fee (₹)</label>
+                        <input type="number" name="fee_amount" id="fee_amount" class="form-control form-control-sm breakup-input" value="0" min="0" step="1" oninput="calcBalance()">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" style="font-size:0.68rem; font-weight:600; color:#475569;">Other Charges (₹)</label>
+                        <input type="number" name="other_amount" id="other_amount" class="form-control form-control-sm breakup-input" value="0" min="0" step="1" oninput="calcBalance()">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" style="font-size:0.68rem; font-weight:600; color:#475569;">Other Charges Description</label>
+                        <input type="text" name="other_desc" id="other_desc" class="form-control form-control-sm" placeholder="e.g., Annual Return Filing">
+                    </div>
+                </div>
+                <input type="hidden" name="excess_adjust" id="excess_adjust" value="0">
+            </div>
+
+            <!-- Balance Check -->
+            <div id="balance_check" style="border-radius:8px; padding:10px 14px; margin-bottom:14px; font-size:0.78rem; background:#f0fdf4; border:1px solid #bbf7d0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+                <div>
+                    <span style="color:#64748b;">Breakup Total:</span> <strong id="breakup_total">0</strong>
+                    <span style="color:#64748b; margin-left:12px;">Source (Bank+TDS+Excess):</span> <strong id="source_total">0</strong>
+                </div>
+                <div id="balance_status" style="font-weight:700; color:#16a34a;">
+                    <i class="bi bi-check-circle-fill me-1"></i>Balanced
+                </div>
+            </div>
+
+            <!-- Narration -->
+            <div class="mb-3">
+                <label class="form-label" style="font-size:0.72rem; font-weight:600;">Narration</label>
+                <input type="text" name="narration" id="narration_field" class="form-control form-control-sm" placeholder="e.g., Feb 2026 Compliance Payment of EPF/ESIC">
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <a href="{{ url_for('accounts.accounts_home') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i>Back
+                </a>
+                {% if edit_mode is defined and edit_mode %}
+                <button type="submit" class="btn btn-warning">
+                    <i class="bi bi-pencil-square me-1"></i> Update Entry
+                </button>
+                {% else %}
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-check-lg me-1"></i> Save Entry
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var monthNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// TDS info per establishment (embedded from server)
+var estTdsMap = {
+    {% for est in establishments %}
+    '{{ est.id }}': { applicable: {{ 'true' if est.tds_applicable else 'false' }}, rate: {{ est.tds_rate or 10 }}, fee: {{ est.fee_amount or 0 }} },
+    {% endfor %}
+};
+
+function onClientChange(){
+    // Auto-fill TDS when client changes
+    var estId = document.getElementById('est_select').value;
+    var tdsInfo = estTdsMap[estId];
+    if(tdsInfo && tdsInfo.applicable && tdsInfo.fee > 0){
+        var tdsAmt = Math.round(tdsInfo.fee * tdsInfo.rate / 100);
+        document.getElementById('tds_amount').value = tdsAmt;
+        document.getElementById('tds_hint').textContent = 'Auto: ' + tdsInfo.rate + '% TDS on fee of \u20B9' + tdsInfo.fee.toLocaleString('en-IN');
+        document.getElementById('tds_hint').style.color = '#059669';
+    } else {
+        document.getElementById('tds_amount').value = 0;
+        document.getElementById('tds_hint').textContent = tdsInfo && !tdsInfo.applicable ? 'TDS not applicable for this client' : 'Default 0. Enter only if client deducted TDS.';
+        document.getElementById('tds_hint').style.color = '#94a3b8';
+    }
+    calcBalance();
+    fetchSuggestion();
+    updateNarration();
+}
+
+function updateNarration(){
+    var month = document.getElementById('suggest_month').value;
+    var year = document.getElementById('suggest_year').value;
+    var estSel = document.getElementById('est_select');
+    var clientName = estSel.options[estSel.selectedIndex] ? estSel.options[estSel.selectedIndex].text : '';
+    if(month && year && clientName && clientName !== '— Select Client —'){
+        document.getElementById('narration_field').value = monthNames[parseInt(month)] + '-' + year + ' Compliance Payment of EPF/ESIC - ' + clientName;
+    }
+}
+
+function fetchSuggestion(){
+    var estId = document.getElementById('est_select').value;
+    var month = document.getElementById('suggest_month').value;
+    var year = document.getElementById('suggest_year').value;
+    var status = document.getElementById('suggest_status');
+
+    updateNarration();
+
+    if(!estId || !month || !year){ return; }
+
+    status.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Loading...';
+
+    fetch('/accounts/client-payment/suggest?est_id='+estId+'&month='+month+'&year='+year)
+    .then(r => r.json())
+    .then(data => {
+        if(data.found){
+            document.getElementById('epf_amount').value = data.epf_payable || 0;
+            document.getElementById('esic_amount').value = data.esic_payable || 0;
+            document.getElementById('fee_amount').value = data.professional_fee || 0;
+            document.getElementById('other_amount').value = data.other_charges || 0;
+            document.getElementById('other_desc').value = data.other_charges_desc || '';
+            document.getElementById('payroll_id').value = data.payroll_id || '';
+
+            // TDS from payroll suggest (overrides initial auto-fill with actual fee)
+            if(data.tds_applicable && data.tds_on_fee > 0){
+                document.getElementById('tds_amount').value = data.tds_on_fee;
+                document.getElementById('tds_hint').textContent = 'Auto: ' + data.tds_rate + '% TDS on fee of \u20B9' + (data.professional_fee || 0).toLocaleString('en-IN');
+                document.getElementById('tds_hint').style.color = '#059669';
+            }
+
+            // Excess balance
+            if(data.excess_balance > 0){
+                document.getElementById('excess_banner').style.display = 'block';
+                document.getElementById('excess_display').textContent = '\u20B9' + data.excess_balance.toLocaleString('en-IN');
+                document.getElementById('excess_adjust').value = data.excess_balance;
+            } else {
+                document.getElementById('excess_banner').style.display = 'none';
+                document.getElementById('excess_adjust').value = 0;
+            }
+
+            calcBalance();
+            status.innerHTML = '<i class="bi bi-check-circle text-success me-1"></i>Auto-filled from payroll. <strong>You can edit all amounts.</strong>';
+        } else {
+            status.innerHTML = '<i class="bi bi-exclamation-circle text-warning me-1"></i>No payroll found for this month. Enter manually.';
+        }
+    })
+    .catch(e => {
+        status.innerHTML = '<i class="bi bi-x-circle text-danger me-1"></i>Error fetching data.';
+    });
+}
+
+function calcBalance(){
+    var epf = parseFloat(document.getElementById('epf_amount').value) || 0;
+    var esic = parseFloat(document.getElementById('esic_amount').value) || 0;
+    var fee = parseFloat(document.getElementById('fee_amount').value) || 0;
+    var other = parseFloat(document.getElementById('other_amount').value) || 0;
+    var received = parseFloat(document.getElementById('total_received').value) || 0;
+    var tds = parseFloat(document.getElementById('tds_amount').value) || 0;
+    var excess = parseFloat(document.getElementById('excess_adjust').value) || 0;
+
+    var breakup = epf + esic + fee + other;
+    var source = received + tds + excess;
+
+    document.getElementById('breakup_total').textContent = '\u20B9' + Math.round(breakup).toLocaleString('en-IN');
+    document.getElementById('source_total').textContent = '\u20B9' + Math.round(source).toLocaleString('en-IN');
+
+    var diff = breakup - source;
+    var statusEl = document.getElementById('balance_status');
+    var checkDiv = document.getElementById('balance_check');
+
+    if(Math.abs(diff) < 1){
+        statusEl.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>Balanced';
+        statusEl.style.color = '#16a34a';
+        checkDiv.style.background = '#f0fdf4';
+        checkDiv.style.borderColor = '#bbf7d0';
+    } else if(diff > 0){
+        statusEl.innerHTML = '<i class="bi bi-info-circle me-1"></i>Part Payment — Balance Due \u20B9' + Math.round(diff).toLocaleString('en-IN') + ' (will remain on client ledger)';
+        statusEl.style.color = '#d97706';
+        checkDiv.style.background = '#fefce8';
+        checkDiv.style.borderColor = '#fde68a';
+    } else {
+        statusEl.innerHTML = '<i class="bi bi-info-circle me-1"></i>Excess \u20B9' + Math.round(Math.abs(diff)).toLocaleString('en-IN') + ' (will be saved as Excess Receipt)';
+        statusEl.style.color = '#d97706';
+        checkDiv.style.background = '#fefce8';
+        checkDiv.style.borderColor = '#fde68a';
+    }
+}
+
+{% if edit_mode is defined and edit_mode %}
+// Pre-fill fields in edit mode
+document.addEventListener('DOMContentLoaded', function(){
+    document.getElementById('total_received').value = {{ ed.total_received|int }};
+    document.getElementById('tds_amount').value = {{ ed.tds_amount|int }};
+    document.getElementById('epf_amount').value = {{ ed.epf_amount|int }};
+    document.getElementById('esic_amount').value = {{ ed.esic_amount|int }};
+    document.getElementById('fee_amount').value = {{ ed.fee_amount|int }};
+    document.getElementById('other_amount').value = {{ ed.other_amount|int }};
+    document.getElementById('other_desc').value = '{{ ed.other_desc }}';
+    document.getElementById('excess_adjust').value = {{ ed.excess_adjust|int }};
+    document.getElementById('narration_field').value = '{{ ed.narration|e }}';
+    document.querySelector('[name="reference"]').value = '{{ ed.reference|e }}';
+    {% if ed.bank_id %}
+    document.querySelector('[name="bank_account_id"]').value = {{ ed.bank_id }};
+    {% endif %}
+    calcBalance();
+});
+{% endif %}
+</script>
+{% endblock %}

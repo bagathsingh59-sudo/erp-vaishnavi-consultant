@@ -1,0 +1,422 @@
+{% extends "base.html" %}
+
+{% block title %}{{ est.company_name }} - Client Dashboard{% endblock %}
+{% block page_header %}Client Dashboard{% endblock %}
+
+{% block content %}
+
+<!-- Client Dashboard Polish -->
+<style>
+    /* Stat cards hover lift */
+    .cd-stat-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .cd-stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
+    }
+
+    /* Quick action buttons slide effect */
+    .cd-quick-actions .btn {
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .cd-quick-actions .btn:hover {
+        transform: translateX(3px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    /* Table row hover */
+    .cd-table tbody tr {
+        transition: background 0.15s ease;
+    }
+    .cd-table tbody tr:hover {
+        background: #f0f4ff !important;
+    }
+
+    /* Section headers consistent */
+    .cd-section-header {
+        font-weight: 700;
+        color: #1e293b;
+        font-size: 0.85rem;
+        letter-spacing: 0.2px;
+    }
+
+    /* Credential table hover */
+    .cd-cred-table tbody tr {
+        transition: background 0.15s ease;
+    }
+    .cd-cred-table tbody tr:hover {
+        background: #fefce8 !important;
+    }
+
+    /* Card containers */
+    .cd-card {
+        transition: box-shadow 0.2s ease;
+    }
+    .cd-card:hover {
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08) !important;
+    }
+
+    /* Badge polish */
+    .badge { transition: transform 0.15s ease; }
+    .badge:hover { transform: scale(1.05); }
+</style>
+
+<!-- ==================== CLIENT HEADER ==================== -->
+<div class="card border-0 mb-4" style="background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; border-radius: 12px;">
+    <div class="card-body py-3 px-4">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <div style="font-size: 0.7rem; text-transform: uppercase; opacity: 0.8; letter-spacing: 1px;">Currently Working On</div>
+                <h4 class="mb-1" style="font-weight: 700;">{{ est.company_name }}</h4>
+                <div style="font-size: 0.8rem; opacity: 0.9;">
+                    {% if est.pf_code %}<span class="me-3"><i class="bi bi-shield-check me-1"></i>{{ est.pf_code }}</span>{% endif %}
+                    {% if est.esic_code %}<span class="me-3"><i class="bi bi-hospital me-1"></i>{{ est.esic_code }}</span>{% endif %}
+                    {% if est.service_type %}<span class="me-3"><i class="bi bi-tag me-1"></i>{{ est.service_type }}</span>{% endif %}
+                </div>
+                {% if est.contact_person %}
+                <div style="font-size: 0.75rem; opacity: 0.75; margin-top: 4px;">
+                    <i class="bi bi-person me-1"></i>{{ est.contact_person }}
+                    {% if est.contact_phone %} | <i class="bi bi-telephone me-1"></i>{{ est.contact_phone }}{% endif %}
+                </div>
+                {% endif %}
+            </div>
+            <div class="col-md-4 text-md-end mt-2 mt-md-0">
+                <div class="d-flex align-items-center justify-content-md-end gap-2 flex-wrap">
+                    <!-- FY Selector -->
+                    <div class="d-flex align-items-center" style="background:rgba(255,255,255,0.15); border-radius:10px; padding:4px 6px 4px 12px; border:1px solid rgba(255,255,255,0.25);">
+                        <i class="bi bi-calendar3 me-2" style="font-size:0.8rem; opacity:0.8;"></i>
+                        <select class="form-select form-select-sm" style="background:transparent; color:#fff; border:none; font-weight:700; font-size:0.78rem; padding:2px 24px 2px 4px; cursor:pointer; min-width:120px;"
+                                onchange="window.location.href='{{ url_for('establishment.client_dashboard') }}?fy=' + this.value">
+                            {% for fy in fy_options %}
+                            <option value="{{ fy.value }}" {% if fy.value == current_fy %}selected{% endif %} style="color:#1e293b;">{{ fy.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <a href="{{ url_for('establishment.deselect_establishment') }}" class="btn btn-light btn-sm">
+                        <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== EMPLOYEE & FINANCIAL STATS ==================== -->
+<div class="row g-3 mb-4">
+    <!-- Employees -->
+    <div class="col-6 col-lg-2">
+        <div class="card border-0 h-100 text-center cd-stat-card" style="border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.06);">
+            <div class="card-body py-3">
+                <div style="font-size: 1.8rem; font-weight: 700; color: #4f46e5;">{{ active_employees }}</div>
+                <div style="font-size: 0.7rem; color: #64748b; text-transform: uppercase;">Active Employees</div>
+                <div style="font-size: 0.65rem; color: #94a3b8;">{{ exited_employees }} exited</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Total Salary Disbursed -->
+    <div class="col-6 col-lg-2">
+        <div class="card border-0 h-100 text-center cd-stat-card" style="border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.06);">
+            <div class="card-body py-3">
+                <div style="font-size: 1.3rem; font-weight: 700; color: #059669;">{{ "₹{:,.0f}".format(total_salary_disbursed) }}</div>
+                <div style="font-size: 0.7rem; color: #64748b; text-transform: uppercase;">Salary Disbursed</div>
+                <div style="font-size: 0.65rem; color: #94a3b8;">{{ fy_label }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EPF Employee Share -->
+    <div class="col-6 col-lg-2">
+        <div class="card border-0 h-100 text-center cd-stat-card" style="border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.06);">
+            <div class="card-body py-3">
+                <div style="font-size: 1.3rem; font-weight: 700; color: #2563eb;">{{ "₹{:,.0f}".format(total_epf_ee) }}</div>
+                <div style="font-size: 0.7rem; color: #64748b; text-transform: uppercase;">EPF (EE)</div>
+                <div style="font-size: 0.65rem; color: #94a3b8;">Employee Share</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EPF Employer Share -->
+    <div class="col-6 col-lg-2">
+        <div class="card border-0 h-100 text-center cd-stat-card" style="border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.06);">
+            <div class="card-body py-3">
+                <div style="font-size: 1.3rem; font-weight: 700; color: #7c3aed;">{{ "₹{:,.0f}".format(total_epf_er) }}</div>
+                <div style="font-size: 0.7rem; color: #64748b; text-transform: uppercase;">EPF (ER)</div>
+                <div style="font-size: 0.65rem; color: #94a3b8;">Employer Share</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ESIC Employee Share -->
+    <div class="col-6 col-lg-2">
+        <div class="card border-0 h-100 text-center cd-stat-card" style="border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.06);">
+            <div class="card-body py-3">
+                <div style="font-size: 1.3rem; font-weight: 700; color: #0891b2;">{{ "₹{:,.0f}".format(total_esic_ee) }}</div>
+                <div style="font-size: 0.7rem; color: #64748b; text-transform: uppercase;">ESIC (EE)</div>
+                <div style="font-size: 0.65rem; color: #94a3b8;">Employee Share</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ESIC Employer Share -->
+    <div class="col-6 col-lg-2">
+        <div class="card border-0 h-100 text-center cd-stat-card" style="border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.06);">
+            <div class="card-body py-3">
+                <div style="font-size: 1.3rem; font-weight: 700; color: #ea580c;">{{ "₹{:,.0f}".format(total_esic_er) }}</div>
+                <div style="font-size: 0.7rem; color: #64748b; text-transform: uppercase;">ESIC (ER)</div>
+                <div style="font-size: 0.65rem; color: #94a3b8;">Employer Share</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== FY BAR CHART ==================== -->
+<div class="row g-3 mb-4">
+    <div class="col-md-8">
+        <div class="card border-0 cd-card" style="border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06);">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="cd-section-header" style="margin: 0;">
+                        <i class="bi bi-bar-chart-fill text-primary me-2"></i>{{ fy_label }} — Filing Status
+                    </h6>
+                    <div style="font-size: 0.72rem;">
+                        <span class="me-2"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#10b981;margin-right:4px;"></span>Filed</span>
+                        <span class="me-2"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f59e0b;margin-right:4px;"></span>In Progress</span>
+                        <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#e2e8f0;margin-right:4px;"></span>Pending</span>
+                    </div>
+                </div>
+                <div style="height: 200px;">
+                    <canvas id="fyChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="col-md-4">
+        <div class="card border-0 h-100 cd-card" style="border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06);">
+            <div class="card-body cd-quick-actions">
+                <h6 class="cd-section-header" style="margin-bottom: 14px;">
+                    <i class="bi bi-lightning-fill text-warning me-2"></i>Quick Actions
+                </h6>
+                <div class="d-grid gap-2">
+                    <!-- PRIMARY: Salary Processing (single entry point) -->
+                    <a href="{{ url_for('payroll.payroll_list') }}" class="btn btn-success btn-sm text-start" style="padding:10px 14px; font-weight:600;">
+                        <i class="bi bi-calculator me-2" style="font-size:1rem;"></i>Salary Processing
+                        <span style="float:right; opacity:0.7; font-size:0.65rem; margin-top:2px;">Create & Manage</span>
+                    </a>
+
+                    <hr style="margin:4px 0; border-color:#e2e8f0;">
+
+                    <!-- Employees -->
+                    <a href="{{ url_for('employee.employee_list') }}" class="btn btn-outline-primary btn-sm text-start">
+                        <i class="bi bi-people me-2"></i>View Employees
+                    </a>
+                    <a href="{{ url_for('employee.employee_add', establishment_id=est.id) }}" class="btn btn-outline-primary btn-sm text-start">
+                        <i class="bi bi-person-plus me-2"></i>Add Employee
+                    </a>
+
+                    <hr style="margin:4px 0; border-color:#e2e8f0;">
+
+                    <!-- Settings -->
+                    <a href="{{ url_for('establishment.establishment_view', id=est.id) }}" class="btn btn-outline-secondary btn-sm text-start">
+                        <i class="bi bi-building me-2"></i>Establishment Details
+                    </a>
+                    <a href="{{ url_for('payroll.payroll_config', est_id=est.id) }}" class="btn btn-outline-secondary btn-sm text-start">
+                        <i class="bi bi-gear me-2"></i>Payroll Config
+                    </a>
+                    <a href="{{ url_for('payroll.salary_template_list', est_id=est.id) }}" class="btn btn-outline-secondary btn-sm text-start">
+                        <i class="bi bi-file-earmark-ruled me-2"></i>Salary Templates
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== MONTH-WISE DETAILS TABLE ==================== -->
+<div class="card border-0 mb-4 cd-card" style="border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06);">
+    <div class="card-header bg-white" style="border-radius: 12px 12px 0 0;">
+        <h6 class="cd-section-header" style="margin: 0;">
+            <i class="bi bi-calendar3 text-primary me-2"></i>{{ fy_label }} — Month-wise Filing Details
+        </h6>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 cd-table" style="font-size: 0.8rem;">
+                <thead style="background: #f8fafc;">
+                    <tr>
+                        <th>Month</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-end">Gross Salary</th>
+                        <th class="text-end">Net Pay</th>
+                        <th class="text-end">EPF (EE)</th>
+                        <th class="text-end">EPF (ER)</th>
+                        <th class="text-end">ESIC (EE)</th>
+                        <th class="text-end">ESIC (ER)</th>
+                        <th class="text-center">Employees</th>
+                        <th class="text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for fm in fy_months %}
+                    <tr>
+                        <td class="fw-semibold">{{ fm.month_name }} {{ fm.year }}</td>
+                        <td class="text-center">
+                            {% if fm.status == 'finalized' %}
+                                <span class="badge bg-success" style="font-size: 0.68rem;"><i class="bi bi-check-circle me-1"></i>Filed</span>
+                            {% elif fm.status == 'processing' %}
+                                <span class="badge bg-warning text-dark" style="font-size: 0.68rem;"><i class="bi bi-hourglass-split me-1"></i>Processing</span>
+                            {% elif fm.status == 'draft' %}
+                                <span class="badge bg-info text-dark" style="font-size: 0.68rem;"><i class="bi bi-pencil me-1"></i>Draft</span>
+                            {% else %}
+                                <span class="badge bg-light text-muted" style="font-size: 0.68rem;"><i class="bi bi-dash me-1"></i>Not Created</span>
+                            {% endif %}
+                        </td>
+                        {% if fm.payroll %}
+                        <td class="text-end">{{ "₹{:,.0f}".format(fm.payroll.total_gross or 0) }}</td>
+                        <td class="text-end">{{ "₹{:,.0f}".format(fm.payroll.total_net_pay or 0) }}</td>
+                        <td class="text-end">{{ "₹{:,.0f}".format(fm.payroll.total_epf_employee or 0) }}</td>
+                        <td class="text-end">{{ "₹{:,.0f}".format(fm.payroll.total_epf_employer or 0) }}</td>
+                        <td class="text-end">{{ "₹{:,.0f}".format(fm.payroll.total_esic_employee or 0) }}</td>
+                        <td class="text-end">{{ "₹{:,.0f}".format(fm.payroll.total_esic_employer or 0) }}</td>
+                        <td class="text-center">{{ fm.payroll.total_employees or 0 }}</td>
+                        <td class="text-center">
+                            <a href="{{ url_for('payroll.payroll_process', payroll_id=fm.payroll.id) }}" class="btn btn-sm btn-outline-primary" style="font-size: 0.68rem; padding: 2px 8px;">
+                                Open
+                            </a>
+                        </td>
+                        {% else %}
+                        <td class="text-end text-muted">—</td>
+                        <td class="text-end text-muted">—</td>
+                        <td class="text-end text-muted">—</td>
+                        <td class="text-end text-muted">—</td>
+                        <td class="text-end text-muted">—</td>
+                        <td class="text-end text-muted">—</td>
+                        <td class="text-center text-muted">—</td>
+                        <td class="text-center">
+                            <span class="text-muted" style="font-size: 0.68rem;">—</span>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot style="background: #f1f5f9; font-weight: 600;">
+                    <tr>
+                        <td>TOTAL ({{ fy_label }})</td>
+                        <td class="text-center">
+                            <span class="text-success">{{ months_filed }} Filed</span> /
+                            <span class="text-danger">{{ months_pending }} Pending</span>
+                        </td>
+                        <td class="text-end">{{ "₹{:,.0f}".format(total_salary_disbursed + total_epf_ee + total_esic_ee) }}</td>
+                        <td class="text-end">{{ "₹{:,.0f}".format(total_salary_disbursed) }}</td>
+                        <td class="text-end">{{ "₹{:,.0f}".format(total_epf_ee) }}</td>
+                        <td class="text-end">{{ "₹{:,.0f}".format(total_epf_er) }}</td>
+                        <td class="text-end">{{ "₹{:,.0f}".format(total_esic_ee) }}</td>
+                        <td class="text-end">{{ "₹{:,.0f}".format(total_esic_er) }}</td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== PORTAL CREDENTIALS ==================== -->
+{% if credentials %}
+<div class="card border-0 mb-4 cd-card" style="border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06);">
+    <div class="card-header bg-white" style="border-radius: 12px 12px 0 0;">
+        <h6 class="cd-section-header" style="margin: 0;">
+            <i class="bi bi-key-fill text-warning me-2"></i>Portal Credentials
+        </h6>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table mb-0 cd-cred-table" style="font-size: 0.8rem;">
+                <thead style="background: #f8fafc;">
+                    <tr>
+                        <th>Portal</th>
+                        <th>Username / ID</th>
+                        <th>Password</th>
+                        <th>Remarks</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cred in credentials %}
+                    <tr>
+                        <td class="fw-semibold">{{ cred.portal_name }}</td>
+                        <td><code>{{ cred.username }}</code></td>
+                        <td><code>{{ cred.password }}</code></td>
+                        <td style="color: #64748b;">{{ cred.remarks or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// FY Bar Chart
+const fyCtx = document.getElementById('fyChart');
+if (fyCtx) {
+    const months = {{ fy_months|map(attribute='month_name')|list|tojson }};
+    const statusData = {{ fy_months|map(attribute='status')|list|tojson }};
+
+    // Map status to color values
+    const barColors = statusData.map(s => {
+        if (s === 'finalized') return '#10b981';
+        if (s === 'processing' || s === 'draft') return '#f59e0b';
+        return '#e2e8f0';
+    });
+
+    // Bar height: 1 for all (just showing status via color)
+    const barData = statusData.map(() => 1);
+
+    new Chart(fyCtx, {
+        type: 'bar',
+        data: {
+            labels: months,
+            datasets: [{
+                data: barData,
+                backgroundColor: barColors,
+                borderRadius: 6,
+                barPercentage: 0.7
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { display: false, max: 1.2 },
+                x: {
+                    grid: { display: false },
+                    ticks: { font: { size: 11, weight: '600' } }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            const s = statusData[ctx.dataIndex];
+                            if (s === 'finalized') return 'Filed';
+                            if (s === 'processing') return 'Processing';
+                            if (s === 'draft') return 'Draft';
+                            return 'Not Created';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+</script>
+{% endblock %}

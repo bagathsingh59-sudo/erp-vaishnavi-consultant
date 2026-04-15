@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+
+{% block title %}Salary Register (Format 2) - {{ payroll.period_display }}{% endblock %}
+{% block page_header %}Salary Register — Modern Professional{% endblock %}
+
+{% block content %}
+<style>
+    @page { size: legal landscape; margin: 8mm; }
+    @media print {
+        .sidebar, .top-navbar, .no-print { display: none !important; }
+        .main-content { margin-left: 0 !important; padding: 0 !important; }
+        .page-content { padding: 0 !important; }
+        body { background: #fff !important; }
+        .sf2-page { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 12px !important; }
+        .sf2-table th, .sf2-table td { font-size: 8px !important; padding: 3px 4px !important; }
+        .page-break { page-break-before: always; }
+    }
+
+    .sf2-page { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:28px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+    .sf2-header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:3px solid #2563eb; padding-bottom:14px; margin-bottom:16px; }
+    .sf2-logo-area { }
+    .sf2-logo-area h2 { font-size:1.2rem; font-weight:800; color:#1e3a8a; margin:0; letter-spacing:1px; }
+    .sf2-logo-area p { font-size:0.7rem; color:#64748b; margin:2px 0 0; }
+    .sf2-info-area { text-align:right; font-size:0.75rem; color:#334155; }
+    .sf2-info-area strong { color:#1e293b; }
+    .sf2-badge { display:inline-block; background:#2563eb; color:#fff; font-size:0.62rem; padding:2px 10px; border-radius:10px; font-weight:700; letter-spacing:0.5px; margin-top:4px; }
+
+    .sf2-table { width:100%; border-collapse:collapse; font-size:0.72rem; }
+    .sf2-table thead th {
+        padding:6px 6px; text-align:center; font-weight:700; font-size:0.65rem;
+        text-transform:uppercase; letter-spacing:0.3px; vertical-align:middle;
+        border:1px solid #bfdbfe;
+    }
+    .sf2-table .hdr-main { background:linear-gradient(135deg, #1e3a8a, #2563eb); color:#fff; }
+    .sf2-table .hdr-earn { background:#dcfce7; color:#166534; }
+    .sf2-table .hdr-ded { background:#fef3c7; color:#92400e; }
+    .sf2-table .hdr-net { background:#dbeafe; color:#1e3a8a; }
+    .sf2-table .hdr-att { background:#e0e7ff; color:#3730a3; }
+
+    .sf2-table tbody td { padding:4px 6px; border:1px solid #e2e8f0; vertical-align:middle; }
+    .sf2-table tbody tr:nth-child(even) { background:#f8fafc; }
+    .sf2-table tbody tr:hover { background:#eff6ff; }
+    .sf2-table .text-right { text-align:right; }
+    .sf2-table .text-center { text-align:center; }
+    .sf2-table .text-left { text-align:left; }
+
+    .sf2-table .total-row { background:linear-gradient(135deg, #1e3a8a, #2563eb) !important; color:#fff; font-weight:700; }
+    .sf2-table .total-row td { border-color:#1e3a8a; padding:6px; }
+    .sf2-table .total-row .amt { color:#fde68a; }
+
+    .sf2-summary-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:14px; }
+    .sf2-summary-card { border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; text-align:center; }
+    .sf2-summary-card .lbl { font-size:0.6rem; color:#64748b; text-transform:uppercase; font-weight:600; letter-spacing:0.5px; }
+    .sf2-summary-card .val { font-size:1.05rem; font-weight:700; color:#1e293b; margin-top:2px; }
+
+    .sf2-stat-section { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .sf2-stat-box { border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; }
+    .sf2-stat-box .box-hdr { padding:6px 12px; font-weight:700; font-size:0.72rem; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; }
+    .sf2-stat-box table { width:100%; border-collapse:collapse; font-size:0.72rem; }
+    .sf2-stat-box table td { padding:4px 12px; border-bottom:1px solid #f1f5f9; }
+    .sf2-stat-box table .lbl { color:#475569; }
+    .sf2-stat-box table .val { text-align:right; font-weight:600; color:#1e293b; }
+    .sf2-stat-box table .grand td { border-top:2px solid #1e293b; font-weight:700; font-size:0.78rem; padding:6px 12px; }
+</style>
+
+<div class="no-print mb-3 d-flex justify-content-between align-items-center">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb" style="font-size:0.85rem; margin:0;">
+            <li class="breadcrumb-item"><a href="{{ url_for('payroll.payroll_list') }}" class="text-decoration-none">Salary Processing</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('payroll.payroll_process', payroll_id=payroll.id) }}" class="text-decoration-none">{{ payroll.period_display }}</a></li>
+            <li class="breadcrumb-item active">Salary Register (Format 2)</li>
+        </ol>
+    </nav>
+    <div class="d-flex gap-2">
+        <button onclick="window.history.back()" style="background:#e5e7eb; color:#333; border:none; padding:6px 16px; border-radius:6px; cursor:pointer; font-size:0.82rem;"><i class="bi bi-arrow-left me-1"></i> Back to Payroll</button>
+        <button onclick="window.print()" class="btn btn-primary btn-sm">
+            <i class="bi bi-printer me-1"></i> Print / PDF
+        </button>
+    </div>
+</div>
+
+<!-- =============== PAGE 1: SALARY REGISTER =============== -->
+<div class="sf2-page">
+    <div class="sf2-header">
+        <div class="sf2-logo-area">
+            <h2>VAISHNAVI CONSULTANT</h2>
+            <p>Compliance & Payroll Consultants</p>
+            <div class="sf2-badge">SALARY REGISTER</div>
+        </div>
+        <div class="sf2-info-area">
+            <div><strong>{{ est.company_name }}</strong></div>
+            {% if est.address %}<div style="font-size:0.68rem; color:#64748b;">{{ est.address }}</div>{% endif %}
+            <div style="margin-top:6px;">
+                <strong>Period:</strong> {{ payroll.month_name }} {{ payroll.year }} &nbsp;|&nbsp;
+                <strong>Working Days:</strong> {{ payroll.working_days }}
+            </div>
+            {% if est.pf_code %}<div><strong>PF Code:</strong> {{ est.pf_code }}</div>{% endif %}
+            {% if est.esic_code %}<div><strong>ESIC Code:</strong> {{ est.esic_code }}</div>{% endif %}
+        </div>
+    </div>
+
+    <div style="overflow-x:auto;">
+        <table class="sf2-table">
+            <thead>
+                <tr>
+                    <th rowspan="2" class="hdr-main" style="min-width:30px;">Sl</th>
+                    <th rowspan="2" class="hdr-main" style="min-width:130px; text-align:left;">Employee Name</th>
+                    <th rowspan="2" class="hdr-main" style="min-width:70px;">Designation</th>
+                    <th rowspan="2" class="hdr-main">UAN</th>
+                    <th rowspan="2" class="hdr-main">ESIC IP</th>
+                    <th rowspan="2" class="hdr-att">Rate</th>
+                    <th colspan="4" class="hdr-att">Attendance</th>
+                    {% for head in heads %}
+                    <th rowspan="2" class="hdr-earn">{{ head.short_code }}</th>
+                    {% endfor %}
+                    <th rowspan="2" class="hdr-earn">NPH<br>Amt</th>
+                    <th rowspan="2" class="hdr-earn" style="font-weight:800;">Gross<br>Earned</th>
+                    {% if config.ot_applicable %}
+                    <th rowspan="2" class="hdr-att">OT<br>Hrs</th>
+                    <th rowspan="2" class="hdr-earn">OT<br>Amt</th>
+                    {% endif %}
+                    {% if config.epf_applicable %}
+                    <th rowspan="2" class="hdr-ded">EPF<br>EE</th>
+                    <th rowspan="2" class="hdr-ded">EPF<br>ER</th>
+                    {% endif %}
+                    {% if config.esic_applicable %}
+                    <th rowspan="2" class="hdr-ded">ESIC<br>EE</th>
+                    <th rowspan="2" class="hdr-ded">ESIC<br>ER</th>
+                    {% endif %}
+                    {% if config.pt_applicable %}
+                    <th rowspan="2" class="hdr-ded">PT</th>
+                    {% endif %}
+                    <th rowspan="2" class="hdr-ded">Other<br>Ded</th>
+                    <th rowspan="2" class="hdr-ded" style="font-weight:800;">Total<br>Ded</th>
+                    <th rowspan="2" class="hdr-net" style="font-weight:800;">NET<br>PAY</th>
+                    <th rowspan="2" class="hdr-main">Sign</th>
+                </tr>
+                <tr>
+                    <th class="hdr-att" style="font-size:0.58rem;">Pres</th>
+                    <th class="hdr-att" style="font-size:0.58rem;">Abs</th>
+                    <th class="hdr-att" style="font-size:0.58rem;">PH</th>
+                    <th class="hdr-att" style="font-size:0.58rem;">Pay<br>Days</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set ns = namespace(
+                    t_present=0, t_absent=0, t_ph=0, t_payable=0,
+                    t_nph_amt=0, t_earned=0, t_ot_hrs=0, t_ot=0,
+                    t_epf_ee=0, t_epf_er=0, t_esic_ee=0, t_esic_er=0,
+                    t_pt=0, t_other_ded=0, t_total_ded=0, t_net=0
+                ) %}
+                {% set head_totals = {} %}
+
+                {% for entry in entries %}
+                <tr>
+                    <td class="text-center" style="color:#94a3b8; font-weight:600;">{{ loop.index }}</td>
+                    <td class="text-left">
+                        <div style="font-weight:700; font-size:0.74rem; color:#1e293b;">{{ entry.employee.name }}</div>
+                    </td>
+                    <td class="text-center" style="font-size:0.65rem; color:#64748b;">{{ entry.employee.designation or '' }}</td>
+                    {% set uan = entry.employee.uan_number or '' %}
+                    {% set uan_bad = uan and (uan|length != 12 or not uan.isdigit()) %}
+                    <td class="text-center" style="font-size:0.62rem;{% if uan_bad %} color:#dc2626; font-weight:700; background:#fef2f2;{% else %} color:#64748b;{% endif %}"{% if uan_bad %} title="UAN must be 12 digits"{% endif %}>{{ uan }}{% if uan_bad %} <i class="bi bi-exclamation-triangle-fill" style="font-size:0.55rem;"></i>{% endif %}</td>
+                    {% set ip = entry.employee.esic_ip_number or '' %}
+                    {% set ip_bad = ip and (ip|length != 10 or not ip.isdigit()) %}
+                    <td class="text-center" style="font-size:0.62rem;{% if ip_bad %} color:#dc2626; font-weight:700; background:#fef2f2;{% else %} color:#64748b;{% endif %}"{% if ip_bad %} title="ESIC IP must be 10 digits"{% endif %}>{{ ip or 'NA' }}{% if ip_bad %} <i class="bi bi-exclamation-triangle-fill" style="font-size:0.55rem;"></i>{% endif %}</td>
+                    <td class="text-right" style="font-size:0.68rem; color:#64748b;">{% if entry._salary_type == 'daily_wages' and entry._daily_rate %}{{ "{:,.0f}".format(entry._daily_rate) }}{% else %}{{ "{:,.0f}".format(entry.gross_salary) }}{% endif %}</td>
+                    <td class="text-center">{{ entry.days_present|int if entry.days_present == entry.days_present|int else entry.days_present }}</td>
+                    <td class="text-center">{{ entry.days_absent|int if entry.days_absent == entry.days_absent|int else entry.days_absent }}</td>
+                    <td class="text-center">{{ entry.paid_holidays|int if entry.paid_holidays else 0 }}</td>
+                    <td class="text-center" style="font-weight:700;">{{ entry.total_payable_days|int if entry.total_payable_days == entry.total_payable_days|int else entry.total_payable_days }}</td>
+
+                    {% for head in heads %}
+                    <td class="text-right">
+                        {% if head.id in entry.head_amounts %}
+                            {{ "{:,.0f}".format(entry.head_amounts[head.id].earned_amount) }}
+                            {% if head_totals.update({head.id: (head_totals.get(head.id, 0) + entry.head_amounts[head.id].earned_amount)}) %}{% endif %}
+                        {% else %}-{% endif %}
+                    </td>
+                    {% endfor %}
+
+                    <td class="text-right">{{ "{:,.0f}".format(entry._nph_amount) if entry._nph_amount else "-" }}</td>
+                    <td class="text-right" style="font-weight:700; background:#f0fdf4;">{{ "{:,.0f}".format(entry.earned_gross) }}</td>
+                    {% if config.ot_applicable %}
+                    <td class="text-center">{{ entry.ot_hours|int if entry.ot_hours else "-" }}</td>
+                    <td class="text-right">{{ "{:,.0f}".format(entry.ot_amount) }}</td>
+                    {% endif %}
+                    {% if config.epf_applicable %}
+                    <td class="text-right" style="color:#b91c1c;">{{ "{:,.0f}".format(entry.epf_employee) }}</td>
+                    <td class="text-right" style="color:#92400e;">{{ "{:,.0f}".format(entry.epf_employer) }}</td>
+                    {% endif %}
+                    {% if config.esic_applicable %}
+                    <td class="text-right" style="color:#b91c1c;">{{ "{:,.0f}".format(entry.esic_employee) }}</td>
+                    <td class="text-right" style="color:#92400e;">{{ "{:,.0f}".format(entry.esic_employer) }}</td>
+                    {% endif %}
+                    {% if config.pt_applicable %}
+                    <td class="text-right" style="color:#b91c1c;">{{ "{:,.0f}".format(entry.professional_tax) }}</td>
+                    {% endif %}
+                    <td class="text-right">{{ "{:,.0f}".format(entry.other_deduction) if entry.other_deduction else "-" }}</td>
+                    <td class="text-right" style="font-weight:700; color:#b91c1c;">{{ "{:,.0f}".format(entry.total_deductions) }}</td>
+                    <td class="text-right" style="font-weight:800; color:#1e3a8a; background:#eff6ff;">{{ "{:,.0f}".format(entry.net_pay) }}</td>
+                    <td></td>
+                </tr>
+                {% set ns.t_present = ns.t_present + entry.days_present %}
+                {% set ns.t_absent = ns.t_absent + entry.days_absent %}
+                {% set ns.t_ph = ns.t_ph + (entry.paid_holidays or 0) %}
+                {% set ns.t_payable = ns.t_payable + entry.total_payable_days %}
+                {% set ns.t_nph_amt = ns.t_nph_amt + (entry._nph_amount or 0) %}
+                {% set ns.t_earned = ns.t_earned + entry.earned_gross %}
+                {% set ns.t_ot_hrs = ns.t_ot_hrs + (entry.ot_hours or 0) %}
+                {% set ns.t_ot = ns.t_ot + entry.ot_amount %}
+                {% set ns.t_epf_ee = ns.t_epf_ee + entry.epf_employee %}
+                {% set ns.t_epf_er = ns.t_epf_er + entry.epf_employer %}
+                {% set ns.t_esic_ee = ns.t_esic_ee + entry.esic_employee %}
+                {% set ns.t_esic_er = ns.t_esic_er + entry.esic_employer %}
+                {% set ns.t_pt = ns.t_pt + entry.professional_tax %}
+                {% set ns.t_other_ded = ns.t_other_ded + entry.other_deduction %}
+                {% set ns.t_total_ded = ns.t_total_ded + entry.total_deductions %}
+                {% set ns.t_net = ns.t_net + entry.net_pay %}
+                {% endfor %}
+
+                <!-- TOTAL ROW -->
+                <tr class="total-row">
+                    <td></td>
+                    <td class="text-left" style="font-size:0.78rem;">TOTAL ({{ entries|length }} Emp)</td>
+                    <td></td><td></td><td></td>
+                    <td></td>
+                    <td class="text-center">{{ ns.t_present|int }}</td>
+                    <td class="text-center">{{ ns.t_absent|int }}</td>
+                    <td class="text-center">{{ ns.t_ph|int }}</td>
+                    <td class="text-center">{{ ns.t_payable|int }}</td>
+                    {% for head in heads %}
+                    <td class="text-right amt">{{ "{:,.0f}".format(head_totals.get(head.id, 0)) }}</td>
+                    {% endfor %}
+                    <td class="text-right amt">{{ "{:,.0f}".format(ns.t_nph_amt) }}</td>
+                    <td class="text-right amt">{{ "{:,.0f}".format(ns.t_earned) }}</td>
+                    {% if config.ot_applicable %}
+                    <td class="text-center amt">{{ ns.t_ot_hrs|int }}</td>
+                    <td class="text-right amt">{{ "{:,.0f}".format(ns.t_ot) }}</td>
+                    {% endif %}
+                    {% if config.epf_applicable %}
+                    <td class="text-right amt">{{ "{:,.0f}".format(ns.t_epf_ee) }}</td>
+                    <td class="text-right amt">{{ "{:,.0f}".format(ns.t_epf_er) }}</td>
+                    {% endif %}
+                    {% if config.esic_applicable %}
+                    <td class="text-right amt">{{ "{:,.0f}".format(ns.t_esic_ee) }}</td>
+                    <td class="text-right amt">{{ "{:,.0f}".format(ns.t_esic_er) }}</td>
+                    {% endif %}
+                    {% if config.pt_applicable %}
+                    <td class="text-right amt">{{ "{:,.0f}".format(ns.t_pt) }}</td>
+                    {% endif %}
+                    <td class="text-right amt">{{ "{:,.0f}".format(ns.t_other_ded) }}</td>
+                    <td class="text-right amt">{{ "{:,.0f}".format(ns.t_total_ded) }}</td>
+                    <td class="text-right" style="font-size:0.85rem; color:#fde68a;">{{ "{:,.0f}".format(ns.t_net) }}</td>
+                    <td></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div style="margin-top:20px; display:flex; justify-content:space-between; font-size:0.68rem; color:#94a3b8;">
+        <div>Generated: {{ generated_on }}</div>
+        <div>Vaishnavi Consultant</div>
+    </div>
+</div>
+
+{% endblock %}

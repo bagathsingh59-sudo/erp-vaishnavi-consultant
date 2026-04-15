@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Bulk Form B + D PDF{% endblock %}
+{% block page_header %}Bulk Form B + D — Department Submission{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm" style="max-width: 900px;">
+    <div class="card-body">
+        <p class="text-muted" style="font-size:0.85rem;">
+            Select an establishment, then tick the months you want. A single landscape PDF will be
+            generated containing Form B and/or Form D for each selected month — ready to print and
+            submit to the department.
+        </p>
+
+        <form method="POST" id="bulkForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">Establishment</label>
+                <select name="establishment_id" id="estSelect" class="form-select" required>
+                    <option value="">-- Select --</option>
+                    {% for e in establishments %}
+                    <option value="{{ e.id }}">{{ e.company_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">Reports to Include</label>
+                <div>
+                    <label class="me-3"><input type="checkbox" name="include_b" checked> Form B (Wage Register)</label>
+                    <label><input type="checkbox" name="include_d" checked> Form D (Attendance Register)</label>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">Select Months</label>
+                <div class="mb-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleAll(true)">Select All</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleAll(false)">Clear</button>
+                </div>
+                <div id="monthsBox" style="max-height:320px; overflow:auto; border:1px solid #e2e8f0; border-radius:6px; padding:10px;">
+                    <div class="text-muted" style="font-size:0.85rem;">Select an establishment to see available months.</div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-file-earmark-pdf"></i> Open Combined Print View
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+// Payroll data keyed by establishment id
+var EST_PAYROLLS = {
+    {% for est_id, prs in est_payrolls.items() %}
+    "{{ est_id }}": [
+        {% for p in prs %}
+        { id: {{ p.id }}, label: "{{ p.period_display }}", status: "{{ p.status }}" }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ]{% if not loop.last %},{% endif %}
+    {% endfor %}
+};
+
+document.getElementById('estSelect').addEventListener('change', function(){
+    var eid = this.value;
+    var box = document.getElementById('monthsBox');
+    if(!eid){ box.innerHTML = '<div class="text-muted" style="font-size:0.85rem;">Select an establishment to see available months.</div>'; return; }
+    var list = EST_PAYROLLS[eid] || [];
+    if(list.length === 0){ box.innerHTML = '<div class="text-muted">No payrolls found for this establishment.</div>'; return; }
+    var html = '';
+    list.forEach(function(p){
+        html += '<label style="display:block; padding:3px 0; font-size:0.88rem;">' +
+                '<input type="checkbox" name="payroll_ids" value="' + p.id + '"> ' +
+                p.label + ' <span style="color:#64748b; font-size:0.75rem;">[' + p.status + ']</span></label>';
+    });
+    box.innerHTML = html;
+});
+
+function toggleAll(state){
+    document.querySelectorAll('#monthsBox input[type=checkbox]').forEach(function(cb){ cb.checked = state; });
+}
+</script>
+{% endblock %}

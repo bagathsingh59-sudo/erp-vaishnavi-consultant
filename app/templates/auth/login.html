@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login — Vaishnavi Consultant</title>
+    <link rel="icon" type="image/svg+xml" href="/static/img/namam.svg">
+    <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 40%, #334155 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Background decoration */
+        body::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -30%;
+            width: 800px;
+            height: 800px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(79,70,229,0.15) 0%, transparent 70%);
+        }
+        body::after {
+            content: '';
+            position: absolute;
+            bottom: -40%;
+            left: -20%;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(124,58,237,0.1) 0%, transparent 70%);
+        }
+
+        .login-container {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 440px;
+            padding: 20px;
+        }
+
+        /* Branding */
+        .brand-section {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .brand-icon {
+            width: 72px;
+            height: 72px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            box-shadow: 0 8px 32px rgba(79,70,229,0.4);
+        }
+        .brand-icon i {
+            font-size: 2rem;
+            color: #fff;
+        }
+        .brand-name {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: -0.5px;
+        }
+        .brand-subtitle {
+            font-size: 0.78rem;
+            color: #94a3b8;
+            margin-top: 4px;
+        }
+
+        /* Clerk widget container */
+        .clerk-container {
+            background: #fff;
+            border-radius: 16px;
+            padding: 32px 28px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Loading state */
+        .clerk-loading {
+            text-align: center;
+            color: #64748b;
+        }
+        .clerk-loading .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid #e2e8f0;
+            border-top-color: #4f46e5;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Dev mode notice */
+        .dev-notice {
+            background: rgba(250,204,21,0.1);
+            border: 1px solid rgba(250,204,21,0.3);
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin-top: 20px;
+            text-align: center;
+        }
+        .dev-notice i { color: #fbbf24; font-size: 1.1rem; }
+        .dev-notice p { color: #fbbf24; font-size: 0.72rem; margin: 6px 0 0; }
+        .dev-notice a {
+            display: inline-block;
+            margin-top: 8px;
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: #fff;
+            padding: 8px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.82rem;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        .dev-notice a:hover { transform: translateY(-1px); }
+
+        /* Footer */
+        .login-footer {
+            text-align: center;
+            margin-top: 24px;
+            color: #475569;
+            font-size: 0.68rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+
+        <!-- Branding -->
+        <div class="brand-section">
+            <div class="brand-icon" style="background:none; box-shadow:none;">
+                <img src="/static/img/logo.svg" alt="Vaishnavi Namam"
+                     style="width:52px; height:52px; filter:drop-shadow(0 3px 8px rgba(255,69,0,0.4));">
+            </div>
+            <div class="brand-name">Vaishnavi Consultant</div>
+            <div class="brand-subtitle">Jai Shriman Narayana</div>
+        </div>
+
+        {% if clerk_pub_key and not clerk_pub_key.startswith('pk_test_XXXX') %}
+        <!-- Clerk Sign-In Widget -->
+        <div class="clerk-container" id="clerk-box">
+            <div class="clerk-loading" id="clerk-loading">
+                <div class="spinner"></div>
+                <div style="font-size:0.78rem;">Loading secure login...</div>
+            </div>
+            <div id="sign-in"></div>
+        </div>
+
+        <!-- Clerk JS -->
+        <script
+            async
+            crossorigin="anonymous"
+            data-clerk-publishable-key="{{ clerk_pub_key }}"
+            src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+            onload="initClerk()"
+            onerror="clerkError()">
+        </script>
+
+        <script>
+        function initClerk() {
+            window.Clerk.load().then(function() {
+                // Hide loading spinner
+                document.getElementById('clerk-loading').style.display = 'none';
+
+                if (window.Clerk.user) {
+                    // Already signed in — redirect to dashboard
+                    window.location.href = '/';
+                } else {
+                    // Mount the sign-in component
+                    window.Clerk.mountSignIn(document.getElementById('sign-in'), {
+                        afterSignInUrl: '/',
+                        appearance: {
+                            elements: {
+                                rootBox: { width: '100%' },
+                                card: { boxShadow: 'none', border: 'none' },
+                                headerTitle: { display: 'none' },
+                                headerSubtitle: { display: 'none' },
+                                socialButtonsBlockButton: { borderRadius: '8px' },
+                                formButtonPrimary: {
+                                    background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+                                    borderRadius: '8px',
+                                    fontWeight: '600',
+                                },
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        function clerkError() {
+            document.getElementById('clerk-loading').innerHTML =
+                '<i class="bi bi-exclamation-triangle" style="font-size:1.5rem; color:#ef4444;"></i>' +
+                '<div style="font-size:0.78rem; color:#ef4444; margin-top:8px;">Failed to load login. Check your internet connection.</div>' +
+                '<div style="margin-top:12px;"><a href="javascript:location.reload()" style="color:#4f46e5; font-size:0.75rem;">Retry</a></div>';
+        }
+        </script>
+
+        {% else %}
+        <!-- Dev Mode — Clerk Not Configured -->
+        <div class="dev-notice">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <p>Clerk authentication is not configured yet.<br>
+               System is running in <strong>open development mode</strong>.<br>
+               Add your Clerk API keys in the <code>.env</code> file to enable login.</p>
+            <a href="/">Enter ERP (Dev Mode)</a>
+        </div>
+        {% endif %}
+
+        <!-- Footer -->
+        <div class="login-footer">
+            &copy; 2026 Vaishnavi Consultant. All rights reserved.
+        </div>
+
+    </div>
+</body>
+</html>

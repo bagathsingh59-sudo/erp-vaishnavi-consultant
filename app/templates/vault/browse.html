@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Vault — {{ est.company_name }}{% endblock %}
+{% block page_header %}Vault — {{ est.company_name }}{% endblock %}
+
+{% block content %}
+<div class="mb-3 d-flex gap-2 flex-wrap">
+    <a href="{{ url_for('vault.vault_home') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+    <a href="{{ url_for('vault.vault_upload', est_id=est.id, fy=sel_fy, month=sel_month) }}" class="btn btn-sm btn-primary">
+        <i class="bi bi-cloud-upload"></i> Upload More
+    </a>
+    <a href="{{ url_for('vault.vault_zip', est_id=est.id, fy=sel_fy, month=sel_month) }}" class="btn btn-sm btn-success">
+        <i class="bi bi-file-earmark-zip"></i> Download All as ZIP
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card shadow-sm mb-3">
+    <div class="card-body py-3">
+        <form method="GET" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small mb-1">Financial Year</label>
+                <select name="fy" class="form-select form-select-sm">
+                    <option value="">All FYs</option>
+                    {% for y in fys %}
+                    <option value="{{ y }}" {% if sel_fy == y %}selected{% endif %}>FY {{ y }}-{{ (y+1)|string|slice(2) }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small mb-1">Month</label>
+                <select name="month" class="form-select form-select-sm">
+                    <option value="">All Months</option>
+                    {% for m, nm in [(4,'April'),(5,'May'),(6,'June'),(7,'July'),(8,'August'),(9,'September'),(10,'October'),(11,'November'),(12,'December'),(1,'January'),(2,'February'),(3,'March')] %}
+                    <option value="{{ m }}" {% if sel_month == m %}selected{% endif %}>{{ nm }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4 d-flex gap-1">
+                <button type="submit" class="btn btn-sm btn-primary flex-fill">Filter</button>
+                <a href="{{ url_for('vault.vault_browse', est_id=est.id) }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Month-strip coverage per FY -->
+{% if fys %}
+{% set month_names = {1:'Jan',2:'Feb',3:'Mar',4:'Apr',5:'May',6:'Jun',7:'Jul',8:'Aug',9:'Sep',10:'Oct',11:'Nov',12:'Dec'} %}
+<div class="card shadow-sm mb-3">
+    <div class="card-header bg-light py-2">
+        <strong><i class="bi bi-calendar3"></i> Month-wise Coverage</strong>
+        <small class="text-muted ms-2">Green = files present · Red = empty · Click to filter</small>
+    </div>
+    <div class="card-body py-2">
+        {% for y in fys %}
+        <div class="mb-2 d-flex align-items-center flex-wrap gap-1">
+            <strong class="me-2" style="min-width:110px;">FY {{ y }}-{{ (y+1)|string|slice(2) }}</strong>
+            {% for m in fy_month_order %}
+                {% set has = month_map.get(y) and m in month_map.get(y) %}
+                <a href="{{ url_for('vault.vault_browse', est_id=est.id, fy=y, month=m) }}"
+                   class="badge text-decoration-none {% if has %}bg-success{% else %}bg-danger bg-opacity-50{% endif %}"
+                   style="min-width:38px;">
+                    {{ month_names[m] }}
+                </a>
+            {% endfor %}
+            {% set total_m = month_map.get(y)|length if month_map.get(y) else 0 %}
+            <span class="ms-2 text-muted small">{{ total_m }} / 12</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Files -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        {% if files %}
+        <table class="table table-sm table-hover mb-0" style="font-size:0.85rem;">
+            <thead class="table-light">
+                <tr>
+                    <th>FY</th>
+                    <th>Month</th>
+                    <th>File Name</th>
+                    <th>Description</th>
+                    <th class="text-end">Size</th>
+                    <th>Uploaded</th>
+                    <th class="text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in files %}
+                <tr>
+                    <td>{{ f.fy_label }}</td>
+                    <td>{{ f.month_label }}</td>
+                    <td><i class="bi bi-file-earmark"></i> {{ f.original_filename }}</td>
+                    <td><small class="text-muted">{{ f.description or '' }}</small></td>
+                    <td class="text-end"><small>{{ f.size_human }}</small></td>
+                    <td><small>{{ f.uploaded_at.strftime('%d %b %Y %I:%M %p') if f.uploaded_at }}</small></td>
+                    <td class="text-center">
+                        <a href="{{ url_for('vault.vault_download', file_id=f.id) }}" class="btn btn-sm btn-outline-primary" title="Download"><i class="bi bi-download"></i></a>
+                        <form method="POST" action="{{ url_for('vault.vault_delete', file_id=f.id) }}" class="d-inline"
+                              onsubmit="return confirm('Delete {{ f.original_filename|e }}? This cannot be undone.')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="p-5 text-center text-muted">
+            <i class="bi bi-folder2-open" style="font-size:2rem;"></i>
+            <p class="mt-2 mb-0">No files found for this selection. Click <strong>Upload More</strong> to add some.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

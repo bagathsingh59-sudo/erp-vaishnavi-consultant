@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+
+{% block title %}Form B - Wage Register - {{ payroll.period_display }}{% endblock %}
+{% block page_header %}Form B — Wage Register{% endblock %}
+
+{% block content %}
+<style>
+    /* Force LANDSCAPE orientation — explicit dimensions (width > height) work
+       across Chrome, Edge, Firefox, Safari print engines regardless of the
+       browser's default print dialog selection. */
+    @page {
+        size: 14in 8.5in;         /* Legal landscape: 14" wide × 8.5" tall */
+        margin: 8mm;
+    }
+    @media print {
+        @page {
+            size: 14in 8.5in landscape;
+            margin: 8mm;
+        }
+        html, body {
+            width: 14in;
+            background: #fff !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .sidebar, .top-navbar, .no-print { display: none !important; }
+        .main-content { margin-left: 0 !important; padding: 0 !important; width: 100% !important; }
+        .page-content { padding: 0 !important; }
+        .form-b-page {
+            box-shadow: none !important;
+            border: none !important;
+            margin: 0 !important;
+            padding: 8px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow: visible !important;
+        }
+        .form-b-table {
+            width: 100% !important;
+            page-break-inside: auto;
+        }
+        .form-b-table th, .form-b-table td { font-size: 8px !important; padding: 3px 4px !important; }
+        .form-b-table thead { display: table-header-group; }
+        .form-b-table tr { page-break-inside: avoid; }
+    }
+
+    .form-b-page {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        overflow-x: auto;
+    }
+    .form-b-title { text-align: center; margin-bottom: 16px; }
+    .form-b-title h3 { font-size: 1.1rem; font-weight: 700; margin: 0; letter-spacing: 1px; }
+    .form-b-title h4 { font-size: 0.95rem; font-weight: 700; margin: 2px 0; }
+    .form-b-title p { font-size: 0.78rem; font-weight: 600; margin: 2px 0; }
+
+    .form-b-info {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 14px;
+        font-size: 0.78rem;
+        color: #334155;
+    }
+    .form-b-info .label { font-weight: 700; min-width: 160px; display: inline-block; }
+    .form-b-info .value { font-weight: 400; }
+
+    .form-b-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.72rem;
+    }
+    .form-b-table th {
+        background: #f1f5f9;
+        font-weight: 700;
+        padding: 5px 6px;
+        border: 1px solid #94a3b8;
+        text-align: center;
+        white-space: nowrap;
+        font-size: 0.68rem;
+        vertical-align: middle;
+    }
+    .form-b-table td {
+        padding: 4px 6px;
+        border: 1px solid #cbd5e1;
+        white-space: nowrap;
+        vertical-align: middle;
+    }
+    .form-b-table .text-right { text-align: right; }
+    .form-b-table .text-center { text-align: center; }
+    .form-b-table .total-row {
+        background: #d9ead3;
+        font-weight: 700;
+    }
+    .form-b-table .total-row td {
+        border-top: 2px solid #1e293b;
+        border-bottom: 2px solid #1e293b;
+    }
+    .form-b-table .gross-col { background: #f0fdf4; font-weight: 700; }
+    .form-b-table .net-col { background: #f0fdf4; font-weight: 700; }
+    .form-b-table .ded-header { background: #fef3c7; }
+</style>
+
+<!-- Action Bar -->
+<div class="no-print mb-3 d-flex justify-content-between align-items-center">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb" style="font-size:0.85rem; margin:0;">
+            <li class="breadcrumb-item"><a href="{{ url_for('payroll.payroll_list') }}" class="text-decoration-none">Salary Processing</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('payroll.payroll_process', payroll_id=payroll.id) }}" class="text-decoration-none">{{ payroll.period_display }}</a></li>
+            <li class="breadcrumb-item active">Form B</li>
+        </ol>
+    </nav>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('reports.form_b_excel', payroll_id=payroll.id) }}" class="btn btn-success btn-sm">
+            <i class="bi bi-file-earmark-excel me-1"></i> Download Excel
+        </a>
+        <button onclick="window.history.back()" style="background:#e5e7eb; color:#333; border:none; padding:6px 16px; border-radius:6px; cursor:pointer; font-size:0.82rem;"><i class="bi bi-arrow-left me-1"></i> Back to Payroll</button>
+        <button onclick="window.print()" class="btn btn-primary btn-sm">
+            <i class="bi bi-printer me-1"></i> Print / PDF
+        </button>
+    </div>
+</div>
+
+<div class="no-print alert alert-warning py-2 px-3 mb-3" style="font-size:0.82rem;">
+    <i class="bi bi-info-circle-fill me-1"></i>
+    <strong>Printing / Save as PDF:</strong> Click <b>Print / PDF</b>, then in the print dialog set
+    <b>Layout = Landscape</b> and <b>Paper size = Legal</b> for the correct format.
+</div>
+
+<div class="form-b-page">
+
+    <!-- Title -->
+    <div class="form-b-title">
+        <h3>FORM B</h3>
+        <h4>FORMAT OF WAGE REGISTER</h4>
+        <p>[Part-A: For all Establishments]</p>
+    </div>
+
+    <!-- Establishment Info -->
+    <div class="form-b-info">
+        <div style="flex:1;">
+            <div><span class="label">Name of the Establishment:</span> <strong>{{ est.company_name.upper() }}</strong></div>
+            <div><span class="label">Name of Owner:</span> <span class="value">{{ est.address or '' }}</span></div>
+            <div><span class="label">LIN/PAN:</span> <span class="value">{{ est.pan_number or '' }}</span></div>
+        </div>
+        <div style="text-align:right; font-size:0.72rem;">
+            <div style="font-style:italic; color:#64748b;">Rate of Minimum Wages and since the date………</div>
+        </div>
+    </div>
+
+    <!-- Wage Period -->
+    <div style="font-size:0.78rem; margin-bottom:12px;">
+        <span class="label" style="font-weight:700;">Wage period From</span>
+        <strong style="margin:0 8px;">01-{{ payroll.month_name[:3] }}-{{ payroll.year }}</strong>
+        <span>To</span>
+        <strong style="margin:0 8px;">
+            {% set last_day = [31,28,31,30,31,30,31,31,30,31,30,31] %}
+            {% if payroll.month == 2 and payroll.year % 4 == 0 %}
+                29-{{ payroll.month_name[:3] }}-{{ payroll.year }}
+            {% else %}
+                {{ last_day[payroll.month - 1] }}-{{ payroll.month_name[:3] }}-{{ payroll.year }}
+            {% endif %}
+        </strong>
+        <span style="margin-left:16px; color:#64748b;">(Monthly/Fortnight/Weekly/Daily/Piece Rated)</span>
+        <span style="float:right; color:#dc2626; font-weight:700;">Salary for the Month of: - {{ payroll.month_name }}-{{ payroll.year }}</span>
+    </div>
+
+    <!-- Data Table -->
+    <table class="form-b-table">
+        <thead>
+            <tr>
+                <th rowspan="2" style="min-width:35px;">Sr.<br>No.</th>
+                <th rowspan="2" style="min-width:80px;">Emp.<br>Code</th>
+                <th rowspan="2" style="min-width:160px; text-align:left;">Name</th>
+                <th rowspan="2">Rate of<br>Wages</th>
+                <th rowspan="2">No. of<br>Days<br>worked</th>
+                <th rowspan="2">Paid<br>Holidays</th>
+                <th rowspan="2">Overtime<br>worked in<br>days</th>
+                <th rowspan="2">Basic</th>
+                <th rowspan="2">Special<br>Basic</th>
+                <th rowspan="2">DA</th>
+                <th rowspan="2">Payment<br>Over Time</th>
+                <th rowspan="2">HRA</th>
+                <th rowspan="2">Others</th>
+                <th rowspan="2">NPH</th>
+                <th rowspan="2" style="background:#dcfce7;">Gross<br>Wages</th>
+                <th colspan="7" class="ded-header">Deductions</th>
+                <th rowspan="2">Total</th>
+                <th rowspan="2" style="background:#dcfce7;">Net Payment<br>NET PAY<br>FOE ADV</th>
+                <th rowspan="2">Receipt by<br>Employee /<br>Bank<br>Transaction ID</th>
+                <th rowspan="2">Date of<br>Payment</th>
+                <th rowspan="2">Remarks</th>
+            </tr>
+            <tr>
+                <th class="ded-header">PF</th>
+                <th class="ded-header">ESIC</th>
+                <th class="ded-header">Society</th>
+                <th class="ded-header">Income<br>Tax</th>
+                <th class="ded-header">Insurance</th>
+                <th class="ded-header">LWF</th>
+                <th class="ded-header">Recoveries</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% set ns = namespace(
+                t_days=0, t_ph=0, t_ot=0,
+                t_basic=0, t_spl=0, t_da=0, t_ot_amt=0, t_hra=0, t_others=0, t_nph=0,
+                t_gross=0, t_pf=0, t_esic=0, t_soc=0, t_it=0, t_ins=0, t_lwf=0, t_rec=0,
+                t_total_ded=0, t_net=0
+            ) %}
+
+            {% for row in rows %}
+            <tr>
+                <td class="text-center">{{ loop.index }}</td>
+                <td class="text-center" style="font-size:0.75rem;">{{ row.emp_code }}</td>
+                <td style="text-align:left; font-weight:600;">{{ row.name }}</td>
+                <td class="text-right">{{ "%.2f"|format(row.rate) }}</td>
+                <td class="text-center">{{ row.days_worked|int if row.days_worked == row.days_worked|int else "%.1f"|format(row.days_worked) }}</td>
+                <td class="text-center">{{ row.ph_days|int if row.ph_days else 0 }}</td>
+                <td class="text-center">{{ "%.0f"|format(row.ot_days) }}</td>
+                <td class="text-right">{{ row.basic|int }}</td>
+                <td class="text-right">{{ row.spl_basic|int }}</td>
+                <td class="text-right">{{ row.da|int }}</td>
+                <td class="text-right">{{ row.ot_amount|int }}</td>
+                <td class="text-right">{{ row.hra|int }}</td>
+                <td class="text-right">{{ row.others|int }}</td>
+                <td class="text-right">{{ row.nph|int }}</td>
+                <td class="text-right gross-col">{{ "{:,.0f}".format(row.gross) }}</td>
+                <td class="text-right">{{ row.pf|int }}</td>
+                <td class="text-right">{{ row.esic|int }}</td>
+                <td class="text-right">{{ row.society|int }}</td>
+                <td class="text-right">{{ row.income_tax|int }}</td>
+                <td class="text-right">{{ row.insurance|int }}</td>
+                <td class="text-right">{{ row.lwf|int }}</td>
+                <td class="text-right">{{ row.recoveries|int }}</td>
+                <td class="text-right" style="font-weight:600;">{{ row.total_ded|int }}</td>
+                <td class="text-right net-col">{{ "{:,.0f}".format(row.net_pay) }}</td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+            {% set ns.t_days = ns.t_days + row.days_worked %}
+            {% set ns.t_ph = ns.t_ph + (row.ph_days or 0) %}
+            {% set ns.t_ot = ns.t_ot + row.ot_days %}
+            {% set ns.t_basic = ns.t_basic + row.basic %}
+            {% set ns.t_spl = ns.t_spl + row.spl_basic %}
+            {% set ns.t_da = ns.t_da + row.da %}
+            {% set ns.t_ot_amt = ns.t_ot_amt + row.ot_amount %}
+            {% set ns.t_hra = ns.t_hra + row.hra %}
+            {% set ns.t_others = ns.t_others + row.others %}
+            {% set ns.t_nph = ns.t_nph + row.nph %}
+            {% set ns.t_gross = ns.t_gross + row.gross %}
+            {% set ns.t_pf = ns.t_pf + row.pf %}
+            {% set ns.t_esic = ns.t_esic + row.esic %}
+            {% set ns.t_rec = ns.t_rec + row.recoveries %}
+            {% set ns.t_total_ded = ns.t_total_ded + row.total_ded %}
+            {% set ns.t_net = ns.t_net + row.net_pay %}
+            {% endfor %}
+
+            <!-- TOTALS ROW -->
+            <tr class="total-row">
+                <td class="text-center" colspan="3" style="text-align:center;">
+                    <strong>TOTAL ({{ rows|length }} Employees)</strong>
+                </td>
+                <td></td>
+                <td class="text-center">{{ ns.t_days|int }}</td>
+                <td class="text-center">{{ ns.t_ph|int }}</td>
+                <td class="text-center">{{ "%.0f"|format(ns.t_ot) }}</td>
+                <td class="text-right">{{ ns.t_basic|int }}</td>
+                <td class="text-right">{{ ns.t_spl|int }}</td>
+                <td class="text-right">{{ ns.t_da|int }}</td>
+                <td class="text-right">{{ ns.t_ot_amt|int }}</td>
+                <td class="text-right">{{ ns.t_hra|int }}</td>
+                <td class="text-right">{{ ns.t_others|int }}</td>
+                <td class="text-right">{{ ns.t_nph|int }}</td>
+                <td class="text-right gross-col">{{ "{:,.0f}".format(ns.t_gross) }}</td>
+                <td class="text-right">{{ ns.t_pf|int }}</td>
+                <td class="text-right">{{ ns.t_esic|int }}</td>
+                <td class="text-right">0</td>
+                <td class="text-right">0</td>
+                <td class="text-right">0</td>
+                <td class="text-right">0</td>
+                <td class="text-right">{{ ns.t_rec|int }}</td>
+                <td class="text-right">{{ ns.t_total_ded|int }}</td>
+                <td class="text-right net-col">{{ "{:,.0f}".format(ns.t_net) }}</td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Footer -->
+    <div style="margin-top:20px; display:flex; justify-content:space-between; font-size:0.7rem; color:#94a3b8;">
+        <div>Generated: {{ generated_on }}</div>
+        <div>Vaishnavi Consultant</div>
+    </div>
+</div>
+{% endblock %}

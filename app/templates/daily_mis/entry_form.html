@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if entry else 'Add' }} MIS Entry{% endblock %}
+{% block page_header %}{{ 'Edit' if entry else 'Add' }} MIS Entry{% endblock %}
+
+{% block content %}
+<style>
+    .mis-form .form-label { font-size: 0.74rem; font-weight: 600; color: #334155; margin-bottom: 3px; }
+    .mis-form .form-control, .mis-form .form-select { font-size: 0.78rem; }
+    .mis-form .form-text { font-size: 0.68rem; }
+    .payment-fields { display: none; background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 8px; padding: 14px; margin-top: 8px; }
+    .payment-fields.show { display: block; }
+    .section-title { font-size: 0.8rem; font-weight: 700; color: #4f46e5; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 2px solid #e0e7ff; }
+    .assign-section { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 14px; margin-top: 8px; }
+</style>
+
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-8">
+        <div class="card" style="border:none; box-shadow:0 1px 6px rgba(0,0,0,0.08); border-radius:12px;">
+            <div class="card-body p-4">
+
+                <a href="{{ url_for('daily_mis.mis_home') }}" class="text-decoration-none mb-3 d-inline-block" style="font-size:0.76rem;">
+                    <i class="bi bi-arrow-left me-1"></i>Back to Daily MIS
+                </a>
+
+                <h5 style="font-weight:700; font-size:1rem; margin-bottom:20px;">
+                    <i class="bi bi-{{ 'pencil-square' if entry else 'plus-circle' }} text-primary me-2"></i>
+                    {{ 'Edit' if entry else 'New' }} Task Entry
+                </h5>
+
+                <form method="POST" class="mis-form" id="misForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <!-- Section 1: Task Details -->
+                    <div class="section-title"><i class="bi bi-clipboard me-1"></i>Task Details</div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Date <span class="text-danger">*</span></label>
+                            <input type="date" name="task_date" class="form-control"
+                                   value="{{ (entry.task_date if entry else today).strftime('%Y-%m-%d') }}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Category <span class="text-danger">*</span></label>
+                            <select name="category" id="categorySelect" class="form-select" required>
+                                <option value="">— Select Category —</option>
+                                {% for cat in categories %}
+                                <option value="{{ cat }}" {% if entry and entry.category == cat %}selected{% endif %}>{{ cat }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Task Type <span class="text-danger">*</span></label>
+                            <select name="task_type" id="taskTypeSelect" class="form-select" required>
+                                <option value="">— Select Category First —</option>
+                                {% if entry %}
+                                {% for task in categories.get(entry.category, []) %}
+                                <option value="{{ task }}" {% if entry.task_type == task %}selected{% endif %}>{{ task }}</option>
+                                {% endfor %}
+                                {% endif %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Establishment</label>
+                            <select name="establishment_id" id="estSelect" class="form-select">
+                                <option value="">— No Establishment (Internal Task) —</option>
+                                {% for est in establishments %}
+                                <option value="{{ est.id }}" {% if entry and entry.establishment_id == est.id %}selected{% endif %}>
+                                    {{ est.display_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Optional for internal tasks.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Status <span class="text-danger">*</span></label>
+                            <select name="status" class="form-select" required>
+                                <option value="completed" {% if not entry or entry.status == 'completed' %}selected{% endif %}>Completed</option>
+                                <option value="in_progress" {% if entry and entry.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                                <option value="pending" {% if entry and entry.status == 'pending' %}selected{% endif %}>Pending</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Description / Remarks</label>
+                        <textarea name="description" class="form-control" rows="2"
+                                  placeholder="Brief note about what was done...">{{ entry.description if entry else '' }}</textarea>
+                    </div>
+
+                    <!-- Section 2: Priority & Due Date -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Priority</label>
+                            <select name="priority" class="form-select">
+                                <option value="normal" {% if not entry or entry.priority == 'normal' %}selected{% endif %}>Normal</option>
+                                <option value="urgent" {% if entry and entry.priority == 'urgent' %}selected{% endif %}>Urgent</option>
+                                <option value="critical" {% if entry and entry.priority == 'critical' %}selected{% endif %}>Critical</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Due Date</label>
+                            <input type="date" name="due_date" class="form-control"
+                                   value="{{ entry.due_date.strftime('%Y-%m-%d') if entry and entry.due_date else '' }}">
+                            <div class="form-text">If not completed by this date, it shows as OVERDUE.</div>
+                        </div>
+                    </div>
+
+                    {% if is_admin and staff_list %}
+                    <!-- Section 3: Task Assignment (Admin Only) -->
+                    <div class="assign-section">
+                        <div class="section-title" style="color:#1d4ed8; border-color:#bfdbfe;">
+                            <i class="bi bi-person-check me-1"></i>Assign Task to Staff
+                            <small class="text-muted fw-normal ms-2">(Admin Only — Leave blank if logging your own task)</small>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Assign To</label>
+                                <select name="assign_to_id" class="form-select">
+                                    <option value="">— No Assignment (My Own Task) —</option>
+                                    {% for user in staff_list %}
+                                    <option value="{{ user.clerk_user_id }}"
+                                            {% if entry and entry.assigned_to_id == user.clerk_user_id %}selected{% endif %}>
+                                        {{ user.name or user.email }} {% if user.role == 'admin' %}(Admin){% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <div class="form-text">Staff will see this task in their "Assigned Tasks" section when they login.</div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Section 4: Payment Details (shown only for payment tasks) -->
+                    <div id="paymentSection" class="payment-fields {% if entry and entry.category == 'Payment & Accounts' %}show{% endif %}" style="margin-top:14px;">
+                        <div class="section-title" style="color:#7c3aed; border-color:#e9d5ff;">
+                            <i class="bi bi-currency-rupee me-1"></i>Payment Details
+                            <small class="text-muted fw-normal ms-2">(Auto-linked to Accounts)</small>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Amount (Rs.) <span class="text-danger">*</span></label>
+                                <input type="number" name="amount" id="amountField" class="form-control"
+                                       value="{{ entry.amount|int if entry and entry.amount else '' }}"
+                                       placeholder="0" min="1" step="1">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Reference / UTR</label>
+                                <input type="text" name="reference" class="form-control"
+                                       value="{{ entry.reference or '' }}"
+                                       placeholder="UTR / TRRN / Challan No.">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Bank Account <span class="text-danger">*</span></label>
+                                <select name="bank_account_id" id="bankSelect" class="form-select">
+                                    <option value="">— Select Bank —</option>
+                                    {% for bank in bank_accounts %}
+                                    <option value="{{ bank.id }}">{{ bank.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mt-2">
+                            <small class="text-muted" style="font-size:0.68rem;">
+                                <i class="bi bi-info-circle me-1"></i>
+                                A voucher will be auto-created in Accounts when you save.
+                            </small>
+                        </div>
+                    </div>
+
+                    {% if is_admin and entry and entry.admin_remarks %}
+                    <!-- Existing Admin Remark Display -->
+                    <div style="margin-top:14px; background:#fefce8; border:1px solid #fde68a; border-radius:8px; padding:10px 14px;">
+                        <div style="font-size:0.74rem; font-weight:600; color:#92400e;">
+                            <i class="bi bi-chat-left-text me-1"></i>Admin Remark
+                        </div>
+                        <div style="font-size:0.78rem; margin-top:4px;">{{ entry.admin_remarks }}</div>
+                        <div style="font-size:0.66rem; color:#92400e; margin-top:2px;">
+                            — {{ entry.admin_remarks_by }}, {{ entry.admin_remarks_at.strftime('%d-%b %H:%M') if entry.admin_remarks_at else '' }}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Submit -->
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary" style="font-size:0.82rem;">
+                            <i class="bi bi-check-lg me-1"></i>{{ 'Update' if entry else 'Save' }} Entry
+                        </button>
+                        <a href="{{ url_for('daily_mis.mis_home') }}" class="btn btn-outline-secondary" style="font-size:0.82rem;">Cancel</a>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const PAYMENT_TASKS = ['Compliance Amount Received', 'Fee Received', 'Challan Payment Done', 'Refund / Reversal'];
+const categorySelect = document.getElementById('categorySelect');
+const taskTypeSelect = document.getElementById('taskTypeSelect');
+const paymentSection = document.getElementById('paymentSection');
+const amountField = document.getElementById('amountField');
+const bankSelect = document.getElementById('bankSelect');
+
+categorySelect.addEventListener('change', function() {
+    const cat = this.value;
+    if (!cat) {
+        taskTypeSelect.innerHTML = '<option value="">— Select Category First —</option>';
+        paymentSection.classList.remove('show');
+        return;
+    }
+    fetch(`/daily-mis/api/tasks?category=${encodeURIComponent(cat)}`)
+        .then(r => r.json())
+        .then(data => {
+            taskTypeSelect.innerHTML = '<option value="">— Select Task —</option>';
+            (data.tasks || []).forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t;
+                opt.textContent = t;
+                taskTypeSelect.appendChild(opt);
+            });
+        });
+    if (cat === 'Payment & Accounts') {
+        paymentSection.classList.add('show');
+    } else {
+        paymentSection.classList.remove('show');
+        amountField.value = '';
+    }
+});
+
+taskTypeSelect.addEventListener('change', function() {
+    if (PAYMENT_TASKS.includes(this.value)) {
+        paymentSection.classList.add('show');
+    } else if (categorySelect.value !== 'Payment & Accounts') {
+        paymentSection.classList.remove('show');
+    }
+});
+
+document.getElementById('misForm').addEventListener('submit', function(e) {
+    const task = taskTypeSelect.value;
+    if (PAYMENT_TASKS.includes(task)) {
+        if (!amountField.value || parseFloat(amountField.value) <= 0) {
+            e.preventDefault(); alert('Amount is required for payment tasks.'); amountField.focus(); return;
+        }
+        if (!bankSelect.value) {
+            e.preventDefault(); alert('Please select a Bank Account.'); bankSelect.focus(); return;
+        }
+        if (!document.getElementById('estSelect').value) {
+            e.preventDefault(); alert('Establishment is required for payment tasks.'); document.getElementById('estSelect').focus(); return;
+        }
+    }
+});
+</script>
+{% endblock %}

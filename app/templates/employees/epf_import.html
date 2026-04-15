@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+
+{% block title %}EPF Import - {{ est.company_name }}{% endblock %}
+{% block page_header %}Import from EPF Active Member Data{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb" style="font-size:0.85rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('establishment.establishment_list') }}" class="text-decoration-none">Establishments</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('establishment.establishment_view', id=est.id) }}" class="text-decoration-none">{{ est.company_name }}</a></li>
+        <li class="breadcrumb-item active">EPF Import</li>
+    </ol>
+</nav>
+
+<!-- Establishment Banner -->
+<div style="background:linear-gradient(135deg, #2563eb, #7c3aed); color:#fff; padding:14px 24px; border-radius:var(--radius); margin-bottom:24px; display:flex; align-items:center; gap:16px;">
+    <div style="width:42px; height:42px; background:rgba(255,255,255,0.15); border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.2rem;">
+        <i class="bi bi-cloud-upload"></i>
+    </div>
+    <div>
+        <div style="font-weight:700; font-size:1rem;">{{ est.company_name }}</div>
+        <div style="opacity:0.75; font-size:0.8rem;">Import employees from EPF Portal's Active Member Data (CSV)</div>
+    </div>
+</div>
+
+{% if step == 'upload' %}
+<!-- ========== STEP 1: UPLOAD ========== -->
+<div class="form-card" style="max-width:700px;">
+    <div class="form-section">
+        <div class="form-section-title"><i class="bi bi-1-circle"></i> Upload EPF Active Member CSV</div>
+        <div class="form-section-desc">Download the Active Member Data from the EPF Portal and upload the CSV file here</div>
+
+        <form method="POST" enctype="multipart/form-data" id="uploadForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="preview">
+
+            <div style="border:2px dashed #cbd5e1; border-radius:12px; padding:40px 20px; text-align:center; cursor:pointer; transition:all 0.2s;" id="dropzone"
+                 ondragover="event.preventDefault(); this.style.borderColor='#6366f1'; this.style.background='#eef2ff';"
+                 ondragleave="this.style.borderColor='#cbd5e1'; this.style.background='transparent';"
+                 ondrop="event.preventDefault(); handleDrop(event);"
+                 onclick="document.getElementById('csv_file').click();">
+                <i class="bi bi-file-earmark-spreadsheet" style="font-size:2.5rem; color:#6366f1;"></i>
+                <div style="margin-top:12px; font-weight:600; color:#1e293b;">Drop your CSV file here or click to browse</div>
+                <div style="margin-top:4px; font-size:0.75rem; color:#94a3b8;">Accepts .csv files from EPF Portal's Active Member download</div>
+                <div id="file_name" style="margin-top:12px; font-weight:600; color:#059669; display:none;">
+                    <i class="bi bi-check-circle me-1"></i><span></span>
+                </div>
+            </div>
+            <input type="file" name="csv_file" id="csv_file" accept=".csv" style="display:none;" onchange="showFile(this)">
+
+            <!-- ESIC Column Note -->
+            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px 16px; margin-top:16px; font-size:0.8rem;">
+                <i class="bi bi-info-circle text-primary me-1"></i>
+                <strong>ESIC IP Number:</strong> If you have added an "ESIC IP Number" column to the CSV file, it will be automatically imported. The column header should contain "ESIC" or "IP Number" or "E-Pehchan".
+            </div>
+
+            <div class="d-flex justify-content-between mt-4">
+                <a href="{{ url_for('establishment.establishment_view', id=est.id) }}" class="btn btn-light px-4">
+                    <i class="bi bi-arrow-left me-1"></i> Back
+                </a>
+                <button type="submit" class="btn btn-primary px-4" id="uploadBtn" disabled>
+                    <i class="bi bi-eye me-1"></i> Preview Import
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- How It Works -->
+    <div class="form-section" style="background:#f8fafc; border-bottom:none;">
+        <div style="font-size:0.82rem; color:#475569;">
+            <strong><i class="bi bi-lightbulb me-1"></i>How it works:</strong>
+            <ol style="margin:8px 0 0; padding-left:20px;">
+                <li>Go to <strong>EPF Portal</strong> → Establishment Login → View → Active Member Data → Download CSV</li>
+                <li>(Optional) Add an <strong>"ESIC IP Number"</strong> column at the end of the CSV</li>
+                <li>Remove any <strong>"Mr." / "Mrs."</strong> prefixes will be done automatically</li>
+                <li>Upload here → <strong>Preview</strong> before importing → <strong>Confirm</strong></li>
+                <li>Existing employees (matched by UAN) will be <strong>updated</strong>, new ones will be <strong>created</strong></li>
+            </ol>
+        </div>
+    </div>
+</div>
+
+{% elif step == 'preview' %}
+<!-- ========== STEP 2: PREVIEW ========== -->
+
+<!-- Summary Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:16px; text-align:center;">
+            <div style="font-size:1.8rem; font-weight:700; color:#1e293b;">{{ total }}</div>
+            <div style="font-size:0.75rem; color:#64748b;">Total Employees</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:16px; text-align:center;">
+            <div style="font-size:1.8rem; font-weight:700; color:#16a34a;">{{ new_count }}</div>
+            <div style="font-size:0.75rem; color:#16a34a;">New (Will Create)</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:16px; text-align:center;">
+            <div style="font-size:1.8rem; font-weight:700; color:#2563eb;">{{ update_count }}</div>
+            <div style="font-size:0.75rem; color:#2563eb;">Existing (Will Update)</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div style="background:{% if mismatch_count > 0 %}#fef2f2{% else %}#f8fafc{% endif %}; border:1px solid {% if mismatch_count > 0 %}#fecaca{% else %}#e2e8f0{% endif %}; border-radius:10px; padding:16px; text-align:center;">
+            <div style="font-size:1.8rem; font-weight:700; color:{% if mismatch_count > 0 %}#dc2626{% else %}#64748b{% endif %};">{{ mismatch_count }}</div>
+            <div style="font-size:0.75rem; color:{% if mismatch_count > 0 %}#dc2626{% else %}#64748b{% endif %};">Name Mismatches</div>
+        </div>
+    </div>
+</div>
+
+<!-- Preview Table -->
+<div class="table-container">
+    <div class="table-header">
+        <div class="table-title"><i class="bi bi-table me-2"></i>Preview — Review before confirming</div>
+    </div>
+    <div style="overflow-x:auto;">
+        <table class="table table-sm table-hover" style="font-size:0.72rem;">
+            <thead>
+                <tr style="background:#f8fafc;">
+                    <th style="width:30px;">#</th>
+                    <th>Status</th>
+                    <th>UAN</th>
+                    <th>Name (Cleaned)</th>
+                    <th>Father/Husband</th>
+                    <th>Gender</th>
+                    <th>DOB</th>
+                    <th>DOJ</th>
+                    <th>ESIC IP</th>
+                    <th>Mobile</th>
+                    <th>Aadhaar</th>
+                    <th>KYC</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rec in preview_data %}
+                <tr style="{% if rec.name_mismatch %}background:#fef2f2;{% endif %}">
+                    <td>{{ loop.index }}</td>
+                    <td>
+                        {% if rec.status == 'new' %}
+                            <span class="badge bg-success bg-opacity-10 text-success" style="font-size:0.62rem;">NEW</span>
+                        {% else %}
+                            <span class="badge bg-primary bg-opacity-10 text-primary" style="font-size:0.62rem;">UPDATE</span>
+                        {% endif %}
+                        {% if rec.name_mismatch %}
+                            <span class="badge bg-danger bg-opacity-10 text-danger" style="font-size:0.62rem;" title="ERP: {{ rec.existing_name }} | EPFO: {{ rec.cleaned_name }}">MISMATCH</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-family:monospace;">{{ rec.uan }}</td>
+                    <td style="{% if rec.name_mismatch %}color:#dc2626; font-weight:700;{% endif %}">
+                        {{ rec.cleaned_name }}
+                        {% if rec.name_mismatch %}
+                            <br><small style="color:#94a3b8;">ERP: {{ rec.existing_name }}</small>
+                        {% endif %}
+                    </td>
+                    <td>{{ rec.father or '' }}</td>
+                    <td>{{ rec.gender or '' }}</td>
+                    <td>{{ rec.dob or '' }}</td>
+                    <td>{{ rec.doj or '' }}</td>
+                    <td style="font-family:monospace;">{{ rec.esic or '' }}</td>
+                    <td>{{ rec.mobile or '' }}</td>
+                    <td>{{ rec.aadhaar or '' }}</td>
+                    <td>
+                        {% if rec.aadhaar_verified %}<span class="badge bg-success bg-opacity-10 text-success" style="font-size:0.55rem;">Aadhaar</span>{% endif %}
+                        {% if rec.face_auth %}<span class="badge bg-info bg-opacity-10 text-info" style="font-size:0.55rem;">Face</span>{% endif %}
+                        {% if rec.nomination %}<span class="badge bg-warning bg-opacity-10 text-warning" style="font-size:0.55rem;">Nominee</span>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Confirm / Cancel -->
+<div class="d-flex justify-content-between mt-4 mb-4">
+    <a href="{{ url_for('employee_bulk.epf_import', est_id=est.id) }}" class="btn btn-light px-4">
+        <i class="bi bi-arrow-left me-1"></i> Upload Different File
+    </a>
+    <form method="POST" style="display:flex; align-items:center; gap:12px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="confirm">
+        {% if salary_templates and new_count > 0 %}
+        <div style="display:flex; align-items:center; gap:8px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:6px 12px;">
+            <i class="bi bi-lightning" style="color:#4f46e5;"></i>
+            <select name="salary_template_id" class="form-select form-select-sm" style="max-width:220px; font-size:0.78rem;">
+                <option value="">No salary template</option>
+                {% for tmpl in salary_templates %}
+                <option value="{{ tmpl.id }}">{{ tmpl.name }} ({% if tmpl.salary_type == 'daily_wages' %}₹{{ "{:,.0f}".format(tmpl.daily_rate) }}/day{% else %}₹{{ "{:,.0f}".format(tmpl.gross_salary) }}{% endif %})</option>
+                {% endfor %}
+            </select>
+            <small style="color:#64748b; font-size:0.68rem; white-space:nowrap;">Auto-assign salary to new employees</small>
+        </div>
+        {% endif %}
+        <button type="submit" class="btn btn-success px-5" onclick="this.disabled=true; this.innerHTML='<span class=\'spinner-border spinner-border-sm me-1\'></span>Importing...'; this.form.submit();">
+            <i class="bi bi-check-lg me-1"></i> Confirm Import ({{ new_count }} new + {{ update_count }} update)
+        </button>
+    </form>
+</div>
+
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showFile(input){
+    var name = input.files[0] ? input.files[0].name : '';
+    var display = document.getElementById('file_name');
+    var btn = document.getElementById('uploadBtn');
+    if(name){
+        display.style.display = 'block';
+        display.querySelector('span').textContent = name;
+        btn.disabled = false;
+    } else {
+        display.style.display = 'none';
+        btn.disabled = true;
+    }
+}
+function handleDrop(e){
+    var files = e.dataTransfer.files;
+    if(files.length > 0){
+        document.getElementById('csv_file').files = files;
+        showFile(document.getElementById('csv_file'));
+    }
+    document.getElementById('dropzone').style.borderColor = '#cbd5e1';
+    document.getElementById('dropzone').style.background = 'transparent';
+}
+</script>
+{% endblock %}

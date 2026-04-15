@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+{% block title %}UAN & ESIC IP Tracker{% endblock %}
+{% block page_header %}UAN & ESIC IP Tracker{% endblock %}
+
+{% block content %}
+<style>
+    .enr-stat { text-align: center; padding: 14px 8px; }
+    .enr-stat .num { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+    .enr-stat .lbl { font-size: 0.68rem; color: #64748b; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .enr-table th { font-size: 0.7rem; text-transform: uppercase; color: #64748b; letter-spacing: 0.3px; white-space: nowrap; }
+    .enr-table td { font-size: 0.76rem; vertical-align: middle; }
+    .status-completed { background: #d1fae5; color: #065f46; }
+    .status-partial { background: #fef3c7; color: #92400e; }
+    .status-pending { background: #fee2e2; color: #991b1b; }
+    .status-badge { font-size: 0.62rem; padding: 3px 8px; border-radius: 12px; font-weight: 600; }
+    .linked-badge { background: #dbeafe; color: #1d4ed8; font-size: 0.6rem; padding: 2px 6px; border-radius: 10px; }
+    .not-linked-badge { background: #f1f5f9; color: #64748b; font-size: 0.6rem; padding: 2px 6px; border-radius: 10px; }
+    .select-all-bar { background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 8px; padding: 8px 14px; font-size: 0.76rem; display: none; align-items: center; gap: 10px; }
+    .select-all-bar.visible { display: flex; }
+</style>
+
+<!-- Header -->
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+    <div>
+        <h5 class="mb-0" style="font-weight:700; font-size:1.1rem;">
+            <i class="bi bi-person-vcard text-primary me-2"></i>UAN & ESIC IP Tracker
+        </h5>
+        <small class="text-muted" style="font-size:0.72rem;">Track new employee enrollments — UAN & ESIC IP generation</small>
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <a href="{{ url_for('enrollment.enrollment_report', year=year) }}" class="btn btn-outline-info btn-sm" style="font-size:0.72rem;">
+            <i class="bi bi-printer me-1"></i>Report
+        </a>
+        <a href="{{ url_for('enrollment.enrollment_add') }}" class="btn btn-primary btn-sm" style="font-size:0.72rem;">
+            <i class="bi bi-plus-lg me-1"></i>New Enrollment
+        </a>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="row g-2 mb-3">
+    <div class="col-6 col-md-2">
+        <div class="card" style="border:none; box-shadow:0 1px 4px rgba(0,0,0,0.06); border-radius:10px;">
+            <div class="enr-stat">
+                <div class="num" style="color:#1e40af;">{{ stats.total_year }}</div>
+                <div class="lbl">Total ({{ year }})</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-2">
+        <div class="card" style="border:none; box-shadow:0 1px 4px rgba(0,0,0,0.06); border-radius:10px;">
+            <div class="enr-stat">
+                <div class="num" style="color:#0891b2;">{{ stats.total_month }}</div>
+                <div class="lbl">This Month</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-2">
+        <div class="card" style="border:none; box-shadow:0 1px 4px rgba(0,0,0,0.06); border-radius:10px;">
+            <div class="enr-stat">
+                <div class="num" style="color:#16a34a;">{{ stats.completed }}</div>
+                <div class="lbl">Completed</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-2">
+        <div class="card" style="border:none; box-shadow:0 1px 4px rgba(0,0,0,0.06); border-radius:10px;">
+            <div class="enr-stat">
+                <div class="num" style="color:#dc2626;">{{ stats.pending }}</div>
+                <div class="lbl">Pending</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-2">
+        <div class="card" style="border:none; box-shadow:0 1px 4px rgba(0,0,0,0.06); border-radius:10px;">
+            <div class="enr-stat">
+                <div class="num" style="color:#7c3aed;">{{ stats.linked }}</div>
+                <div class="lbl">Linked</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-2">
+        <div class="card" style="border:none; box-shadow:0 1px 4px rgba(0,0,0,0.06); border-radius:10px;">
+            <div class="enr-stat">
+                <div class="num" style="color:#f59e0b;">{{ stats.not_linked }}</div>
+                <div class="lbl">Not Linked</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-3" style="border:none; box-shadow:0 1px 4px rgba(0,0,0,0.06); border-radius:10px;">
+    <div class="card-body py-2 px-3">
+        <form method="GET" action="{{ url_for('enrollment.enrollment_home') }}" class="d-flex align-items-center gap-2 flex-wrap">
+            <select name="est_id" class="form-select form-select-sm" style="font-size:0.76rem; width:220px;">
+                <option value="">All Establishments</option>
+                {% for est in establishments %}
+                <option value="{{ est.id }}" {% if est_id == est.id %}selected{% endif %}>{{ est.display_name }}</option>
+                {% endfor %}
+            </select>
+            <select name="month" class="form-select form-select-sm" style="font-size:0.76rem; width:130px;">
+                <option value="">All Months</option>
+                {% for m in range(1, 13) %}
+                <option value="{{ m }}" {% if month == m %}selected{% endif %}>{{ ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m-1] }}</option>
+                {% endfor %}
+            </select>
+            <select name="year" class="form-select form-select-sm" style="font-size:0.76rem; width:100px;">
+                {% for y in range(2024, 2028) %}
+                <option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+            <select name="status" class="form-select form-select-sm" style="font-size:0.76rem; width:140px;">
+                <option value="">All Status</option>
+                <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Completed</option>
+                <option value="partial" {% if status_filter == 'partial' %}selected{% endif %}>Partial</option>
+                <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+                <option value="linked" {% if status_filter == 'linked' %}selected{% endif %}>Linked</option>
+            </select>
+            <button type="submit" class="btn btn-sm btn-primary" style="font-size:0.72rem;"><i class="bi bi-funnel me-1"></i>Filter</button>
+            {% if est_id or month or status_filter %}
+            <a href="{{ url_for('enrollment.enrollment_home', year=year) }}" class="btn btn-sm btn-outline-secondary" style="font-size:0.72rem;">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<!-- Bulk Action Bar -->
+<form method="POST" id="bulkForm" action="{{ url_for('enrollment.bulk_link_template') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="select-all-bar mb-2" id="bulkBar">
+        <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)" style="width:16px; height:16px;">
+        <span id="selectedCount">0</span> selected
+        <button type="submit" class="btn btn-sm btn-success" style="font-size:0.7rem;" formaction="{{ url_for('enrollment.bulk_link_template') }}">
+            <i class="bi bi-file-earmark-excel me-1"></i>Download Template
+        </button>
+        <button type="submit" class="btn btn-sm btn-primary" style="font-size:0.7rem;" formaction="{{ url_for('enrollment.mark_linked_bulk') }}">
+            <i class="bi bi-link-45deg me-1"></i>Mark as Linked
+        </button>
+    </div>
+
+    <!-- Enrollment Table -->
+    <div class="table-container">
+        <div class="table-header">
+            <div class="table-title">
+                <i class="bi bi-list-ul"></i> Enrollments
+                <span style="font-size:0.65rem; color:#94a3b8; margin-left:8px;">{{ enrollments|length }} record{{ 's' if enrollments|length != 1 }}</span>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0 enr-table">
+                <thead>
+                    <tr style="background:#f8fafc;">
+                        <th style="width:35px;">
+                            <input type="checkbox" id="headerCheck" onchange="toggleSelectAll(this)" style="width:14px; height:14px;">
+                        </th>
+                        <th>Employee</th>
+                        <th>Establishment</th>
+                        <th>DOJ</th>
+                        <th>UAN</th>
+                        <th>ESIC IP</th>
+                        <th style="text-align:center;">Status</th>
+                        <th style="text-align:center;">Linked</th>
+                        <th style="width:100px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for enr in enrollments %}
+                    <tr>
+                        <td>
+                            <input type="checkbox" name="enrollment_ids" value="{{ enr.id }}" class="row-check" onchange="updateBulkBar()" style="width:14px; height:14px;">
+                        </td>
+                        <td>
+                            <div style="font-weight:600;">{{ enr.employee_name }}</div>
+                            <div style="font-size:0.62rem; color:#94a3b8;">{{ enr.father_husband_name }} | {{ enr.gender }}</div>
+                        </td>
+                        <td>
+                            <span style="font-size:0.72rem;">{{ enr.establishment.display_name if enr.establishment else '—' }}</span>
+                        </td>
+                        <td style="white-space:nowrap;">{{ enr.date_of_joining.strftime('%d-%m-%Y') if enr.date_of_joining else '—' }}</td>
+                        <td>
+                            {% if enr.uan_number %}
+                            <span style="font-family:monospace; font-weight:600; color:#1e40af;">{{ enr.uan_number }}</span>
+                            {% else %}
+                            <span style="color:#cbd5e1;">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if enr.esic_ip_number %}
+                            <span style="font-family:monospace; font-weight:600; color:#065f46;">{{ enr.esic_ip_number }}</span>
+                            {% else %}
+                            <span style="color:#cbd5e1;">—</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align:center;">
+                            {% set s = enr.enrollment_status %}
+                            <span class="status-badge status-{{ s }}">{{ enr.status_label }}</span>
+                        </td>
+                        <td style="text-align:center;">
+                            {% if enr.is_linked %}
+                            <span class="linked-badge"><i class="bi bi-check-circle-fill me-1"></i>Linked</span>
+                            {% else %}
+                            <span class="not-linked-badge">Not Linked</span>
+                            {% endif %}
+                        </td>
+                        <td style="white-space:nowrap;">
+                            <a href="{{ url_for('enrollment.enrollment_edit', enrollment_id=enr.id) }}" class="btn btn-link btn-sm text-primary p-0 me-1" style="font-size:0.68rem;" title="Edit">
+                                <i class="bi bi-pencil-square"></i>
+                            </a>
+                            {% if not enr.is_linked and (enr.uan_number or enr.esic_ip_number) %}
+                            <a href="{{ url_for('enrollment.quick_link', enrollment_id=enr.id) }}" class="btn btn-link btn-sm text-success p-0 me-1" style="font-size:0.68rem;" title="Quick Link (Add Employee)">
+                                <i class="bi bi-person-plus"></i>
+                            </a>
+                            <form method="POST" action="{{ url_for('enrollment.mark_linked', enrollment_id=enr.id) }}" style="display:inline;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-link btn-sm text-info p-0 me-1" style="font-size:0.68rem;" title="Mark as Linked" onclick="return confirm('Mark {{ enr.employee_name }} as linked?')">
+                                    <i class="bi bi-link-45deg"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                            <form method="POST" action="{{ url_for('enrollment.enrollment_delete', enrollment_id=enr.id) }}" style="display:inline;" onsubmit="return confirm('Delete enrollment for {{ enr.employee_name }}?')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-link btn-sm text-danger p-0" style="font-size:0.68rem;" title="Delete">
+                                    <i class="bi bi-trash3"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not enrollments %}
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-4">
+                            <i class="bi bi-inbox" style="font-size:1.5rem;"></i>
+                            <div style="margin-top:6px; font-size:0.78rem;">No enrollments found. Click <strong>New Enrollment</strong> to add one.</div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleSelectAll(el) {
+    var checks = document.querySelectorAll('.row-check');
+    checks.forEach(function(c){ c.checked = el.checked; });
+    document.getElementById('headerCheck').checked = el.checked;
+    if (document.getElementById('selectAll')) document.getElementById('selectAll').checked = el.checked;
+    updateBulkBar();
+}
+
+function updateBulkBar() {
+    var checks = document.querySelectorAll('.row-check:checked');
+    var bar = document.getElementById('bulkBar');
+    var count = document.getElementById('selectedCount');
+    count.textContent = checks.length;
+    if (checks.length > 0) {
+        bar.classList.add('visible');
+    } else {
+        bar.classList.remove('visible');
+    }
+}
+</script>
+{% endblock %}

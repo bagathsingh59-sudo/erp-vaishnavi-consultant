@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% block title %}MIS Report{% endblock %}
+{% block page_header %}MIS Report{% endblock %}
+
+{% block content %}
+<style>
+    .mis-card { border-radius: 10px; border: none; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .mis-stat { text-align: center; padding: 12px 8px; }
+    .mis-stat .num { font-size: 1.4rem; font-weight: 700; line-height: 1; }
+    .mis-stat .lbl { font-size: 0.66rem; color: #64748b; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .filter-bar { background: #f8fafc; border-radius: 10px; padding: 14px; border: 1px solid #e2e8f0; }
+    .filter-bar label { font-size: 0.7rem; font-weight: 600; color: #334155; margin-bottom: 2px; }
+    .filter-bar .form-control, .filter-bar .form-select { font-size: 0.76rem; }
+    .mis-table th { font-size: 0.7rem; text-transform: uppercase; color: #64748b; letter-spacing: 0.3px; white-space: nowrap; }
+    .mis-table td { font-size: 0.76rem; vertical-align: middle; }
+    .cat-badge { font-size: 0.65rem; padding: 3px 8px; border-radius: 20px; font-weight: 500; }
+</style>
+
+<!-- Header -->
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+    <div>
+        <h5 class="mb-0" style="font-weight:700; font-size:1.1rem;">
+            <i class="bi bi-bar-chart text-info me-2"></i>MIS Report
+        </h5>
+        <small class="text-muted" style="font-size:0.72rem;">Detailed analysis of daily tasks</small>
+    </div>
+    <a href="{{ url_for('daily_mis.mis_home') }}" class="btn btn-outline-primary btn-sm" style="font-size:0.74rem;">
+        <i class="bi bi-arrow-left me-1"></i>Back to Daily MIS
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="filter-bar mb-3">
+    <form method="GET" action="{{ url_for('daily_mis.mis_report') }}">
+        <div class="row g-2 align-items-end">
+            <div class="col-6 col-md-2">
+                <label>From Date</label>
+                <input type="date" name="from_date" class="form-control" value="{{ from_date.strftime('%Y-%m-%d') }}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label>To Date</label>
+                <input type="date" name="to_date" class="form-control" value="{{ to_date.strftime('%Y-%m-%d') }}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label>Category</label>
+                <select name="category" class="form-select">
+                    <option value="">All Categories</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat }}" {% if category_filter == cat %}selected{% endif %}>{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label>Status</label>
+                <select name="status" class="form-select">
+                    <option value="">All Status</option>
+                    <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Completed</option>
+                    <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="in_progress" {% if status_filter == 'in_progress' %}selected{% endif %}>In Progress</option>
+                </select>
+            </div>
+            {% if is_admin and staff_list %}
+            <div class="col-6 col-md-2">
+                <label>Staff</label>
+                <select name="staff" class="form-select">
+                    <option value="">All Staff</option>
+                    {% for s in staff_list %}
+                    <option value="{{ s }}" {% if staff_filter == s %}selected{% endif %}>{{ s }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <div class="col-6 col-md-2">
+                <label>Establishment</label>
+                <select name="establishment_id" class="form-select">
+                    <option value="">All Establishments</option>
+                    {% for est in establishments %}
+                    <option value="{{ est.id }}" {% if est_filter == est.id|string %}selected{% endif %}>{{ est.display_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-2 mt-2 mt-md-0">
+                <button type="submit" class="btn btn-primary btn-sm w-100" style="font-size:0.76rem;">
+                    <i class="bi bi-funnel me-1"></i>Apply
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Summary Cards -->
+<div class="row g-2 mb-3">
+    <div class="col-6 col-md">
+        <div class="card mis-card">
+            <div class="mis-stat">
+                <div class="num text-primary">{{ total_tasks }}</div>
+                <div class="lbl">Total Tasks</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md">
+        <div class="card mis-card">
+            <div class="mis-stat">
+                <div class="num text-success">{{ completed }}</div>
+                <div class="lbl">Completed</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md">
+        <div class="card mis-card">
+            <div class="mis-stat">
+                <div class="num text-danger">{{ pending }}</div>
+                <div class="lbl">Pending</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md">
+        <div class="card mis-card">
+            <div class="mis-stat">
+                <div class="num text-warning">{{ in_progress }}</div>
+                <div class="lbl">In Progress</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md">
+        <div class="card mis-card">
+            <div class="mis-stat">
+                <div class="num" style="color:#7c3aed;">{{ "{:,.0f}".format(total_amount) }}</div>
+                <div class="lbl">Total Amount</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if category_counts %}
+<!-- Category Breakdown -->
+<div class="card mis-card mb-3">
+    <div class="card-body py-2 px-3">
+        <h6 style="font-size:0.78rem; font-weight:700; color:#334155; margin-bottom:10px;">
+            <i class="bi bi-grid me-1"></i>Category Breakdown
+        </h6>
+        <div class="d-flex flex-wrap gap-2">
+            {% set cat_colors = {
+                'Payment & Accounts': '#7c3aed',
+                'Return Filing': '#059669',
+                'Employee / Portal Work': '#2563eb',
+                'Records & Data Management': '#d97706',
+                'Registration & License': '#dc2626',
+                'Inspection & Legal': '#be185d',
+                'Communication & Support': '#0891b2',
+                'Other': '#64748b'
+            } %}
+            {% for cat, count in category_counts.items() %}
+            <span class="cat-badge" style="background:{{ cat_colors.get(cat, '#64748b') }}15; color:{{ cat_colors.get(cat, '#64748b') }}; border:1px solid {{ cat_colors.get(cat, '#64748b') }}30;">
+                {{ cat }}: <strong>{{ count }}</strong>
+            </span>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Entries Table -->
+<div class="card mis-card">
+    <div class="card-body p-0">
+        {% if entries %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 mis-table">
+                <thead style="background:#f8fafc;">
+                    <tr>
+                        <th>#</th>
+                        <th>Date</th>
+                        {% if is_admin %}<th>Staff</th>{% endif %}
+                        <th>Category</th>
+                        <th>Task</th>
+                        <th>Establishment</th>
+                        <th>Description</th>
+                        <th class="text-end">Amount</th>
+                        <th>Reference</th>
+                        <th>Status</th>
+                        <th>Voucher</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in entries %}
+                    <tr>
+                        <td class="text-muted">{{ loop.index }}</td>
+                        <td style="white-space:nowrap;">{{ entry.task_date.strftime('%d-%m-%Y') }}</td>
+                        {% if is_admin %}
+                        <td><span style="font-weight:500;">{{ entry.staff_name or '—' }}</span></td>
+                        {% endif %}
+                        <td>
+                            {% set cat_colors = {
+                                'Payment & Accounts': '#7c3aed',
+                                'Return Filing': '#059669',
+                                'Employee / Portal Work': '#2563eb',
+                                'Records & Data Management': '#d97706',
+                                'Registration & License': '#dc2626',
+                                'Inspection & Legal': '#be185d',
+                                'Communication & Support': '#0891b2',
+                                'Other': '#64748b'
+                            } %}
+                            <span class="cat-badge" style="background:{{ cat_colors.get(entry.category, '#64748b') }}15; color:{{ cat_colors.get(entry.category, '#64748b') }};">
+                                {{ entry.category }}
+                            </span>
+                        </td>
+                        <td style="font-weight:500;">{% set r_url = mis_action_url(entry) %}{% if r_url %}<a href="{{ r_url }}" style="color:#1e40af;">{{ entry.task_type }} <i class="bi bi-box-arrow-up-right" style="font-size:0.6rem; opacity:0.5;"></i></a>{% else %}{{ entry.task_type }}{% endif %}</td>
+                        <td>{{ entry.establishment_name }}</td>
+                        <td>
+                            {% if entry.description %}
+                            <span title="{{ entry.description }}">{{ entry.description[:40] }}{{ '...' if entry.description|length > 40 }}</span>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="text-end">
+                            {% if entry.amount %}
+                            <strong style="color:#7c3aed;">{{ "{:,.0f}".format(entry.amount) }}</strong>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>
+                            {% if entry.reference %}
+                            <code style="font-size:0.7rem;">{{ entry.reference }}</code>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>{{ entry.status_badge|safe }}</td>
+                        <td>
+                            {% if entry.voucher %}
+                            <span class="badge bg-info" style="font-size:0.62rem;">{{ entry.voucher.voucher_number }}</span>
+                            {% else %}—{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Footer totals -->
+        <div class="px-3 py-2" style="background:#f8fafc; border-top:1px solid #e2e8f0; font-size:0.76rem;">
+            <strong>Total:</strong> {{ total_tasks }} tasks
+            <span class="mx-2">|</span>
+            <span class="text-success">{{ completed }} completed</span>
+            <span class="mx-2">|</span>
+            <span class="text-danger">{{ pending }} pending</span>
+            <span class="mx-2">|</span>
+            <span class="text-warning">{{ in_progress }} in progress</span>
+            {% if total_amount > 0 %}
+            <span class="mx-2">|</span>
+            <strong style="color:#7c3aed;">Rs. {{ "{:,.0f}".format(total_amount) }}</strong>
+            {% endif %}
+        </div>
+
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-search text-muted" style="font-size:2.5rem;"></i>
+            <p class="text-muted mt-2" style="font-size:0.82rem;">No entries found for the selected filters</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

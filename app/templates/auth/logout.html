@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logging out... — Vaishnavi Consultant</title>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 40%, #334155 100%);
+        }
+        .logout-box {
+            text-align: center;
+            padding: 40px;
+        }
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #334155;
+            border-top-color: #7c3aed;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .msg {
+            color: #94a3b8;
+            font-size: 0.88rem;
+            font-weight: 500;
+        }
+        .done-icon {
+            font-size: 2.5rem;
+            color: #16a34a;
+            margin-bottom: 12px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="logout-box">
+        <div class="spinner" id="spinner"></div>
+        <i class="bi bi-check-circle-fill done-icon" id="done-icon"></i>
+        <div class="msg" id="msg">Signing out...</div>
+    </div>
+
+    {% if clerk_pub_key and not clerk_pub_key.startswith('pk_test_XXXX') %}
+    <!-- Load Clerk JS to call signOut -->
+    <script
+        async
+        crossorigin="anonymous"
+        data-clerk-publishable-key="{{ clerk_pub_key }}"
+        src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+        onload="doLogout()"
+        onerror="fallbackLogout()">
+    </script>
+
+    <script>
+    function doLogout() {
+        window.Clerk.load().then(function() {
+            if (window.Clerk.user) {
+                // Sign out from Clerk (this clears the __session cookie)
+                window.Clerk.signOut().then(function() {
+                    showDone();
+                }).catch(function() {
+                    showDone();
+                });
+            } else {
+                // Already signed out
+                showDone();
+            }
+        }).catch(function() {
+            showDone();
+        });
+    }
+
+    function fallbackLogout() {
+        // If Clerk JS fails to load, just redirect
+        showDone();
+    }
+
+    function showDone() {
+        document.getElementById('spinner').style.display = 'none';
+        document.getElementById('done-icon').style.display = 'block';
+        document.getElementById('msg').textContent = 'Signed out successfully!';
+        // Redirect to login after brief pause
+        setTimeout(function() {
+            window.location.href = '/login';
+        }, 800);
+    }
+    </script>
+
+    {% else %}
+    <!-- Dev mode — just redirect -->
+    <script>
+    setTimeout(function() {
+        window.location.href = '/login';
+    }, 500);
+    </script>
+    {% endif %}
+</body>
+</html>

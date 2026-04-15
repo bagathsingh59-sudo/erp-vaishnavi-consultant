@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}New Bonus Run{% endblock %}
+{% block page_header %}Create New Bonus Run{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm" style="max-width:800px;">
+    <div class="card-body">
+
+        <div class="alert alert-info py-2 px-3" style="font-size:0.82rem;">
+            <i class="bi bi-info-circle-fill me-1"></i>
+            <strong>What is a Bonus Run?</strong>
+            A Bonus Run calculates annual bonus for all employees of one establishment for one
+            Financial Year (Apr → Mar). It reads your processed payrolls, finds each month's
+            Basic+DA, and computes bonus per the Payment of Bonus Act, 1965.
+        </div>
+
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">Establishment <span class="text-danger">*</span></label>
+                <select name="establishment_id" class="form-select" required>
+                    <option value="">-- Select --</option>
+                    {% for e in establishments %}
+                    <option value="{{ e.id }}" data-minwage="{{ e.bonus_min_wage or '' }}">
+                        {{ e.company_name }}{% if e.bonus_min_wage %} (Min Wage: ₹{{ e.bonus_min_wage }}){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">Financial Year <span class="text-danger">*</span></label>
+                <select name="start_year" class="form-select" required>
+                    {% for y in years|reverse %}
+                    <option value="{{ y }}" {% if y == current_year - 1 %}selected{% endif %}>
+                        FY {{ y }}-{{ (y+1)|string|slice(2) }} (Apr {{ y }} – Mar {{ y+1 }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <hr/>
+            <h6 class="fw-bold text-muted">Bonus Configuration <small class="text-muted">(editable per run)</small></h6>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Bonus Percentage <span class="text-danger">*</span></label>
+                    <select name="bonus_percentage" class="form-select">
+                        <option value="8.33" selected>8.33% (Minimum — Section 10)</option>
+                        <option value="10">10%</option>
+                        <option value="12">12%</option>
+                        <option value="15">15%</option>
+                        <option value="18">18%</option>
+                        <option value="20">20% (Maximum — Section 11)</option>
+                    </select>
+                    <small class="text-muted">Default = 8.33% (minimum statutory bonus)</small>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Wage Ceiling (₹)</label>
+                    <input type="number" step="0.01" name="wage_ceiling" class="form-select" value="7000.00"/>
+                    <small class="text-muted">Section 12 default = ₹7,000</small>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Minimum Wage Floor (₹)</label>
+                    <input type="number" step="0.01" name="min_wage_floor" id="minWageFloor"
+                           class="form-select" placeholder="Auto-filled from establishment"/>
+                    <small class="text-muted">If higher than ₹7,000, this is used instead (Sec 12 proviso)</small>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Eligibility Cap — Basic+DA (₹)</label>
+                    <input type="number" step="0.01" name="eligibility_cap" class="form-select" value="21000.00"/>
+                    <small class="text-muted">Section 2(13) — employees above this are not eligible</small>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Minimum Days Worked in FY</label>
+                    <input type="number" name="min_days_worked" class="form-select" value="30"/>
+                    <small class="text-muted">Section 8 — at least 30 days for eligibility</small>
+                </div>
+            </div>
+
+            <div class="mt-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-calculator"></i> Create & Calculate
+                </button>
+                <a href="{{ url_for('bonus.bonus_list') }}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// When establishment is selected, auto-fill min_wage_floor from data attribute
+document.querySelector('select[name="establishment_id"]').addEventListener('change', function(){
+    var mw = this.options[this.selectedIndex].getAttribute('data-minwage');
+    document.getElementById('minWageFloor').value = mw || '';
+});
+</script>
+{% endblock %}

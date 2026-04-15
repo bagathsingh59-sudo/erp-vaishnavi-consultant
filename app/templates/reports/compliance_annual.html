@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Annual Compliance Statement — {{ est.company_name }} | FY {{ fy_label }}</title>
+    <style>
+        @page {
+            size: legal landscape;
+            margin: 8mm;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 10px;
+            color: #000;
+            background: #fff;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #1a237e;
+        }
+        .header h1 {
+            font-size: 18px;
+            color: #1a237e;
+            margin-bottom: 2px;
+        }
+        .header h2 {
+            font-size: 14px;
+            color: #333;
+            font-weight: normal;
+        }
+        .header .subtitle {
+            font-size: 10px;
+            color: #666;
+            margin-top: 4px;
+        }
+        .header .fy-badge {
+            display: inline-block;
+            background: #1a237e;
+            color: #fff;
+            padding: 3px 16px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+
+        /* Registration info */
+        .reg-bar {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 12px;
+            font-size: 11px;
+        }
+        .reg-bar .reg-item {
+            background: #f0f4ff;
+            border: 1px solid #c5cae9;
+            border-radius: 4px;
+            padding: 4px 16px;
+        }
+        .reg-bar .reg-item strong { color: #1a237e; }
+
+        /* Main annual table */
+        .annual-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9.5px;
+            margin-bottom: 10px;
+        }
+        .annual-table th {
+            padding: 5px 4px;
+            text-align: center;
+            font-size: 8.5px;
+            font-weight: 600;
+            border: 1px solid #555;
+            white-space: nowrap;
+        }
+        .annual-table th.main-hdr {
+            background: #1a237e;
+            color: #fff;
+        }
+        .annual-table th.epf-hdr {
+            background: #1565c0;
+            color: #fff;
+        }
+        .annual-table th.esic-hdr {
+            background: #2e7d32;
+            color: #fff;
+        }
+        .annual-table th.total-hdr {
+            background: #bf360c;
+            color: #fff;
+        }
+
+        .annual-table td {
+            padding: 4px 5px;
+            border: 1px solid #bbb;
+            text-align: right;
+            font-family: 'Consolas', monospace;
+            font-size: 9.5px;
+        }
+        .annual-table td.month-cell {
+            text-align: center;
+            font-family: Arial, sans-serif;
+            font-weight: 600;
+            background: #f8f9ff;
+            white-space: nowrap;
+        }
+        .annual-table td.center {
+            text-align: center;
+            font-family: Arial, sans-serif;
+        }
+        .annual-table td.no-data {
+            text-align: center;
+            color: #999;
+            font-style: italic;
+            font-family: Arial, sans-serif;
+        }
+
+        .annual-table tbody tr:nth-child(even) {
+            background: #fafbff;
+        }
+        .annual-table tbody tr:hover {
+            background: #e8eaf6;
+        }
+
+        /* Grand total row */
+        .annual-table .grand-row td {
+            background: #1a237e;
+            color: #fff;
+            font-weight: 700;
+            font-size: 10.5px;
+            border-color: #0d1347;
+        }
+        .annual-table .grand-row td.month-cell {
+            background: #1a237e;
+            color: #fff;
+            font-size: 10.5px;
+        }
+
+        /* Summary cards at bottom */
+        .annual-summary {
+            display: flex;
+            gap: 12px;
+            margin-top: 14px;
+            page-break-inside: avoid;
+        }
+        .annual-card {
+            flex: 1;
+            border-radius: 6px;
+            padding: 10px 14px;
+            text-align: center;
+        }
+        .annual-card.epf-card {
+            background: #e3f2fd;
+            border: 1.5px solid #64b5f6;
+        }
+        .annual-card.esic-card {
+            background: #e8f5e9;
+            border: 1.5px solid #81c784;
+        }
+        .annual-card.grand-card {
+            background: #fff3e0;
+            border: 1.5px solid #ffb74d;
+        }
+        .annual-card .card-title {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .annual-card.epf-card .card-title { color: #1565c0; }
+        .annual-card.esic-card .card-title { color: #2e7d32; }
+        .annual-card.grand-card .card-title { color: #e65100; }
+
+        .annual-card .card-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2px 8px;
+            text-align: left;
+            font-size: 10px;
+        }
+        .annual-card .card-grid .lbl { color: #555; }
+        .annual-card .card-grid .val { font-weight: 700; text-align: right; font-family: 'Consolas', monospace; }
+
+        .annual-card .card-total {
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1.5px solid rgba(0,0,0,0.15);
+            font-size: 16px;
+            font-weight: 800;
+        }
+        .annual-card.epf-card .card-total { color: #1565c0; }
+        .annual-card.esic-card .card-total { color: #2e7d32; }
+        .annual-card.grand-card .card-total { color: #e65100; }
+
+        /* Footer note */
+        .footer-note {
+            margin-top: 14px;
+            padding-top: 8px;
+            border-top: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            font-size: 9px;
+            color: #888;
+        }
+
+        /* Print */
+        @media print {
+            body { background: #fff; }
+            .no-print { display: none !important; }
+            .annual-table tbody tr:hover { background: inherit; }
+        }
+
+        .print-bar {
+            background: #1a237e;
+            color: #fff;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            border-radius: 6px;
+        }
+        .print-bar button {
+            background: #fff;
+            color: #1a237e;
+            border: none;
+            padding: 6px 18px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .print-bar select {
+            padding: 4px 8px;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Print Bar -->
+    <div class="print-bar no-print">
+        <div>
+            <strong>Annual Compliance Statement</strong> |
+            {{ est.company_name }} | FY {{ fy_label }}
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+            <!-- FY Selector -->
+            <select onchange="changeFY(this.value)">
+                {% for y in range(fy_start_year - 3, fy_start_year + 2) %}
+                <option value="{{ y }}" {{ 'selected' if y == fy_start_year else '' }}>
+                    FY {{ y }}-{{ (y+1)|string }}
+                </option>
+                {% endfor %}
+            </select>
+            <button onclick="window.print()">&#128424; Print / Save PDF</button>
+            <button onclick="window.close()" style="background:#e5e7eb; color:#333;">&#10005; Close</button>
+        </div>
+    </div>
+
+    <script>
+    function changeFY(fy) {
+        var url = window.location.pathname + '?fy=' + fy;
+        window.location.href = url;
+    }
+    </script>
+
+    <!-- Header -->
+    <div class="header">
+        <h1>{{ est.company_name | upper }}</h1>
+        <h2>Annual Compliance Statement</h2>
+        <span class="fy-badge">Financial Year {{ fy_label }} (April {{ fy_start_year }} — March {{ fy_start_year + 1 }})</span>
+        <div class="subtitle">
+            {% if est.address %}{{ est.address }} | {% endif %}
+            Generated: {{ generated_on }}
+        </div>
+    </div>
+
+    <!-- Registration Info -->
+    <div class="reg-bar">
+        {% if est.pf_code %}
+        <div class="reg-item">EPF Code: <strong>{{ est.pf_code }}</strong></div>
+        {% endif %}
+        {% if est.esic_code %}
+        <div class="reg-item">ESIC Code: <strong>{{ est.esic_code }}</strong></div>
+        {% endif %}
+        {% if est.pan_number %}
+        <div class="reg-item">PAN: <strong>{{ est.pan_number }}</strong></div>
+        {% endif %}
+    </div>
+
+    <!-- Main Annual Table -->
+    <table class="annual-table">
+        <thead>
+            <tr>
+                <th rowspan="2" class="main-hdr" style="width:35px;">Sr.</th>
+                <th rowspan="2" class="main-hdr" style="min-width:70px;">Month</th>
+                <th rowspan="2" class="main-hdr">Man<br>Power</th>
+                <th rowspan="2" class="main-hdr">Total<br>Gross</th>
+                {% if config and config.epf_applicable %}
+                <th colspan="7" class="epf-hdr">EPF CONTRIBUTION</th>
+                {% endif %}
+                {% if config and config.esic_applicable %}
+                <th colspan="4" class="esic-hdr">ESIC CONTRIBUTION</th>
+                {% endif %}
+                <th colspan="3" class="total-hdr">COMPLIANCE TOTALS</th>
+            </tr>
+            <tr>
+                {% if config and config.epf_applicable %}
+                <th class="epf-hdr">EPF<br>Wages</th>
+                <th class="epf-hdr">EE<br>(12%)</th>
+                <th class="epf-hdr">A/c01<br>(3.67%)</th>
+                <th class="epf-hdr">EPS<br>(8.33%)</th>
+                <th class="epf-hdr">EDLI<br>(0.5%)</th>
+                <th class="epf-hdr">Admin<br>(0.5%)</th>
+                <th class="epf-hdr">ER<br>Total</th>
+                {% endif %}
+                {% if config and config.esic_applicable %}
+                <th class="esic-hdr">ESIC<br>Wages</th>
+                <th class="esic-hdr">EE<br>(0.75%)</th>
+                <th class="esic-hdr">ER<br>(3.25%)</th>
+                <th class="esic-hdr">ESIC<br>Total</th>
+                {% endif %}
+                <th class="total-hdr">Total<br>EE</th>
+                <th class="total-hdr">Total<br>ER</th>
+                <th class="total-hdr">Total<br>Deposit</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in monthly_data %}
+            <tr>
+                <td class="center">{{ loop.index }}</td>
+                <td class="month-cell">{{ m.month }}</td>
+                {% if m.has_data %}
+                <td class="center">{{ m.employees }}</td>
+                <td>{{ "{:,.0f}".format(m.gross) }}</td>
+                {% if config and config.epf_applicable %}
+                <td>{{ "{:,.0f}".format(m.epf_wages) }}</td>
+                <td>{{ "{:,.0f}".format(m.epf_ee) }}</td>
+                <td>{{ "{:,.0f}".format(m.epf_ac01) }}</td>
+                <td>{{ "{:,.0f}".format(m.epf_eps) }}</td>
+                <td>{{ "{:,.0f}".format(m.epf_edli) }}</td>
+                <td>{{ "{:,.0f}".format(m.epf_admin) }}</td>
+                <td style="font-weight:600;">{{ "{:,.0f}".format(m.epf_er) }}</td>
+                {% endif %}
+                {% if config and config.esic_applicable %}
+                <td>{{ "{:,.0f}".format(m.esic_wages) }}</td>
+                <td>{{ "{:,.0f}".format(m.esic_ee) }}</td>
+                <td>{{ "{:,.0f}".format(m.esic_er) }}</td>
+                <td style="font-weight:600;">{{ "{:,.0f}".format(m.esic_ee + m.esic_er) }}</td>
+                {% endif %}
+                <td style="font-weight:600;">{{ "{:,.0f}".format(m.total_ee) }}</td>
+                <td style="font-weight:600;">{{ "{:,.0f}".format(m.total_er) }}</td>
+                <td style="font-weight:700;">{{ "{:,.0f}".format(m.total_deposit) }}</td>
+                {% else %}
+                {% set col_count = 2 %}
+                {% if config and config.epf_applicable %}{% set col_count = col_count + 7 %}{% endif %}
+                {% if config and config.esic_applicable %}{% set col_count = col_count + 4 %}{% endif %}
+                <td colspan="{{ col_count + 3 }}" class="no-data">— No payroll data —</td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+
+            <!-- Grand Total Row -->
+            <tr class="grand-row">
+                <td colspan="2" class="month-cell" style="text-align:center;">ANNUAL TOTAL</td>
+                <td class="center">—</td>
+                <td>{{ "{:,.0f}".format(grand.gross) }}</td>
+                {% if config and config.epf_applicable %}
+                <td>{{ "{:,.0f}".format(grand.epf_wages) }}</td>
+                <td>{{ "{:,.0f}".format(grand.epf_ee) }}</td>
+                <td>{{ "{:,.0f}".format(grand.epf_ac01) }}</td>
+                <td>{{ "{:,.0f}".format(grand.epf_eps) }}</td>
+                <td>{{ "{:,.0f}".format(grand.epf_edli) }}</td>
+                <td>{{ "{:,.0f}".format(grand.epf_admin) }}</td>
+                <td>{{ "{:,.0f}".format(grand.epf_er) }}</td>
+                {% endif %}
+                {% if config and config.esic_applicable %}
+                <td>{{ "{:,.0f}".format(grand.esic_wages) }}</td>
+                <td>{{ "{:,.0f}".format(grand.esic_ee) }}</td>
+                <td>{{ "{:,.0f}".format(grand.esic_er) }}</td>
+                <td>{{ "{:,.0f}".format(grand.esic_ee + grand.esic_er) }}</td>
+                {% endif %}
+                <td>{{ "{:,.0f}".format(grand.total_ee) }}</td>
+                <td>{{ "{:,.0f}".format(grand.total_er) }}</td>
+                <td>{{ "{:,.0f}".format(grand.total_deposit) }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Annual Summary Cards -->
+    <div class="annual-summary">
+        {% if config and config.epf_applicable %}
+        <div class="annual-card epf-card">
+            <div class="card-title">Annual EPF Summary</div>
+            <div class="card-grid">
+                <span class="lbl">Total EPF Wages:</span>
+                <span class="val">{{ "{:,.0f}".format(grand.epf_wages) }}</span>
+                <span class="lbl">Employee (12%):</span>
+                <span class="val">{{ "{:,.0f}".format(grand.epf_ee) }}</span>
+                <span class="lbl">A/c 01 (3.67%):</span>
+                <span class="val">{{ "{:,.0f}".format(grand.epf_ac01) }}</span>
+                <span class="lbl">EPS (8.33%):</span>
+                <span class="val">{{ "{:,.0f}".format(grand.epf_eps) }}</span>
+                <span class="lbl">EDLI (0.5%):</span>
+                <span class="val">{{ "{:,.0f}".format(grand.epf_edli) }}</span>
+                <span class="lbl">Admin (0.5%):</span>
+                <span class="val">{{ "{:,.0f}".format(grand.epf_admin) }}</span>
+                <span class="lbl">Employer Total:</span>
+                <span class="val">{{ "{:,.0f}".format(grand.epf_er) }}</span>
+            </div>
+            <div class="card-total">
+                ₹{{ "{:,.0f}".format(grand.epf_ee + grand.epf_er) }}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if config and config.esic_applicable %}
+        <div class="annual-card esic-card">
+            <div class="card-title">Annual ESIC Summary</div>
+            <div class="card-grid">
+                <span class="lbl">Total ESIC Wages:</span>
+                <span class="val">{{ "{:,.0f}".format(grand.esic_wages) }}</span>
+                <span class="lbl">Employee (0.75%):</span>
+                <span class="val">{{ "{:,.0f}".format(grand.esic_ee) }}</span>
+                <span class="lbl">Employer (3.25%):</span>
+                <span class="val">{{ "{:,.0f}".format(grand.esic_er) }}</span>
+            </div>
+            <div class="card-total">
+                ₹{{ "{:,.0f}".format(grand.esic_ee + grand.esic_er) }}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="annual-card grand-card">
+            <div class="card-title">Annual Compliance Cost</div>
+            <div class="card-grid">
+                <span class="lbl">Total Employee Share:</span>
+                <span class="val">{{ "{:,.0f}".format(grand.total_ee) }}</span>
+                <span class="lbl">Total Employer Share:</span>
+                <span class="val">{{ "{:,.0f}".format(grand.total_er) }}</span>
+                <span class="lbl">Total Gross Paid:</span>
+                <span class="val">{{ "{:,.0f}".format(grand.gross) }}</span>
+            </div>
+            <div class="card-total">
+                ₹{{ "{:,.0f}".format(grand.total_deposit) }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer-note">
+        <div>This statement is system-generated for FY {{ fy_label }} and is suitable for CA/Auditor reference for IT Filing.</div>
+        <div>{{ est.company_name }} | Generated: {{ generated_on }}</div>
+    </div>
+</body>
+</html>

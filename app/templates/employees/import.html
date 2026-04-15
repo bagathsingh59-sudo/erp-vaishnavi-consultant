@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Import Employees - Vaishnavi Consultant{% endblock %}
+{% block page_header %}Import Employees{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb" style="font-size:0.85rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('employee.employee_list') }}" class="text-decoration-none">Employees</a></li>
+        <li class="breadcrumb-item active">Import from Excel</li>
+    </ol>
+</nav>
+
+<div class="row g-4">
+    <!-- Step 1 -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div style="width:42px; height:42px; background:#d1fae5; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.2rem; color:var(--success); font-weight:700;">1</div>
+                    <div>
+                        <h6 style="margin:0; font-weight:700;">Download Template</h6>
+                        <small style="color:var(--text-secondary);">Get the Excel template with correct columns</small>
+                    </div>
+                </div>
+                <p style="font-size:0.85rem; color:var(--text-secondary); line-height:1.7;">
+                    Download the employee import template, fill your data, and upload. The first column must match an existing establishment name or PF code.
+                </p>
+                <a href="{{ url_for('employee_bulk.download_template') }}" class="btn btn-outline-primary">
+                    <i class="bi bi-download me-2"></i>Download Employee Template (.xlsx)
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div style="width:42px; height:42px; background:var(--primary-light); border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.2rem; color:var(--primary); font-weight:700;">2</div>
+                    <div>
+                        <h6 style="margin:0; font-weight:700;">Upload Filled Excel</h6>
+                        <small style="color:var(--text-secondary);">Upload to import employees</small>
+                    </div>
+                </div>
+
+                <form method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div id="uploadArea" onclick="document.getElementById('fileInput').click();"
+                         style="border:2px dashed var(--border-color); border-radius:var(--radius); padding:32px; text-align:center; cursor:pointer; transition:all 0.2s; margin-bottom:16px;">
+                        <i class="bi bi-cloud-arrow-up" style="font-size:2.5rem; color:var(--text-light); display:block; margin-bottom:8px;"></i>
+                        <p style="margin:0; font-weight:600;" id="fileName">Click to select Excel file</p>
+                        <small style="color:var(--text-light);">Supports .xlsx files</small>
+                    </div>
+                    <input type="file" name="file" id="fileInput" accept=".xlsx" style="display:none;" onchange="handleFile(this)">
+                    <button type="submit" class="btn btn-primary w-100" id="importBtn" disabled>
+                        <i class="bi bi-upload me-2"></i>Import Employees
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Guidelines -->
+<div class="card mt-4">
+    <div class="card-header"><i class="bi bi-info-circle text-primary me-2"></i>Import Guidelines</div>
+    <div class="card-body">
+        <div class="row g-4">
+            <div class="col-md-4">
+                <h6 style="font-weight:700; font-size:0.85rem;">Required Fields</h6>
+                <ul style="font-size:0.85rem; color:var(--text-secondary); padding-left:18px;">
+                    <li><strong>Establishment</strong> — must match name or PF code</li>
+                    <li><strong>Name, Father/Husband, Gender, DOB, DOJ</strong></li>
+                    <li>At least <strong>UAN or ESIC IP</strong></li>
+                </ul>
+            </div>
+            <div class="col-md-4">
+                <h6 style="font-weight:700; font-size:0.85rem;">Salary Types</h6>
+                <ul style="font-size:0.85rem; color:var(--text-secondary); padding-left:18px;">
+                    <li><strong>Daily</strong> — fill Daily Rate + Weekly Off</li>
+                    <li><strong>Monthly</strong> — fill Gross Salary (single amount)</li>
+                    <li><strong>MonthlyHeads</strong> — fill Basic, DA, HRA, etc. columns (Gross auto-calculated)</li>
+                    <li><strong>CTC</strong> — fill CTC Amount only (system auto-splits into Basic, HRA, Other Allowance after deducting employer EPF/ESIC)</li>
+                </ul>
+            </div>
+            <div class="col-md-4">
+                <h6 style="font-weight:700; font-size:0.85rem;">WO Policy & Notes</h6>
+                <ul style="font-size:0.85rem; color:var(--text-secondary); padding-left:18px;">
+                    <li><strong>WO Applicable</strong>: Yes / No (blank = use establishment default)</li>
+                    <li><strong>WO Type</strong>: Paid / Unpaid</li>
+                    <li><strong>WO Day</strong>: Sunday, Monday, etc. or Rotational</li>
+                    <li>Duplicates skipped (matched by UAN)</li>
+                    <li>Names auto-converted to UPPERCASE</li>
+                    <li>Dates: DD-MM-YYYY or DD/MM/YYYY</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function handleFile(input) {
+    var fn = document.getElementById('fileName');
+    var btn = document.getElementById('importBtn');
+    var area = document.getElementById('uploadArea');
+    if (input.files && input.files[0]) {
+        fn.textContent = input.files[0].name;
+        fn.style.color = 'var(--primary)';
+        btn.disabled = false;
+        area.style.borderColor = 'var(--primary)';
+        area.style.background = 'var(--primary-light)';
+    }
+}
+</script>
+{% endblock %}

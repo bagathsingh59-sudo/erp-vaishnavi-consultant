@@ -1,0 +1,22 @@
+# Environment variables (contains secrets)
+.env
+
+# Database
+data/erp.db
+
+# Backups
+data/backups/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code
+.claude/

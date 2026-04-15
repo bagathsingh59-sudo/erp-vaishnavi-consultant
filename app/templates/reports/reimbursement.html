@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Reimbursement Application — {{ est.company_name }} | {{ payroll.period_display }}</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 15mm 18mm;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Times New Roman', Georgia, serif;
+            font-size: 13px;
+            color: #000;
+            background: #fff;
+            line-height: 1.6;
+        }
+
+        .page {
+            max-width: 750px;
+            margin: 0 auto;
+            padding: 10px 0;
+        }
+
+        /* Letterhead */
+        .letterhead {
+            text-align: center;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 3px double #000;
+        }
+        .letterhead .company-name {
+            font-size: 26px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin-bottom: 4px;
+        }
+        .letterhead .address {
+            font-size: 12px;
+            color: #333;
+        }
+        .letterhead .codes {
+            font-size: 11px;
+            color: #444;
+            margin-top: 3px;
+        }
+
+        /* Editable fields */
+        .editable {
+            border: none;
+            border-bottom: 1px dotted #999;
+            outline: none;
+            font-family: 'Times New Roman', Georgia, serif;
+            font-size: 13px;
+            color: #000;
+            background: transparent;
+            min-width: 280px;
+            padding: 1px 4px;
+        }
+        .editable:focus {
+            border-bottom: 1.5px solid #4f46e5;
+            background: #fefce8;
+        }
+
+        /* To/Date section */
+        .letter-meta {
+            margin: 20px 0 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .letter-to {
+            font-size: 13px;
+            line-height: 1.7;
+        }
+        .letter-date {
+            font-size: 13px;
+            text-align: right;
+        }
+
+        /* Ref & Date Row */
+        .ref-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            font-size: 12.5px;
+        }
+
+        /* Body paragraph */
+        .body-text {
+            text-align: justify;
+            margin: 14px 0 16px;
+            font-size: 12.5px;
+            line-height: 1.7;
+        }
+
+        /* Period highlight */
+        .period-highlight {
+            font-weight: bold;
+            text-decoration: underline;
+        }
+
+        /* Main table */
+        .reim-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 14px 0;
+            font-size: 11px;
+        }
+        .reim-table th,
+        .reim-table td {
+            border: 1px solid #000;
+            padding: 5px 6px;
+            text-align: center;
+            vertical-align: middle;
+        }
+        .reim-table th {
+            background: #f0f0f0;
+            font-weight: bold;
+            font-size: 10.5px;
+        }
+        .reim-table td {
+            font-size: 11px;
+        }
+        .reim-table .amt {
+            text-align: right;
+            font-family: 'Consolas', 'Courier New', monospace;
+        }
+        .reim-table .bold-amt {
+            text-align: right;
+            font-weight: bold;
+            font-family: 'Consolas', 'Courier New', monospace;
+        }
+        .reim-table .total-row td {
+            background: #f0f0f0;
+            font-weight: bold;
+            border-top: 2px solid #000;
+        }
+
+        /* Grand total */
+        .grand-total {
+            margin: 18px 0;
+            text-align: center;
+        }
+        .grand-total-box {
+            display: inline-block;
+            border: 2px solid #000;
+            padding: 10px 35px;
+        }
+        .grand-total-label {
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .grand-total-amount {
+            font-size: 22px;
+            font-weight: bold;
+            font-family: 'Consolas', 'Courier New', monospace;
+        }
+        .grand-total-words {
+            font-size: 11px;
+            font-style: italic;
+            margin-top: 3px;
+            color: #333;
+        }
+
+        /* Enclosure */
+        .enclosure {
+            margin-top: 18px;
+            font-size: 12px;
+            line-height: 1.7;
+        }
+        .enclosure strong {
+            text-decoration: underline;
+        }
+
+        /* Closing */
+        .closing {
+            margin-top: 28px;
+            font-size: 12.5px;
+        }
+        .closing .sign-space {
+            margin-top: 45px;
+        }
+        .closing .company-sign {
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .closing .role {
+            font-style: italic;
+            font-size: 12px;
+            margin-top: 3px;
+        }
+
+        /* Print */
+        @media print {
+            body { background: #fff; }
+            .no-print { display: none !important; }
+            .editable { border-bottom: 1px solid #ccc; }
+        }
+
+        .print-bar {
+            background: #1e40af;
+            color: #fff;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            max-width: 750px;
+            margin-left: auto;
+            margin-right: auto;
+            font-size: 0.85rem;
+        }
+        .print-bar button {
+            background: #fff;
+            color: #1e40af;
+            border: none;
+            padding: 6px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.82rem;
+        }
+        .print-bar .hint {
+            font-size: 0.72rem;
+            opacity: 0.85;
+            margin-top: 3px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Print Bar -->
+    <div class="print-bar no-print">
+        <div>
+            <strong>Reimbursement Application</strong> |
+            {{ est.company_name }} | {{ payroll.period_display }}
+            <div class="hint">Fill the "To" address before printing. Click on the dotted lines to type.</div>
+        </div>
+        <div>
+            <button onclick="window.print()">&#128424; Print / Save PDF</button>
+            <button onclick="window.close()" style="margin-left:8px; background:#e5e7eb; color:#333;">&#10005; Close</button>
+        </div>
+    </div>
+
+    <div class="page">
+        <!-- Letterhead -->
+        <div class="letterhead">
+            <div class="company-name">{{ est.company_name | upper }}</div>
+            {% if est.address %}
+            <div class="address">{{ est.address | upper }}</div>
+            {% endif %}
+            <div class="codes">
+                {% if est.pf_code %}EPF Code: {{ est.pf_code }}{% endif %}
+                {% if est.pf_code and est.esic_code %} &nbsp;|&nbsp; {% endif %}
+                {% if est.esic_code %}ESIC Code: {{ est.esic_code }}{% endif %}
+            </div>
+        </div>
+
+        <!-- Ref & Date Row -->
+        <div class="ref-row" style="margin-top: 18px;">
+            <div>Ref No.: <input type="text" class="editable no-print-border" style="min-width: 180px;" placeholder="VC/REIMB/___/___"></div>
+            <div>Date: {{ letter_date }}</div>
+        </div>
+
+        <!-- To Section — EDITABLE -->
+        <div class="letter-to">
+            To,<br>
+            <input type="text" class="editable" placeholder="The Manager / HR Department"><br>
+            <input type="text" class="editable" placeholder="Department / Company Name"><br>
+            <input type="text" class="editable" placeholder="Address Line 1"><br>
+            <input type="text" class="editable" style="min-width: 200px;" placeholder="City, State"><br>
+        </div>
+
+        <div style="margin-top: 12px; font-size: 13px;">
+            Respected Sir / Madam,
+        </div>
+
+        <!-- Body Paragraph -->
+        <div class="body-text">
+            We wish to bring to your kind notice that we have duly remitted the statutory contributions towards
+            <strong>Employees' Provident Fund (EPF)</strong> and <strong>Employees' State Insurance Corporation (ESIC)</strong>
+            for the month of <span class="period-highlight">{{ payroll.month_name }} {{ payroll.year }}</span>,
+            as applicable under the relevant Acts, on behalf of the employees deployed at your esteemed organization.
+        </div>
+
+        <div class="body-text">
+            In this regard, we hereby request you to kindly reimburse the <strong>Employer's Share</strong>
+            of EPF and ESIC contributions as detailed below. The paid challan receipts, ECR acknowledgement,
+            and other supporting documents are enclosed herewith for your kind reference and records.
+        </div>
+
+        <!-- Main Reimbursement Table -->
+        <table class="reim-table">
+            <thead>
+                <tr>
+                    <th rowspan="2">Sr.</th>
+                    <th rowspan="2">Period</th>
+                    <th rowspan="2">No. of<br>Employees</th>
+                    <th colspan="4" style="background: #e8e8e8;">EPF — Employer's Contribution</th>
+                    <th colspan="2" style="background: #e8e8e8;">ESIC — Employer's</th>
+                    <th rowspan="2">Total<br>Refund</th>
+                </tr>
+                <tr>
+                    <th>A/c 01<br>(3.67%)</th>
+                    <th>A/c 10 EPS<br>(8.33%)</th>
+                    <th>A/c 02 EDLI<br>(0.50%)</th>
+                    <th>A/c 21 Admin<br>(0.50%)</th>
+                    <th>ER Share<br>(3.25%)</th>
+                    <th>ESIC<br>Refund</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1</td>
+                    <td style="white-space: nowrap;">{{ payroll.month_name[:3] }}-{{ payroll.year }}</td>
+                    <td>{{ data.epf_count }}</td>
+                    <td class="amt">{{ "{:,.0f}".format(data.total_epf_ac01) }}</td>
+                    <td class="amt">{{ "{:,.0f}".format(data.total_epf_eps) }}</td>
+                    <td class="amt">{{ "{:,.0f}".format(data.total_epf_edli) }}</td>
+                    <td class="amt">{{ "{:,.0f}".format(data.total_epf_admin) }}</td>
+                    <td class="amt">{{ "{:,.0f}".format(data.total_esic_employer) }}</td>
+                    <td class="bold-amt">{{ "{:,.0f}".format(data.esic_employer_refund) }}</td>
+                    <td class="bold-amt">{{ "{:,.0f}".format(data.total_refund) }}</td>
+                </tr>
+
+                <!-- Totals Row -->
+                <tr class="total-row">
+                    <td colspan="3" style="text-align: right; font-size: 11px;">TOTAL EMPLOYER SHARE</td>
+                    <td class="bold-amt">{{ "{:,.0f}".format(data.total_epf_ac01) }}</td>
+                    <td class="bold-amt">{{ "{:,.0f}".format(data.total_epf_eps) }}</td>
+                    <td class="bold-amt">{{ "{:,.0f}".format(data.total_epf_edli) }}</td>
+                    <td class="bold-amt">{{ "{:,.0f}".format(data.total_epf_admin) }}</td>
+                    <td class="bold-amt">{{ "{:,.0f}".format(data.total_esic_employer) }}</td>
+                    <td class="bold-amt">{{ "{:,.0f}".format(data.esic_employer_refund) }}</td>
+                    <td class="bold-amt">{{ "{:,.0f}".format(data.total_refund) }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Summary Box: EPF + ESIC Breakup -->
+        <div style="display: flex; justify-content: space-between; margin: 10px 0; font-size: 12px;">
+            <div style="border: 1px solid #000; padding: 6px 14px; flex: 1; margin-right: 10px;">
+                <strong>EPF Employer Refund:</strong>
+                <div style="font-family: Consolas, monospace; font-size: 14px; font-weight: bold; margin-top: 3px;">
+                    ₹ {{ "{:,.0f}".format(data.epf_employer_refund) }}
+                </div>
+                <div style="font-size: 10px; color: #555;">(A/c 01 + EPS + EDLI + Admin)</div>
+            </div>
+            <div style="border: 1px solid #000; padding: 6px 14px; flex: 1;">
+                <strong>ESIC Employer Refund:</strong>
+                <div style="font-family: Consolas, monospace; font-size: 14px; font-weight: bold; margin-top: 3px;">
+                    ₹ {{ "{:,.0f}".format(data.esic_employer_refund) }}
+                </div>
+                <div style="font-size: 10px; color: #555;">(Employer Share @ 3.25%)</div>
+            </div>
+        </div>
+
+        <!-- Grand Total -->
+        <div class="grand-total">
+            <div class="grand-total-box">
+                <div class="grand-total-label">Total Reimbursement Claimed</div>
+                <div class="grand-total-amount">₹ {{ "{:,.0f}".format(data.total_refund) }}</div>
+            </div>
+        </div>
+
+        <!-- Enclosure -->
+        <div class="enclosure">
+            <strong>Enclosures:</strong>
+            <ol style="margin-left: 18px; margin-top: 4px;">
+                <li>EPF ECR Acknowledgement / TRRN Receipt</li>
+                <li>ESIC Challan Receipt</li>
+                <li>Employee-wise Contribution Statement</li>
+            </ol>
+        </div>
+
+        <!-- Closing -->
+        <div class="closing">
+            <p>We shall be grateful if the above reimbursement is processed at the earliest.</p>
+            <p style="margin-top: 12px;">Thanking You,</p>
+            <p style="margin-top: 4px;">Yours Faithfully,</p>
+            <div class="sign-space">
+                <div class="company-sign">For {{ est.company_name | upper }}</div>
+                <div class="role">Authorized Signatory</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

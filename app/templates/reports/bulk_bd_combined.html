@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% block title %}Bulk Form B + D — {{ est_name }}{% endblock %}
+{% block page_header %}Bulk Form B + D — Print All{% endblock %}
+
+{% block content %}
+<style>
+    @page { size: 14in 8.5in; margin: 8mm; }
+    @media print {
+        @page { size: 14in 8.5in landscape; margin: 8mm; }
+        html, body { width: 14in; background:#fff !important;
+            -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        .sidebar, .top-navbar, .no-print { display: none !important; }
+        .main-content { margin-left: 0 !important; padding: 0 !important; width: 100% !important; }
+        .page-content { padding: 0 !important; }
+        .bulk-section {
+            box-shadow: none !important; border: none !important;
+            margin: 0 !important; padding: 8px !important;
+            width: 100% !important; max-width: 100% !important;
+            page-break-after: always;
+        }
+        .bulk-section:last-child { page-break-after: auto; }
+        .form-b-table, .fd-table { width: 100% !important; page-break-inside: auto; }
+        .form-b-table th, .form-b-table td { font-size: 8px !important; padding: 3px 4px !important; }
+        .fd-table th, .fd-table td { font-size: 7.5px !important; padding: 2px !important; }
+        thead { display: table-header-group; }
+        tr { page-break-inside: avoid; }
+    }
+    .bulk-section { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:20px; margin-bottom:24px; box-shadow:0 1px 3px rgba(0,0,0,0.1); overflow-x:auto; }
+
+    /* Form B table */
+    .form-b-table { width:100%; border-collapse:collapse; font-size:0.72rem; }
+    .form-b-table th { background:#f1f5f9; font-weight:700; padding:5px 6px; border:1px solid #94a3b8; text-align:center; white-space:nowrap; font-size:0.68rem; vertical-align:middle; }
+    .form-b-table td { padding:4px 6px; border:1px solid #cbd5e1; white-space:nowrap; vertical-align:middle; }
+    .form-b-table .text-right { text-align:right; }
+    .form-b-table .text-center { text-align:center; }
+    .form-b-table .total-row { background:#d9ead3; font-weight:700; }
+    .form-b-table .gross-col, .form-b-table .net-col { background:#f0fdf4; font-weight:700; }
+    .form-b-table .ded-header { background:#fef3c7; }
+
+    /* Form D table */
+    .fd-table { width:100%; border-collapse:collapse; font-size:0.7rem; }
+    .fd-table th { background:#e8e8e8; font-weight:700; padding:4px 3px; border:1px solid #94a3b8; text-align:center; font-size:0.65rem; vertical-align:middle; }
+    .fd-table td { padding:3px; border:1px solid #cbd5e1; text-align:center; vertical-align:middle; }
+    .fd-table .rest { background:#fce4ec; color:#c62828; font-weight:700; }
+    .fd-table .holiday { background:#c8e6c9; color:#1b5e20; font-weight:700; }
+    .fd-table .absent { color:#c62828; }
+    .fd-table .total-row { background:#ffff00; font-weight:700; }
+
+    .sec-title { text-align:center; margin-bottom:12px; }
+    .sec-title h3 { font-size:1.1rem; font-weight:700; margin:0; letter-spacing:1px; }
+    .sec-title h4 { font-size:0.95rem; font-weight:700; margin:2px 0; }
+</style>
+
+<div class="no-print alert alert-warning py-2 px-3 mb-3" style="font-size:0.85rem;">
+    <i class="bi bi-info-circle-fill me-1"></i>
+    <strong>Printing / Save as PDF:</strong> Click <b>Print All</b> below, then in the print dialog set
+    <b>Layout = Landscape</b> and <b>Paper size = Legal</b>. You will get a single PDF with all the sections below.
+</div>
+
+<div class="no-print mb-3 d-flex gap-2">
+    <button onclick="window.history.back()" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</button>
+    <button onclick="window.print()" class="btn btn-sm btn-primary"><i class="bi bi-printer"></i> Print All ({{ sections|length }} sections)</button>
+</div>
+
+{% set last_day = [31,28,31,30,31,30,31,31,30,31,30,31] %}
+
+{% for sec in sections %}
+    {% set payroll = sec.payroll %}
+    {% set est = sec.est %}
+    {% set config = sec.config %}
+
+    {% if sec.kind == 'B' %}
+        {% set rows = sec.rows %}
+        <div class="bulk-section">
+            <div class="sec-title">
+                <h3>FORM B — WAGE REGISTER</h3>
+                <h4>{{ est.company_name.upper() }} &nbsp;|&nbsp; {{ payroll.month_name }}-{{ payroll.year }}</h4>
+            </div>
+            <div style="font-size:0.78rem; margin-bottom:8px;">
+                <strong>LIN/PAN:</strong> {{ est.pan_number or '' }} &nbsp;&nbsp;
+                <strong>Wage period:</strong> 01-{{ payroll.month_name[:3] }}-{{ payroll.year }} to
+                {% if payroll.month == 2 and payroll.year % 4 == 0 %}29{% else %}{{ last_day[payroll.month - 1] }}{% endif %}-{{ payroll.month_name[:3] }}-{{ payroll.year }}
+            </div>
+            <table class="form-b-table">
+                <thead>
+                    <tr>
+                        <th>Sr.</th><th>Emp Code</th><th style="text-align:left;">Name</th>
+                        <th>Rate</th><th>Days</th><th>PH</th><th>OT Days</th>
+                        <th>Basic</th><th>Spl Basic</th><th>DA</th><th>OT Amt</th>
+                        <th>HRA</th><th>Others</th><th>NPH</th>
+                        <th style="background:#dcfce7;">Gross</th>
+                        <th class="ded-header">PF</th><th class="ded-header">ESIC</th>
+                        <th class="ded-header">Society</th><th class="ded-header">IT</th>
+                        <th class="ded-header">Ins</th><th class="ded-header">LWF</th>
+                        <th class="ded-header">Recov</th>
+                        <th>Tot Ded</th>
+                        <th style="background:#dcfce7;">Net Pay</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set ns = namespace(t_days=0, t_ph=0, t_ot=0, t_basic=0, t_spl=0, t_da=0, t_ot_amt=0, t_hra=0, t_others=0, t_nph=0, t_gross=0, t_pf=0, t_esic=0, t_rec=0, t_total_ded=0, t_net=0) %}
+                    {% for row in rows %}
+                    <tr>
+                        <td class="text-center">{{ loop.index }}</td>
+                        <td class="text-center">{{ row.emp_code }}</td>
+                        <td style="text-align:left; font-weight:600;">{{ row.name }}</td>
+                        <td class="text-right">{{ "%.2f"|format(row.rate) }}</td>
+                        <td class="text-center">{{ row.days_worked|int if row.days_worked == row.days_worked|int else "%.1f"|format(row.days_worked) }}</td>
+                        <td class="text-center">{{ row.ph_days|int if row.ph_days else 0 }}</td>
+                        <td class="text-center">{{ "%.0f"|format(row.ot_days) }}</td>
+                        <td class="text-right">{{ row.basic|int }}</td>
+                        <td class="text-right">{{ row.spl_basic|int }}</td>
+                        <td class="text-right">{{ row.da|int }}</td>
+                        <td class="text-right">{{ row.ot_amount|int }}</td>
+                        <td class="text-right">{{ row.hra|int }}</td>
+                        <td class="text-right">{{ row.others|int }}</td>
+                        <td class="text-right">{{ row.nph|int }}</td>
+                        <td class="text-right gross-col">{{ "{:,.0f}".format(row.gross) }}</td>
+                        <td class="text-right">{{ row.pf|int }}</td>
+                        <td class="text-right">{{ row.esic|int }}</td>
+                        <td class="text-right">{{ row.society|int }}</td>
+                        <td class="text-right">{{ row.income_tax|int }}</td>
+                        <td class="text-right">{{ row.insurance|int }}</td>
+                        <td class="text-right">{{ row.lwf|int }}</td>
+                        <td class="text-right">{{ row.recoveries|int }}</td>
+                        <td class="text-right">{{ row.total_ded|int }}</td>
+                        <td class="text-right net-col">{{ "{:,.0f}".format(row.net_pay) }}</td>
+                    </tr>
+                    {% set ns.t_days = ns.t_days + row.days_worked %}
+                    {% set ns.t_ph = ns.t_ph + (row.ph_days or 0) %}
+                    {% set ns.t_ot = ns.t_ot + row.ot_days %}
+                    {% set ns.t_basic = ns.t_basic + row.basic %}
+                    {% set ns.t_spl = ns.t_spl + row.spl_basic %}
+                    {% set ns.t_da = ns.t_da + row.da %}
+                    {% set ns.t_ot_amt = ns.t_ot_amt + row.ot_amount %}
+                    {% set ns.t_hra = ns.t_hra + row.hra %}
+                    {% set ns.t_others = ns.t_others + row.others %}
+                    {% set ns.t_nph = ns.t_nph + row.nph %}
+                    {% set ns.t_gross = ns.t_gross + row.gross %}
+                    {% set ns.t_pf = ns.t_pf + row.pf %}
+                    {% set ns.t_esic = ns.t_esic + row.esic %}
+                    {% set ns.t_rec = ns.t_rec + row.recoveries %}
+                    {% set ns.t_total_ded = ns.t_total_ded + row.total_ded %}
+                    {% set ns.t_net = ns.t_net + row.net_pay %}
+                    {% endfor %}
+                    <tr class="total-row">
+                        <td class="text-center" colspan="3"><strong>TOTAL ({{ rows|length }})</strong></td>
+                        <td></td>
+                        <td class="text-center">{{ ns.t_days|int }}</td>
+                        <td class="text-center">{{ ns.t_ph|int }}</td>
+                        <td class="text-center">{{ "%.0f"|format(ns.t_ot) }}</td>
+                        <td class="text-right">{{ ns.t_basic|int }}</td>
+                        <td class="text-right">{{ ns.t_spl|int }}</td>
+                        <td class="text-right">{{ ns.t_da|int }}</td>
+                        <td class="text-right">{{ ns.t_ot_amt|int }}</td>
+                        <td class="text-right">{{ ns.t_hra|int }}</td>
+                        <td class="text-right">{{ ns.t_others|int }}</td>
+                        <td class="text-right">{{ ns.t_nph|int }}</td>
+                        <td class="text-right gross-col">{{ "{:,.0f}".format(ns.t_gross) }}</td>
+                        <td class="text-right">{{ ns.t_pf|int }}</td>
+                        <td class="text-right">{{ ns.t_esic|int }}</td>
+                        <td class="text-right">0</td><td class="text-right">0</td>
+                        <td class="text-right">0</td><td class="text-right">0</td>
+                        <td class="text-right">{{ ns.t_rec|int }}</td>
+                        <td class="text-right">{{ ns.t_total_ded|int }}</td>
+                        <td class="text-right net-col">{{ "{:,.0f}".format(ns.t_net) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    {% elif sec.kind == 'D' %}
+        {% set attendance = sec.attendance %}
+        {% set num_days = sec.num_days %}
+        {% set rest_days = sec.rest_days %}
+        {% set holiday_days = sec.holiday_days %}
+        <div class="bulk-section">
+            <div class="sec-title">
+                <h3>FORM D — ATTENDANCE REGISTER</h3>
+                <h4>{{ est.company_name.upper() }} &nbsp;|&nbsp; {{ payroll.month_name }}-{{ payroll.year }}</h4>
+            </div>
+            <div style="font-size:0.78rem; margin-bottom:8px;">
+                <strong>Period:</strong>
+                01.{{ "%02d"|format(payroll.month) }}.{{ payroll.year }} to
+                {% if payroll.month == 2 and payroll.year % 4 == 0 %}29{% else %}{{ last_day[payroll.month - 1] }}{% endif %}.{{ "%02d"|format(payroll.month) }}.{{ payroll.year }}
+            </div>
+            <table class="fd-table">
+                <thead>
+                    <tr>
+                        <th>Emp Code</th><th style="text-align:left;">Name</th>
+                        <th>Designation</th><th>Place</th>
+                        {% for d in range(1, num_days + 1) %}
+                        <th class="{% if d in rest_days %}rest{% elif d in holiday_days %}holiday{% endif %}">{{ d }}</th>
+                        {% endfor %}
+                        <th>Days</th><th>Hours</th><th>Signature</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set ns2 = namespace(t_days=0, t_hours=0) %}
+                    {% for att in attendance %}
+                    <tr>
+                        <td>{{ att.emp.internal_emp_code if att.emp.use_internal_code and att.emp.internal_emp_code else att.emp.emp_code }}</td>
+                        <td style="text-align:left; font-weight:600; white-space:nowrap;">{{ att.emp.name.upper() }}</td>
+                        <td>{{ att.emp.designation or '' }}</td>
+                        <td></td>
+                        {% for d in range(1, num_days + 1) %}
+                            {% set mark = att.marks.get(d, '') %}
+                            <td class="{% if mark == 'R' %}rest{% elif mark == 'H' %}holiday{% elif mark == 'A' %}absent{% endif %}">{{ mark }}</td>
+                        {% endfor %}
+                        <td style="font-weight:700;">{{ att.days_present|int }}</td>
+                        <td>{{ att.hours }}</td>
+                        <td></td>
+                    </tr>
+                    {% set ns2.t_days = ns2.t_days + att.days_present|int %}
+                    {% set ns2.t_hours = ns2.t_hours + att.hours %}
+                    {% endfor %}
+                    <tr class="total-row">
+                        <td colspan="4"><strong>TOTAL</strong></td>
+                        {% for d in range(1, num_days + 1) %}<td></td>{% endfor %}
+                        <td>{{ ns2.t_days }}</td>
+                        <td>{{ ns2.t_hours }}</td>
+                        <td></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+{% endfor %}
+
+<div class="no-print text-center text-muted" style="font-size:0.75rem; margin-top:16px;">
+    Generated: {{ generated_on }} &nbsp;|&nbsp; Vaishnavi Consultant
+</div>
+{% endblock %}

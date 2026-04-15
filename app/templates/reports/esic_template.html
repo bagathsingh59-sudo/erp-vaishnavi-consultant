@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}ESIC Contribution - {{ payroll.period_display }}{% endblock %}
+{% block page_header %}ESIC Monthly Contribution Statement{% endblock %}
+
+{% block content %}
+<style>
+    @page { size: A4 portrait; margin: 10mm; }
+    @media print {
+        .sidebar, .top-navbar, .no-print { display: none !important; }
+        .main-content { margin-left: 0 !important; padding: 0 !important; }
+        .page-content { padding: 0 !important; }
+        body { background: #fff !important; }
+        .esic-page { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 10px !important; }
+        .esic-table th, .esic-table td { font-size: 9px !important; padding: 3px 4px !important; }
+    }
+    .esic-page { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:24px; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+    .esic-table { width:100%; border-collapse:collapse; font-size:0.78rem; }
+    .esic-table th { background:#2E5090; color:#fff; padding:7px 8px; text-align:center; font-weight:600; font-size:0.72rem; border:1px solid #2E5090; vertical-align:middle; }
+    .esic-table td { padding:5px 8px; border:1px solid #e2e8f0; vertical-align:middle; }
+    .esic-table tbody tr:nth-child(even) { background:#f8fafc; }
+    .esic-table .r { text-align:right; }
+    .esic-table .c { text-align:center; }
+    .esic-table .l { text-align:left; }
+    .esic-table .total-row { background:#fef3c7 !important; font-weight:700; }
+    .esic-table .total-row td { border-top:2px solid #1e293b; border-bottom:2px solid #1e293b; }
+    .esic-table .warn-row { background:#fef2f2 !important; }
+    .esic-table .warn-row td { border-color:#fecaca; }
+    .warn-badge { display:inline-block; background:#dc2626; color:#fff; font-size:0.6rem; padding:1px 5px; border-radius:8px; font-weight:600; cursor:help; }
+    .skipped-section { background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:14px 18px; margin-top:16px; font-size:0.78rem; }
+    .skipped-section .title { font-weight:700; color:#92400e; margin-bottom:8px; }
+    .warn-summary { background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:14px 18px; margin-bottom:16px; font-size:0.78rem; }
+    .warn-summary .title { font-weight:700; color:#dc2626; margin-bottom:6px; }
+</style>
+
+<div class="no-print mb-3 d-flex justify-content-between align-items-center">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb" style="font-size:0.85rem; margin:0;">
+            <li class="breadcrumb-item"><a href="{{ url_for('payroll.payroll_list') }}" class="text-decoration-none">Salary Processing</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('payroll.payroll_process', payroll_id=payroll.id) }}" class="text-decoration-none">{{ payroll.period_display }}</a></li>
+            <li class="breadcrumb-item active">ESIC Contribution</li>
+        </ol>
+    </nav>
+    <div class="d-flex gap-2">
+        <button onclick="window.history.back()" style="background:#e5e7eb; color:#333; border:none; padding:6px 16px; border-radius:6px; cursor:pointer; font-size:0.82rem;"><i class="bi bi-arrow-left me-1"></i> Back to Payroll</button>
+        <a href="{{ url_for('reports.esic_excel', payroll_id=payroll.id) }}" class="btn btn-success btn-sm">
+            <i class="bi bi-file-earmark-excel me-1"></i> Download MC Template (.xls)
+        </a>
+        <button onclick="window.print()" class="btn btn-primary btn-sm">
+            <i class="bi bi-printer me-1"></i> Print
+        </button>
+    </div>
+</div>
+
+<div class="esic-page">
+    <div style="text-align:center; margin-bottom:14px;">
+        <h3 style="font-size:1.1rem; font-weight:700; margin:0; color:#2E5090;">ESIC — MONTHLY CONTRIBUTION STATEMENT</h3>
+        <div style="font-size:0.85rem; font-weight:700; margin-top:4px;">{{ est.company_name }}</div>
+        {% if est.esic_code %}<div style="font-size:0.75rem; color:#64748b;">ESIC Code: {{ est.esic_code }}</div>{% endif %}
+        {% if est.address %}<div style="font-size:0.72rem; color:#94a3b8;">{{ est.address }}</div>{% endif %}
+        <div style="font-size:0.78rem; color:#2E5090; font-weight:600; margin-top:4px;">
+            Contribution Period: {{ payroll.month_name }} {{ payroll.year }}
+        </div>
+    </div>
+
+    {% set warn_rows = rows|selectattr('warnings')|list %}
+    {% if warn_rows %}
+    <div class="warn-summary no-print">
+        <div class="title"><i class="bi bi-exclamation-triangle-fill me-1"></i> {{ warn_rows|length }} employee(s) have validation warnings</div>
+        {% for r in warn_rows %}
+        <div style="padding:2px 0;">
+            <strong>{{ r.ip_number }}</strong> — {{ r.ip_name }}: {{ r.warnings|join('; ') }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if skipped %}
+    <div class="skipped-section no-print">
+        <div class="title"><i class="bi bi-person-slash me-1"></i> {{ skipped|length }} employee(s) skipped from ESIC</div>
+        {% for s in skipped %}
+        <div style="padding:2px 0;">
+            <strong>{{ s.name }}</strong> — {{ s.reason }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if rows %}
+    <table class="esic-table">
+        <thead>
+            <tr>
+                <th style="width:35px;">Sl</th>
+                <th style="width:24px;" class="no-print"></th>
+                <th style="min-width:120px;">IP Number</th>
+                <th style="min-width:160px; text-align:left;">IP Name</th>
+                <th style="width:70px;">No of<br>Days</th>
+                <th style="min-width:110px;">Total Monthly<br>Wages</th>
+                <th style="width:80px;">Reason<br>Code</th>
+                <th style="min-width:100px;">Last Working<br>Day</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% set ns = namespace(t_days=0, t_wages=0) %}
+            {% for r in rows %}
+            <tr{% if r.warnings %} class="warn-row"{% endif %}>
+                <td class="c" style="color:#94a3b8;">{{ loop.index }}</td>
+                <td class="no-print">{% if r.warnings %}<span class="warn-badge" title="{{ r.warnings|join('; ') }}"><i class="bi bi-exclamation-triangle-fill"></i></span>{% endif %}</td>
+                <td class="c" style="font-family:monospace; font-size:0.74rem;">{{ r.ip_number }}</td>
+                <td class="l" style="font-weight:600;">{{ r.ip_name }}</td>
+                <td class="c">{{ r.no_of_days }}</td>
+                <td class="r" style="font-weight:600;">{{ "{:,}".format(r.total_wages|int) }}</td>
+                <td class="c">{{ r.reason_code }}</td>
+                <td class="c">{{ r.last_working_day or '' }}</td>
+            </tr>
+            {% set ns.t_days = ns.t_days + r.no_of_days|int %}
+            {% set ns.t_wages = ns.t_wages + r.total_wages|int %}
+            {% endfor %}
+
+            <tr class="total-row">
+                <td></td>
+                <td class="no-print"></td>
+                <td class="c" style="font-weight:700;">TOTAL</td>
+                <td class="l" style="font-weight:700;">{{ rows|length }} Employees</td>
+                <td class="c">{{ ns.t_days }}</td>
+                <td class="r">{{ "{:,}".format(ns.t_wages) }}</td>
+                <td></td>
+                <td></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- ESIC Contribution Summary -->
+    <div style="margin-top:18px; display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <div style="border:1px solid #e2e8f0; border-radius:6px; overflow:hidden;">
+            <div style="background:#2E5090; color:#fff; padding:6px 12px; font-weight:700; font-size:0.75rem;">ESIC Contribution Breakup</div>
+            <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
+                <tr>
+                    <td style="padding:5px 12px; color:#475569; border-bottom:1px solid #f1f5f9;">Employee ESIC ({{ config.esic_employee_rate if config else 0.75 }}%)</td>
+                    <td style="padding:5px 12px; text-align:right; font-weight:600; border-bottom:1px solid #f1f5f9;">{{ "{:,.0f}".format(payroll.total_esic_employee or 0) }}</td>
+                </tr>
+                <tr>
+                    <td style="padding:5px 12px; color:#475569; border-bottom:1px solid #f1f5f9;">Employer ESIC ({{ config.esic_employer_rate if config else 3.25 }}%)</td>
+                    <td style="padding:5px 12px; text-align:right; font-weight:600; border-bottom:1px solid #f1f5f9;">{{ "{:,.0f}".format(payroll.total_esic_employer or 0) }}</td>
+                </tr>
+                <tr style="background:#f8fafc;">
+                    <td style="padding:6px 12px; font-weight:700; border-top:2px solid #1e293b;">TOTAL ESIC PAYABLE</td>
+                    <td style="padding:6px 12px; text-align:right; font-weight:700; font-size:0.85rem; color:#2E5090; border-top:2px solid #1e293b;">
+                        {{ "{:,.0f}".format((payroll.total_esic_employee or 0) + (payroll.total_esic_employer or 0)) }}
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <div style="border:1px solid #e2e8f0; border-radius:6px; padding:12px; font-size:0.72rem;">
+            <div style="font-weight:700; margin-bottom:8px; color:#475569;">Reason Codes (ESIC Portal Standard)</div>
+            <div style="color:#64748b; line-height:1.6;">
+                <div><strong>0</strong> — Without Reason (default)</div>
+                <div><strong>1</strong> — On Leave</div>
+                <div><strong>2</strong> — Left Service</div>
+                <div><strong>3</strong> — Retired</div>
+                <div><strong>4</strong> — Out of Coverage</div>
+                <div><strong>5</strong> — Expired (Died in Service)</div>
+                <div><strong>6</strong> — Non Implemented Area</div>
+                <div><strong>7</strong> — Compliance by Immediate Employer</div>
+                <div><strong>8</strong> — Suspension of Work</div>
+                <div><strong>9</strong> — Strike / Lockout</div>
+                <div><strong>10</strong> — Retrenchment</div>
+                <div><strong>11</strong> — No Work</div>
+                <div><strong>12</strong> — Doesn't Belong To This Employer</div>
+                <div><strong>13</strong> — Duplicate IP</div>
+            </div>
+            <div style="margin-top:8px; font-size:0.65rem; color:#94a3b8;">
+                Note: Last Working Day required only for codes 2, 3, 4, 5, 6, 10 (when 0 days wages paid)
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <div style="text-align:center; padding:40px; color:#94a3b8;">
+        <i class="bi bi-exclamation-triangle" style="font-size:2rem;"></i>
+        <p style="margin-top:8px;">No employees with ESIC IP Number found. ESIC template requires IP Number for all insured persons.</p>
+    </div>
+    {% endif %}
+
+    <div style="margin-top:14px; display:flex; justify-content:space-between; font-size:0.68rem; color:#94a3b8;">
+        <div>Generated: {{ generated_on }}</div>
+        <div>Vaishnavi Consultant</div>
+    </div>
+</div>
+{% endblock %}

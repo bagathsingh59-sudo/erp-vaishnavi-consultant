@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Establishments - Vaishnavi Consultant{% endblock %}
+{% block page_header %}Establishments{% endblock %}
+
+{% block content %}
+<div class="table-container">
+    <!-- Header with Search and Add Button -->
+    <div class="table-header">
+        <div class="table-title">
+            <i class="bi bi-buildings"></i>
+            All Establishments
+            <span class="badge bg-primary bg-opacity-10 text-primary ms-2" style="font-size:0.75rem; border-radius:20px; padding:3px 12px;">
+                {{ establishments|length }}
+            </span>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            <form method="GET" class="search-box">
+                <i class="bi bi-search"></i>
+                <input type="text" name="search" class="form-control" placeholder="Search by name, PF code, ESIC..."
+                       value="{{ search }}">
+                <!-- Preserve filters -->
+                <input type="hidden" name="status" value="{{ filter_status }}">
+                <input type="hidden" name="service" value="{{ filter_service }}">
+            </form>
+            <a href="{{ url_for('bulk.export_establishments', status=filter_status, service=filter_service) }}" class="btn btn-light" title="Export to Excel">
+                <i class="bi bi-file-earmark-arrow-down me-1"></i> Export
+            </a>
+            <a href="{{ url_for('bulk.import_establishments') }}" class="btn btn-light" title="Import from Excel">
+                <i class="bi bi-file-earmark-arrow-up me-1"></i> Import
+            </a>
+            <a href="{{ url_for('establishment.establishment_add') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1"></i> Add New
+            </a>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+        <span style="font-size:0.78rem; color:var(--text-secondary); font-weight:600;">Status:</span>
+        <a href="{{ url_for('establishment.establishment_list', search=search, service=filter_service) }}"
+           class="filter-btn {{ 'active' if filter_status == 'all' }}">All</a>
+        <a href="{{ url_for('establishment.establishment_list', search=search, status='active', service=filter_service) }}"
+           class="filter-btn {{ 'active' if filter_status == 'active' }}">Active</a>
+        <a href="{{ url_for('establishment.establishment_list', search=search, status='inactive', service=filter_service) }}"
+           class="filter-btn {{ 'active' if filter_status == 'inactive' }}">Inactive</a>
+
+        <span style="margin-left:12px; font-size:0.78rem; color:var(--text-secondary); font-weight:600;">Service:</span>
+        <a href="{{ url_for('establishment.establishment_list', search=search, status=filter_status) }}"
+           class="filter-btn {{ 'active' if filter_service == 'all' }}">All</a>
+        <a href="{{ url_for('establishment.establishment_list', search=search, status=filter_status, service='with_records') }}"
+           class="filter-btn {{ 'active' if filter_service == 'with_records' }}">With Records</a>
+        <a href="{{ url_for('establishment.establishment_list', search=search, status=filter_status, service='only_returns') }}"
+           class="filter-btn {{ 'active' if filter_service == 'only_returns' }}">Only Returns</a>
+    </div>
+
+    <!-- Table -->
+    {% if establishments %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Company Name</th>
+                    <th>PF Code</th>
+                    <th>ESIC Code</th>
+                    <th>Contact Person</th>
+                    <th>Service</th>
+                    <th>Fee</th>
+                    <th>Status</th>
+                    <th style="text-align:center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for est in establishments %}
+                <tr>
+                    <td style="color:var(--text-light);">{{ loop.index }}</td>
+                    <td>
+                        <a href="{{ url_for('establishment.establishment_view', id=est.id) }}"
+                           class="text-decoration-none company-name-cell">
+                            {{ est.company_name }}
+                        </a>
+                        {% if est.type_of_industry %}
+                        <br><small style="color:var(--text-light);">{{ est.type_of_industry }}</small>
+                        {% endif %}
+                    </td>
+                    <td><code style="font-size:0.8rem;">{{ est.pf_code or '—' }}</code></td>
+                    <td><code style="font-size:0.8rem;">{{ est.esic_code or '—' }}</code></td>
+                    <td>{{ est.contact_person or '—' }}</td>
+                    <td>
+                        {% if est.service_type == 'With Records' %}
+                            <span class="badge-service badge-with-records">With Records</span>
+                        {% elif est.service_type == 'Only Returns' %}
+                            <span class="badge-service badge-only-returns">Only Returns</span>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if est.fee_amount %}
+                            <span class="badge-fee">
+                                ₹{{ "{:,.0f}".format(est.fee_amount) }}
+                                {% if est.fee_type %}<small>/{{ est.fee_type[:1] }}</small>{% endif %}
+                            </span>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if est.is_active %}
+                            <span class="badge-status badge-active"><i class="bi bi-circle-fill" style="font-size:0.4rem"></i> Active</span>
+                        {% else %}
+                            <span class="badge-status badge-inactive"><i class="bi bi-circle-fill" style="font-size:0.4rem"></i> Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="d-flex gap-1 justify-content-center">
+                            <a href="{{ url_for('establishment.establishment_view', id=est.id) }}"
+                               class="btn-action" title="View Details">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            <a href="{{ url_for('establishment.establishment_edit', id=est.id) }}"
+                               class="btn-action" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <form method="POST" action="{{ url_for('establishment.establishment_toggle_status', id=est.id) }}"
+                                  style="display:inline;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn-action"
+                                        title="{{ 'Deactivate' if est.is_active else 'Activate' }}">
+                                    <i class="bi bi-{{ 'pause' if est.is_active else 'play' }}"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon">
+            <i class="bi bi-buildings"></i>
+        </div>
+        {% if search %}
+            <h5>No results found</h5>
+            <p>No establishments match "{{ search }}". Try a different search.</p>
+            <a href="{{ url_for('establishment.establishment_list') }}" class="btn btn-light">
+                <i class="bi bi-x-lg me-1"></i> Clear Search
+            </a>
+        {% else %}
+            <h5>No establishments yet</h5>
+            <p>Start by adding your first client establishment.</p>
+            <a href="{{ url_for('establishment.establishment_add') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-2"></i>Add Establishment
+            </a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

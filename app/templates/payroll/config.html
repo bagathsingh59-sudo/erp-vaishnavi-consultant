@@ -1,0 +1,607 @@
+{% extends "base.html" %}
+
+{% block title %}Payroll Config - {{ est.company_name }}{% endblock %}
+{% block page_header %}Payroll Configuration{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb" style="font-size:0.85rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('establishment.establishment_list') }}" class="text-decoration-none">Establishments</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('establishment.establishment_view', id=est.id) }}" class="text-decoration-none">{{ est.company_name }}</a></li>
+        <li class="breadcrumb-item active">Payroll Config</li>
+    </ol>
+</nav>
+
+<!-- Setup Wizard Progress (only shown during new establishment setup) -->
+{% if setup_mode %}
+<div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:16px 24px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+    <div style="display:flex; align-items:center; justify-content:center; gap:0;">
+        <!-- Step 1: Done -->
+        <div style="display:flex; align-items:center; gap:8px;">
+            <div style="width:32px; height:32px; border-radius:50%; background:#10b981; color:#fff; display:flex; align-items:center; justify-content:center; font-size:0.85rem; font-weight:700;">
+                <i class="bi bi-check-lg"></i>
+            </div>
+            <span style="font-size:0.78rem; font-weight:700; color:#10b981;">Establishment Created</span>
+        </div>
+        <div style="width:60px; height:2px; background:linear-gradient(90deg, #10b981, #4f46e5); margin:0 8px;"></div>
+        <!-- Step 2: Current -->
+        <div style="display:flex; align-items:center; gap:8px;">
+            <div style="width:32px; height:32px; border-radius:50%; background:#4f46e5; color:#fff; display:flex; align-items:center; justify-content:center; font-size:0.78rem; font-weight:700; box-shadow:0 0 0 4px rgba(79,70,229,0.2);">
+                2
+            </div>
+            <span style="font-size:0.78rem; font-weight:700; color:#4f46e5;">Payroll Config</span>
+        </div>
+        <div style="width:60px; height:2px; background:#e2e8f0; margin:0 8px;"></div>
+        <!-- Step 3: Pending -->
+        <div style="display:flex; align-items:center; gap:8px;">
+            <div style="width:32px; height:32px; border-radius:50%; background:#f1f5f9; color:#94a3b8; display:flex; align-items:center; justify-content:center; font-size:0.78rem; font-weight:700;">
+                3
+            </div>
+            <span style="font-size:0.78rem; font-weight:600; color:#94a3b8;">Add Employees</span>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Establishment Banner -->
+<div style="background:linear-gradient(135deg, var(--primary), #7c3aed); color:#fff; padding:14px 24px; border-radius:var(--radius); margin-bottom:24px; display:flex; align-items:center; gap:16px;">
+    <div style="width:42px; height:42px; background:rgba(255,255,255,0.15); border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.2rem;">
+        <i class="bi bi-gear-fill"></i>
+    </div>
+    <div>
+        <div style="font-weight:700; font-size:1rem;">{{ est.company_name }}</div>
+        <div style="opacity:0.75; font-size:0.8rem;">Configure how salary is calculated for this establishment</div>
+    </div>
+    {% if config %}
+    <span class="badge bg-success bg-opacity-25 text-white px-3 py-2 ms-auto" style="border-radius:20px; font-size:0.8rem;">
+        <i class="bi bi-check-circle me-1"></i> Configured
+    </span>
+    {% else %}
+    <span class="badge bg-warning bg-opacity-25 text-white px-3 py-2 ms-auto" style="border-radius:20px; font-size:0.8rem;">
+        <i class="bi bi-exclamation-circle me-1"></i> Not Configured
+    </span>
+    {% endif %}
+</div>
+
+<form method="POST" autocomplete="off">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if setup_mode %}<input type="hidden" name="setup_mode" value="1">{% endif %}
+
+    <div class="form-card">
+        <!-- Salary Type -->
+        <div class="form-section">
+            <div class="form-section-title"><i class="bi bi-cash-stack"></i> Default Salary Type</div>
+            <div class="form-section-desc">Default salary type for new employees. Each employee can override this in their salary page.</div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Default Salary Type <span class="text-danger">*</span></label>
+                    <select name="salary_type" class="form-select" id="salaryType">
+                        <option value="monthly_fixed" {% if config and config.salary_type == 'monthly_fixed' %}selected{% endif %}>Monthly Fixed Salary</option>
+                        <option value="daily_wages" {% if config and config.salary_type == 'daily_wages' %}selected{% endif %}>Daily Wages</option>
+                        <option value="monthly_package" {% if config and config.salary_type == 'monthly_package' %}selected{% endif %}>Monthly Package (CTC)</option>
+                    </select>
+                    <small class="text-muted">Most common: Monthly Fixed. Individual employees can have a different type.</small>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Salary Structure <span class="text-danger">*</span></label>
+                    <select name="salary_structure" class="form-select" id="salaryStructure">
+                        <option value="with_heads" {% if config and config.salary_structure == 'with_heads' %}selected{% endif %}>With Heads (Basic + DA + HRA + ...)</option>
+                        <option value="gross_only" {% if config and config.salary_structure == 'gross_only' %}selected{% endif %}>Gross Only (No breakup)</option>
+                    </select>
+                    <small class="text-muted">With Heads allows detailed compliance calculation</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Working Days -->
+        <div class="form-section">
+            <div class="form-section-title"><i class="bi bi-calendar-week"></i> Working Days</div>
+            <div class="form-section-desc">How are working days calculated for per-day deductions?</div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Working Days Basis <span class="text-danger">*</span></label>
+                    <select name="working_days_basis" class="form-select" id="workingDaysBasis" onchange="toggleCustomDays()">
+                        <option value="calendar" {% if config and config.working_days_basis == 'calendar' %}selected{% endif %}>Calendar Days (28/30/31)</option>
+                        <option value="fixed_26" {% if config and config.working_days_basis == 'fixed_26' %}selected{% endif %}>Fixed 26 Days</option>
+                        <option value="fixed_30" {% if config and config.working_days_basis == 'fixed_30' %}selected{% endif %}>Fixed 30 Days</option>
+                        <option value="custom" {% if config and config.working_days_basis == 'custom' %}selected{% endif %}>Custom</option>
+                    </select>
+                </div>
+                <div class="col-md-3" id="customDaysDiv" style="display:none;">
+                    <label class="form-label">Custom Working Days</label>
+                    <input type="number" name="custom_working_days" class="form-control"
+                           value="{{ config.custom_working_days if config and config.custom_working_days else 26 }}"
+                           min="1" max="31">
+                </div>
+            </div>
+        </div>
+
+        <!-- Compliance Basis -->
+        <div class="form-section">
+            <div class="form-section-title"><i class="bi bi-shield-check"></i> Compliance Calculation Basis</div>
+            <div class="form-section-desc">On which amount should EPF/ESIC be calculated?</div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Calculate Compliance On <span class="text-danger">*</span></label>
+                    <select name="compliance_basis" class="form-select">
+                        <option value="basic_da" {% if config and config.compliance_basis == 'basic_da' %}selected{% endif %}>Basic + DA Only (Most Common)</option>
+                        <option value="gross" {% if config and config.compliance_basis == 'gross' %}selected{% endif %}>Gross Salary</option>
+                    </select>
+                    <small class="text-muted">If salary structure is "Gross Only", compliance will be on gross regardless</small>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check" style="padding:10px 0; margin-top:22px;">
+                        <input class="form-check-input" type="checkbox" name="include_ot_in_compliance" id="includeOtCompliance"
+                               {% if config and config.include_ot_in_compliance %}checked{% endif %}>
+                        <label class="form-check-label" for="includeOtCompliance">
+                            <strong>Include OT in EPF/ESIC Wages</strong><br>
+                            <small class="text-muted">If checked, overtime amount will be added to compliance wages for EPF/ESIC calculation</small>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Absence & OT -->
+        <div class="form-section">
+            <div class="form-section-title"><i class="bi bi-clock-history"></i> Attendance Rules</div>
+            <div class="form-section-desc">Absence deduction and overtime settings</div>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="form-check" style="padding:10px 0;">
+                        <input class="form-check-input" type="checkbox" name="absence_deduction" id="absenceDeduction"
+                               {% if not config or config.absence_deduction %}checked{% endif %}>
+                        <label class="form-check-label" for="absenceDeduction">
+                            <strong>Deduct for absent days</strong><br>
+                            <small class="text-muted">Uncheck if this client pays full salary regardless of attendance</small>
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <div class="form-check" style="padding:10px 0;">
+                        <input class="form-check-input" type="checkbox" name="ot_applicable" id="otApplicable"
+                               {% if config and config.ot_applicable %}checked{% endif %} onchange="toggleOT()">
+                        <label class="form-check-label" for="otApplicable">
+                            <strong>Overtime (OT) Applicable</strong>
+                        </label>
+                    </div>
+                    <div id="otSettings" class="row g-2 mt-1" style="display:{% if config and config.ot_applicable %}flex{% else %}none{% endif %};">
+                        <div class="col-md-6">
+                            <label class="form-label" style="font-size:0.8rem;">OT Rate</label>
+                            <select name="ot_rate_type" class="form-select form-select-sm">
+                                <option value="single" {% if config and config.ot_rate_type == 'single' %}selected{% endif %}>Single (1x)</option>
+                                <option value="double" {% if config and config.ot_rate_type == 'double' %}selected{% endif %}>Double (2x)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" style="font-size:0.8rem;">OT Unit</label>
+                            <select name="ot_unit" class="form-select form-select-sm">
+                                <option value="hours" {% if config and config.ot_unit == 'hours' %}selected{% endif %}>Hours</option>
+                                <option value="days" {% if config and config.ot_unit == 'days' %}selected{% endif %}>Days</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rest Day / Weekly Off -->
+        <div class="form-section">
+            <div class="form-section-title"><i class="bi bi-calendar-x"></i> Rest Day / Weekly Off</div>
+            <div class="form-section-desc">How are rest days (weekly off) assigned in this establishment?</div>
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <label class="form-label">Rest Day Type <span class="text-danger">*</span></label>
+                    <select name="rest_day_type" class="form-select" id="restDayType" onchange="toggleRestDay()">
+                        <option value="sunday" {% if config and config.rest_day_type == 'sunday' %}selected{% endif %}>Fixed Sunday</option>
+                        <option value="fixed_day" {% if config and config.rest_day_type == 'fixed_day' %}selected{% endif %}>Fixed Other Weekday</option>
+                        <option value="rotation" {% if config and config.rest_day_type == 'rotation' %}selected{% endif %}>Rotation (Every 7th Day)</option>
+                    </select>
+                    <small class="text-muted">Most common: Fixed Sunday. For factories/shifts: Rotation</small>
+                </div>
+                <div class="col-md-4" id="restDayWeekdayDiv" style="display:none;">
+                    <label class="form-label">Which Weekday?</label>
+                    <select name="rest_day_weekday" class="form-select">
+                        <option value="0" {% if config and config.rest_day_weekday == 0 %}selected{% endif %}>Monday</option>
+                        <option value="1" {% if config and config.rest_day_weekday == 1 %}selected{% endif %}>Tuesday</option>
+                        <option value="2" {% if config and config.rest_day_weekday == 2 %}selected{% endif %}>Wednesday</option>
+                        <option value="3" {% if config and config.rest_day_weekday == 3 %}selected{% endif %}>Thursday</option>
+                        <option value="4" {% if config and config.rest_day_weekday == 4 %}selected{% endif %}>Friday</option>
+                        <option value="5" {% if config and config.rest_day_weekday == 5 %}selected{% endif %}>Saturday</option>
+                        <option value="6" {% if config and config.rest_day_weekday == 6 %}selected{% endif %}>Sunday</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Weekly Off (WO) Policy — applies to ALL salary types -->
+        <div class="form-section" id="woPolicySection">
+            <div class="form-section-title"><i class="bi bi-calendar2-week"></i> Weekly Off (WO) Policy</div>
+            <div class="form-section-desc">Default WO rules for this establishment. Each employee can override these in their salary record.</div>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">WO Applicable? <span class="text-danger">*</span></label>
+                    <select name="wo_applicable" class="form-select" id="woApplicable" onchange="toggleWoFields()">
+                        <option value="1" {% if not config or config.wo_applicable != False %}selected{% endif %}>Yes</option>
+                        <option value="0" {% if config and config.wo_applicable == False %}selected{% endif %}>No</option>
+                    </select>
+                </div>
+                <div class="col-md-3 wo-field">
+                    <label class="form-label">WO Pay Type <span class="text-danger">*</span></label>
+                    <select name="wo_type" class="form-select" id="woType" onchange="updateWoHelp()">
+                        <option value="paid" {% if not config or config.wo_type == 'paid' %}selected{% endif %}>Paid</option>
+                        <option value="unpaid" {% if config and config.wo_type == 'unpaid' %}selected{% endif %}>Unpaid</option>
+                    </select>
+                    <small class="text-muted">Paid = WO day included in salary</small>
+                </div>
+                <div class="col-md-3 wo-field">
+                    <label class="form-label">WO Day</label>
+                    <select name="wo_day" class="form-select" id="woDay">
+                        <option value="sunday" {% if not config or config.wo_day == 'sunday' %}selected{% endif %}>Sunday</option>
+                        <option value="monday" {% if config and config.wo_day == 'monday' %}selected{% endif %}>Monday</option>
+                        <option value="tuesday" {% if config and config.wo_day == 'tuesday' %}selected{% endif %}>Tuesday</option>
+                        <option value="wednesday" {% if config and config.wo_day == 'wednesday' %}selected{% endif %}>Wednesday</option>
+                        <option value="thursday" {% if config and config.wo_day == 'thursday' %}selected{% endif %}>Thursday</option>
+                        <option value="friday" {% if config and config.wo_day == 'friday' %}selected{% endif %}>Friday</option>
+                        <option value="saturday" {% if config and config.wo_day == 'saturday' %}selected{% endif %}>Saturday</option>
+                        <option value="rotational" {% if config and config.wo_day == 'rotational' %}selected{% endif %}>Rotational</option>
+                    </select>
+                </div>
+                <div class="col-md-3 wo-field">
+                    <label class="form-label">WO OT Rate</label>
+                    <select name="wo_ot_rate" class="form-select">
+                        <option value="1.0" {% if config and config.wo_ot_rate == 1.0 %}selected{% endif %}>1x (Single Rate)</option>
+                        <option value="1.5" {% if config and config.wo_ot_rate == 1.5 %}selected{% endif %}>1.5x</option>
+                        <option value="2.0" {% if not config or config.wo_ot_rate == 2.0 %}selected{% endif %}>2x (Double Rate)</option>
+                    </select>
+                    <small class="text-muted">If employee works on WO day</small>
+                </div>
+            </div>
+            <div class="row g-3 mt-1 wo-field">
+                <div class="col-md-3">
+                    <label class="form-label">Sandwich Rule</label>
+                    <select name="wo_sandwich_rule" class="form-select" id="woSandwich">
+                        <option value="0" {% if not config or not config.wo_sandwich_rule %}selected{% endif %}>No (Default)</option>
+                        <option value="1" {% if config and config.wo_sandwich_rule %}selected{% endif %}>Yes</option>
+                    </select>
+                    <small class="text-muted">Absent both sides of WO = WO also absent</small>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Absence Deduction Divisor</label>
+                    <select name="absence_divisor" class="form-select">
+                        <option value="30" {% if not config or config.absence_divisor == '30' %}selected{% endif %}>÷ 30 (Fixed)</option>
+                        <option value="26" {% if config and config.absence_divisor == '26' %}selected{% endif %}>÷ 26 (Working Days)</option>
+                        <option value="calendar" {% if config and config.absence_divisor == 'calendar' %}selected{% endif %}>÷ Calendar Days (28/30/31)</option>
+                    </select>
+                    <small class="text-muted">Per-day deduction = Gross ÷ this</small>
+                </div>
+                <div class="col-md-6">
+                    <div id="woHelpBox" style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:12px 14px; font-size:0.75rem; color:#166534; line-height:1.7;">
+                        <div id="woHelpText"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Paid Holidays -->
+        <div class="form-section">
+            <div class="form-section-title"><i class="bi bi-calendar-heart"></i> Paid Holidays</div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Paid Holiday Treatment</label>
+                    <select name="paid_holiday_type" class="form-select">
+                        <option value="included" {% if config and config.paid_holiday_type == 'included' %}selected{% endif %}>Included in Working Days (No separate line)</option>
+                        <option value="separate" {% if config and config.paid_holiday_type == 'separate' %}selected{% endif %}>Show as Separate Line Item</option>
+                        <option value="not_applicable" {% if config and config.paid_holiday_type == 'not_applicable' %}selected{% endif %}>Not Applicable</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statutory Applicability -->
+        <div class="form-section" style="background:#f0fdf4;">
+            <div class="form-section-title"><i class="bi bi-bank"></i> Statutory Applicability</div>
+            <div class="form-section-desc">Which statutory deductions apply to this establishment?</div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <div class="form-check" style="padding:10px 0;">
+                        <input class="form-check-input" type="checkbox" name="epf_applicable" id="epfApplicable"
+                               {% if not config or config.epf_applicable %}checked{% endif %} onchange="toggleEPF()">
+                        <label class="form-check-label" for="epfApplicable"><strong>EPF Applicable</strong></label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check" style="padding:10px 0;">
+                        <input class="form-check-input" type="checkbox" name="esic_applicable" id="esicApplicable"
+                               {% if config and config.esic_applicable %}checked{% endif %} onchange="toggleESIC()">
+                        <label class="form-check-label" for="esicApplicable"><strong>ESIC Applicable</strong></label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check" style="padding:10px 0;">
+                        <input class="form-check-input" type="checkbox" name="pt_applicable" id="ptApplicable"
+                               {% if config and config.pt_applicable %}checked{% endif %} onchange="togglePT()">
+                        <label class="form-check-label" for="ptApplicable"><strong>Professional Tax</strong></label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PT State Selection -->
+            <div id="ptSettings" style="display:{% if config and config.pt_applicable %}block{% else %}none{% endif %}; background:#fff; padding:14px 16px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:12px;">
+                <h6 style="font-size:0.85rem; font-weight:700; color:#7c3aed; margin-bottom:10px;">
+                    <i class="bi bi-geo-alt me-1"></i> Professional Tax — State
+                </h6>
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <label class="form-label" style="font-size:0.8rem;">Select State</label>
+                        <select name="pt_state" class="form-select form-select-sm" onchange="showPtSlab(this.value)">
+                            {% set pt_st = config.pt_state if config and config.pt_state else 'karnataka' %}
+                            <option value="karnataka" {% if pt_st == 'karnataka' %}selected{% endif %}>Karnataka</option>
+                            <option value="maharashtra" {% if pt_st == 'maharashtra' %}selected{% endif %}>Maharashtra</option>
+                            <option value="tamil_nadu" {% if pt_st == 'tamil_nadu' %}selected{% endif %}>Tamil Nadu</option>
+                            <option value="andhra_pradesh" {% if pt_st == 'andhra_pradesh' %}selected{% endif %}>Andhra Pradesh</option>
+                            <option value="telangana" {% if pt_st == 'telangana' %}selected{% endif %}>Telangana</option>
+                            <option value="west_bengal" {% if pt_st == 'west_bengal' %}selected{% endif %}>West Bengal</option>
+                            <option value="gujarat" {% if pt_st == 'gujarat' %}selected{% endif %}>Gujarat</option>
+                            <option value="madhya_pradesh" {% if pt_st == 'madhya_pradesh' %}selected{% endif %}>Madhya Pradesh</option>
+                            <option value="kerala" {% if pt_st == 'kerala' %}selected{% endif %}>Kerala</option>
+                            <option value="odisha" {% if pt_st == 'odisha' %}selected{% endif %}>Odisha</option>
+                            <option value="bihar" {% if pt_st == 'bihar' %}selected{% endif %}>Bihar</option>
+                            <option value="jharkhand" {% if pt_st == 'jharkhand' %}selected{% endif %}>Jharkhand</option>
+                            <option value="assam" {% if pt_st == 'assam' %}selected{% endif %}>Assam</option>
+                            <option value="chhattisgarh" {% if pt_st == 'chhattisgarh' %}selected{% endif %}>Chhattisgarh</option>
+                            <option value="meghalaya" {% if pt_st == 'meghalaya' %}selected{% endif %}>Meghalaya</option>
+                            <option value="tripura" {% if pt_st == 'tripura' %}selected{% endif %}>Tripura</option>
+                            <option value="manipur" {% if pt_st == 'manipur' %}selected{% endif %}>Manipur</option>
+                            <option value="sikkim" {% if pt_st == 'sikkim' %}selected{% endif %}>Sikkim</option>
+                            <option value="rajasthan" {% if pt_st == 'rajasthan' %}selected{% endif %}>Rajasthan (No PT)</option>
+                            <option value="delhi" {% if pt_st == 'delhi' %}selected{% endif %}>Delhi (No PT)</option>
+                            <option value="haryana" {% if pt_st == 'haryana' %}selected{% endif %}>Haryana (No PT)</option>
+                            <option value="punjab" {% if pt_st == 'punjab' %}selected{% endif %}>Punjab (No PT)</option>
+                            <option value="uttarakhand" {% if pt_st == 'uttarakhand' %}selected{% endif %}>Uttarakhand (No PT)</option>
+                            <option value="goa" {% if pt_st == 'goa' %}selected{% endif %}>Goa (No PT)</option>
+                            <option value="himachal_pradesh" {% if pt_st == 'himachal_pradesh' %}selected{% endif %}>Himachal Pradesh (No PT)</option>
+                        </select>
+                        <small class="text-muted">PT slabs vary by state. Auto-calculated based on earned gross.</small>
+                    </div>
+                    <div class="col-md-6" id="ptSlabInfo" style="font-size:0.72rem; color:#64748b; background:#f8fafc; border-radius:6px; padding:10px;">
+                        <div style="font-weight:700; color:#7c3aed; margin-bottom:4px;">Slab Preview:</div>
+                        <div id="ptSlabText">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EPF Settings -->
+            <div id="epfSettings" style="display:{% if not config or config.epf_applicable %}block{% else %}none{% endif %}; background:#fff; padding:16px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:12px;">
+                <h6 style="font-size:0.85rem; font-weight:700; color:var(--primary); margin-bottom:12px;">
+                    <i class="bi bi-sliders me-1"></i> EPF Rates
+                </h6>
+
+                <!-- Employee Share -->
+                <div style="background:#f8fafc; padding:10px 14px; border-radius:6px; margin-bottom:12px;">
+                    <div style="font-size:0.78rem; font-weight:700; color:var(--text-secondary); margin-bottom:8px;">EMPLOYEE SHARE (Deducted from Salary)</div>
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <label class="form-label" style="font-size:0.8rem;">Employee Rate (%)</label>
+                            <input type="number" name="epf_employee_rate" class="form-control form-control-sm"
+                                   value="{{ config.epf_employee_rate if config else 12.0 }}" step="0.01">
+                            <small class="text-muted">Goes to EPF A/c 01</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Employer Share -->
+                <div style="background:#f0fdf4; padding:10px 14px; border-radius:6px; margin-bottom:12px;">
+                    <div style="font-size:0.78rem; font-weight:700; color:#166534; margin-bottom:8px;">EMPLOYER SHARE (Paid by Employer — Total 13%)</div>
+                    <div class="row g-2">
+                        <div class="col-md-3">
+                            <label class="form-label" style="font-size:0.8rem;">EPF A/c 01 (%)</label>
+                            <input type="number" name="epf_ac01_rate" class="form-control form-control-sm"
+                                   value="{{ config.epf_ac01_rate if config else 3.67 }}" step="0.01">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label" style="font-size:0.8rem;">EPS A/c 10 (%)</label>
+                            <input type="number" name="epf_eps_rate" class="form-control form-control-sm"
+                                   value="{{ config.epf_eps_rate if config else 8.33 }}" step="0.01">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label" style="font-size:0.8rem;">Admin Charge (%)</label>
+                            <input type="number" name="epf_admin_rate" class="form-control form-control-sm"
+                                   value="{{ config.epf_admin_rate if config else 0.5 }}" step="0.01">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label" style="font-size:0.8rem;">EDLI (%)</label>
+                            <input type="number" name="epf_edli_rate" class="form-control form-control-sm"
+                                   value="{{ config.epf_edli_rate if config else 0.5 }}" step="0.01">
+                        </div>
+                    </div>
+                    <div class="row g-2 mt-2">
+                        <div class="col-md-3">
+                            <label class="form-label" style="font-size:0.8rem;">Min Admin Charge (₹)</label>
+                            <input type="number" name="epf_admin_min" class="form-control form-control-sm"
+                                   value="{{ config.epf_admin_min if config else 500 }}" step="1">
+                            <small class="text-muted">Minimum per establishment</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- EPF Contribution Type & Ceiling -->
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <label class="form-label" style="font-size:0.8rem;">EPF Contribution Type</label>
+                        <select name="epf_contribution_type" class="form-select form-select-sm" id="epfContribType" onchange="toggleEpfCeiling()">
+                            <option value="ceiling" {% if not config or config.epf_contribution_type == 'ceiling' %}selected{% endif %}>Ceiling Slab (on max ₹15,000)</option>
+                            <option value="higher" {% if config and config.epf_contribution_type == 'higher' %}selected{% endif %}>Higher Deduction (on full wages)</option>
+                        </select>
+                        <small class="text-muted">Higher = EPF on actual wages, no ceiling cap</small>
+                    </div>
+                    <div class="col-md-4" id="epfCeilingDiv" style="display:{% if config and config.epf_contribution_type == 'higher' %}none{% else %}block{% endif %};">
+                        <label class="form-label" style="font-size:0.8rem;">EPF Wage Ceiling (₹)</label>
+                        <input type="number" name="epf_wage_ceiling" class="form-control form-control-sm"
+                               value="{{ config.epf_wage_ceiling if config else 15000 }}">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <div class="form-check" style="padding:6px 0;">
+                            <input class="form-check-input" type="checkbox" name="epf_employer_in_ctc" id="epfInCtc"
+                                   {% if config and config.epf_employer_in_ctc %}checked{% endif %}>
+                            <label class="form-check-label" for="epfInCtc" style="font-size:0.8rem;">Employer share in CTC</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ESIC Settings -->
+            <div id="esicSettings" style="display:{% if config and config.esic_applicable %}block{% else %}none{% endif %}; background:#fff; padding:16px; border-radius:8px; border:1px solid #e2e8f0;">
+                <h6 style="font-size:0.85rem; font-weight:700; color:var(--primary); margin-bottom:12px;">
+                    <i class="bi bi-sliders me-1"></i> ESIC Rates
+                </h6>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label" style="font-size:0.8rem;">Contribution Type</label>
+                        <select name="esic_contribution_type" class="form-select form-select-sm">
+                            <option value="ceiling" {% if not config or config.esic_contribution_type == 'ceiling' %}selected{% endif %}>Standard (Ceiling Limit)</option>
+                            <option value="higher" {% if config and config.esic_contribution_type == 'higher' %}selected{% endif %}>Higher Deduction (No Ceiling)</option>
+                        </select>
+                        <small class="text-muted" style="font-size:0.7rem;">Higher = Deduct ESIC even if gross exceeds ceiling</small>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" style="font-size:0.8rem;">Employee Rate (%)</label>
+                        <input type="number" name="esic_employee_rate" class="form-control form-control-sm"
+                               value="{{ config.esic_employee_rate if config else 0.75 }}" step="0.01">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" style="font-size:0.8rem;">Employer Rate (%)</label>
+                        <input type="number" name="esic_employer_rate" class="form-control form-control-sm"
+                               value="{{ config.esic_employer_rate if config else 3.25 }}" step="0.01">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" style="font-size:0.8rem;">Wage Ceiling</label>
+                        <input type="number" name="esic_wage_ceiling" class="form-control form-control-sm"
+                               value="{{ config.esic_wage_ceiling if config else 21000 }}">
+                        <small class="text-muted" style="font-size:0.7rem;">Standard: ₹21,000 (ignored if Higher Deduction)</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="form-section" style="border-bottom:none; background:#f8fafc;">
+            <div class="d-flex gap-3 justify-content-between align-items-center">
+                <a href="{{ url_for('establishment.establishment_view', id=est.id) }}" class="btn btn-light px-4">
+                    <i class="bi bi-arrow-left me-1"></i> Back to Establishment
+                </a>
+                <div class="d-flex gap-2">
+                    {% if config %}
+                    <a href="{{ url_for('payroll.salary_heads', est_id=est.id) }}" class="btn btn-outline-primary px-4">
+                        <i class="bi bi-list-columns me-1"></i> Manage Salary Heads
+                    </a>
+                    {% endif %}
+                    <button type="submit" class="btn btn-primary px-4">
+                        {% if setup_mode %}
+                        <i class="bi bi-arrow-right me-1"></i> Save & Continue to Step 3
+                        {% else %}
+                        <i class="bi bi-check-lg me-1"></i> Save Configuration
+                        {% endif %}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function toggleCustomDays() {
+        var basis = document.getElementById('workingDaysBasis').value;
+        document.getElementById('customDaysDiv').style.display = basis === 'custom' ? 'block' : 'none';
+    }
+    function toggleOT() {
+        document.getElementById('otSettings').style.display =
+            document.getElementById('otApplicable').checked ? 'flex' : 'none';
+    }
+    function toggleEPF() {
+        document.getElementById('epfSettings').style.display =
+            document.getElementById('epfApplicable').checked ? 'block' : 'none';
+    }
+    function toggleEpfCeiling() {
+        document.getElementById('epfCeilingDiv').style.display =
+            document.getElementById('epfContribType').value === 'higher' ? 'none' : 'block';
+    }
+    function toggleESIC() {
+        document.getElementById('esicSettings').style.display =
+            document.getElementById('esicApplicable').checked ? 'block' : 'none';
+    }
+    toggleCustomDays();
+    function toggleRestDay() {
+        var type = document.getElementById('restDayType').value;
+        document.getElementById('restDayWeekdayDiv').style.display = type === 'fixed_day' ? 'block' : 'none';
+    }
+    toggleRestDay();
+
+    // Weekly Off Policy
+    function toggleWoFields() {
+        var applicable = document.getElementById('woApplicable').value === '1';
+        document.querySelectorAll('.wo-field').forEach(function(el) {
+            el.style.display = applicable ? '' : 'none';
+        });
+        if (applicable) updateWoHelp();
+    }
+    function updateWoHelp() {
+        var woType = document.getElementById('woType').value;
+        var html = '';
+        if (woType === 'paid') {
+            html = '<strong>WO Paid</strong> — Weekly off day is included in salary.<br>' +
+                   '<strong>Daily:</strong> 26 present + 4 WO = 30 days paid.<br>' +
+                   '<strong>Monthly:</strong> Full salary, deduction only for absent days.';
+        } else {
+            html = '<strong>WO Unpaid</strong> — Weekly off day is NOT paid.<br>' +
+                   '<strong>Daily:</strong> Only actual working days paid (no WO pay).<br>' +
+                   '<strong>Monthly:</strong> Deduction divisor ÷26 recommended.';
+        }
+        document.getElementById('woHelpText').innerHTML = html;
+    }
+    toggleWoFields();
+    updateWoHelp();
+
+    function togglePT() {
+        document.getElementById('ptSettings').style.display =
+            document.getElementById('ptApplicable').checked ? 'block' : 'none';
+    }
+
+    var ptSlabs = {
+        'karnataka':       '≤₹15,000 = Nil | >₹15,000 = ₹200/month',
+        'maharashtra':     '≤₹7,500 = Nil | ₹7,501-10,000 = ₹175 | >₹10,000 = ₹200 (Feb: ₹300)',
+        'tamil_nadu':      '≤₹21,000 = Nil | ₹21-30K = ₹100 | ₹30-45K = ₹235 | ₹45-60K = ₹510 | ₹60-75K = ₹760 | >₹75K = ₹1,095',
+        'andhra_pradesh':  '≤₹15,000 = Nil | ₹15-20K = ₹150 | >₹20,000 = ₹200',
+        'telangana':       '≤₹15,000 = Nil | ₹15-20K = ₹150 | >₹20,000 = ₹200',
+        'west_bengal':     '≤₹10,000 = Nil | ₹10-15K = ₹110 | ₹15-25K = ₹130 | ₹25-40K = ₹150 | >₹40K = ₹200',
+        'gujarat':         '≤₹12,000 = Nil | >₹12,000 = ₹200',
+        'madhya_pradesh':  '≤₹18,750 = Nil | ₹18.7-25K = ₹125 | ₹25-33.3K = ₹167 | >₹33.3K = ₹208',
+        'kerala':          '<₹12,000 = Nil | ₹12-18K = ₹120 | ₹18-25K = ₹180 | ₹25-30K = ₹250 | ≥₹30K = ₹270 (Feb: ₹420)',
+        'odisha':          '≤₹13,304 = Nil | ₹13.3-25K = ₹125 | >₹25K = ₹200',
+        'bihar':           '≤₹25,000 = Nil | ₹25-50K = ₹100 | ₹50-75K = ₹150 | >₹75K = ₹200',
+        'jharkhand':       '≤₹25,000 = Nil | ₹25-41.6K = ₹100 | ₹41.6-66.6K = ₹150 | ₹66.6-83.3K = ₹175 | >₹83.3K = ₹208',
+        'assam':           '≤₹10,000 = Nil | ₹10-15K = ₹150 | ₹15-25K = ₹180 | >₹25K = ₹208',
+        'chhattisgarh':    'Same as MP: ≤₹18,750 = Nil | ₹18.7-25K = ₹125 | ₹25-33.3K = ₹167 | >₹33.3K = ₹208',
+        'meghalaya':       '≤₹16,666 = Nil | ₹16.6-41.6K = ₹150 | >₹41.6K = ₹208',
+        'tripura':         '≤₹15,000 = Nil | ₹15-25K = ₹150 | >₹25K = ₹208',
+        'manipur':         '≤₹15,000 = Nil | ₹15-25K = ₹150 | >₹25K = ₹208',
+        'sikkim':          '≤₹15,000 = Nil | ₹15-25K = ₹150 | >₹25K = ₹208',
+        'rajasthan':       'No Professional Tax in this state',
+        'delhi':           'No Professional Tax in this state',
+        'haryana':         'No Professional Tax in this state',
+        'punjab':          'No Professional Tax in this state',
+        'uttarakhand':     'No Professional Tax in this state',
+        'goa':             'No Professional Tax in this state',
+        'himachal_pradesh':'No Professional Tax in this state'
+    };
+    function showPtSlab(val){
+        document.getElementById('ptSlabText').textContent = ptSlabs[val] || 'Select a state';
+    }
+    // Show on load
+    var ptSelect = document.querySelector('select[name="pt_state"]');
+    if(ptSelect) showPtSlab(ptSelect.value);
+</script>
+{% endblock %}

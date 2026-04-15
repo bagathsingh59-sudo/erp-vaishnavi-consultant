@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}{% if edit_mode %}Edit Enrollment{% else %}New Enrollment{% endif %}{% endblock %}
+{% block page_header %}{% if edit_mode %}Edit Enrollment{% else %}New Enrollment{% endif %}{% endblock %}
+
+{% block content %}
+<div style="max-width:750px; margin:0 auto;">
+
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb" style="font-size:0.78rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('enrollment.enrollment_home') }}" class="text-decoration-none">UAN & ESIC Tracker</a></li>
+        <li class="breadcrumb-item active">{% if edit_mode %}Edit — {{ enrollment.employee_name }}{% else %}New Enrollment{% endif %}</li>
+    </ol>
+</nav>
+
+<div class="card" style="border:none; box-shadow:0 2px 8px rgba(0,0,0,0.08); border-radius:12px;">
+    <div class="card-header" style="background:linear-gradient(135deg,#1e40af,#3b82f6); color:#fff; border-radius:12px 12px 0 0; padding:14px 20px;">
+        <h6 class="mb-0" style="font-weight:700; font-size:0.88rem;">
+            <i class="bi bi-person-vcard me-2"></i>
+            {% if edit_mode %}Edit Enrollment Record{% else %}Record New UAN / ESIC IP Enrollment{% endif %}
+        </h6>
+    </div>
+    <div class="card-body" style="padding:20px;">
+        <form method="POST" action="{% if edit_mode %}{{ url_for('enrollment.enrollment_edit', enrollment_id=enrollment.id) }}{% else %}{{ url_for('enrollment.enrollment_add') }}{% endif %}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <!-- Establishment -->
+            <div class="mb-3">
+                <label class="form-label" style="font-size:0.78rem; font-weight:600;">
+                    <i class="bi bi-building me-1 text-primary"></i>Establishment <span class="text-danger">*</span>
+                </label>
+                <select name="establishment_id" class="form-select form-select-sm" style="font-size:0.82rem;" required>
+                    <option value="">— Select Establishment —</option>
+                    {% for est in establishments %}
+                    <option value="{{ est.id }}"
+                        {% if edit_mode and enrollment.establishment_id == est.id %}selected
+                        {% elif not edit_mode and pre_est_id == est.id %}selected
+                        {% endif %}>
+                        {{ est.display_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Employee Name + Father/Husband Name -->
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label" style="font-size:0.78rem; font-weight:600;">
+                        Employee Name <span class="text-danger">*</span>
+                    </label>
+                    <input type="text" name="employee_name" class="form-control form-control-sm" style="font-size:0.82rem; text-transform:uppercase;"
+                           value="{{ enrollment.employee_name if edit_mode else '' }}" required placeholder="As per Aadhaar">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" style="font-size:0.78rem; font-weight:600;">
+                        Father's / Husband Name <span class="text-danger">*</span>
+                    </label>
+                    <input type="text" name="father_husband_name" class="form-control form-control-sm" style="font-size:0.82rem; text-transform:uppercase;"
+                           value="{{ enrollment.father_husband_name if edit_mode else '' }}" required>
+                </div>
+            </div>
+
+            <!-- Gender + DOB + DOJ -->
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <label class="form-label" style="font-size:0.78rem; font-weight:600;">
+                        Gender <span class="text-danger">*</span>
+                    </label>
+                    <select name="gender" class="form-select form-select-sm" style="font-size:0.82rem;" required>
+                        <option value="Male" {% if edit_mode and enrollment.gender == 'Male' %}selected{% endif %}>Male</option>
+                        <option value="Female" {% if edit_mode and enrollment.gender == 'Female' %}selected{% endif %}>Female</option>
+                        <option value="Other" {% if edit_mode and enrollment.gender == 'Other' %}selected{% endif %}>Other</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" style="font-size:0.78rem; font-weight:600;">
+                        Date of Birth <span class="text-danger">*</span>
+                    </label>
+                    <input type="date" name="date_of_birth" class="form-control form-control-sm" style="font-size:0.82rem;"
+                           value="{{ enrollment.date_of_birth.strftime('%Y-%m-%d') if edit_mode and enrollment.date_of_birth else '' }}" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" style="font-size:0.78rem; font-weight:600;">
+                        Date of Joining <span class="text-danger">*</span>
+                    </label>
+                    <input type="date" name="date_of_joining" class="form-control form-control-sm" style="font-size:0.82rem;"
+                           value="{{ enrollment.date_of_joining.strftime('%Y-%m-%d') if edit_mode and enrollment.date_of_joining else '' }}" required>
+                </div>
+            </div>
+
+            <!-- UAN + ESIC IP -->
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label" style="font-size:0.78rem; font-weight:600;">
+                        <i class="bi bi-hash me-1" style="color:#1e40af;"></i>UAN Number
+                    </label>
+                    <input type="text" name="uan_number" class="form-control form-control-sm" style="font-size:0.82rem; font-family:monospace;"
+                           value="{{ enrollment.uan_number or '' if edit_mode else '' }}" placeholder="12 digit UAN" maxlength="20">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" style="font-size:0.78rem; font-weight:600;">
+                        <i class="bi bi-hash me-1" style="color:#065f46;"></i>ESIC IP Number
+                    </label>
+                    <input type="text" name="esic_ip_number" class="form-control form-control-sm" style="font-size:0.82rem; font-family:monospace;"
+                           value="{{ enrollment.esic_ip_number or '' if edit_mode else '' }}" placeholder="ESIC IP Number" maxlength="20">
+                </div>
+            </div>
+
+            <!-- Aadhaar + Mobile + Designation (optional) -->
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <label class="form-label" style="font-size:0.78rem; font-weight:600; color:#64748b;">
+                        Aadhaar Number <span style="font-size:0.6rem; color:#94a3b8;">(optional)</span>
+                    </label>
+                    <input type="text" name="aadhaar_number" class="form-control form-control-sm" style="font-size:0.82rem;"
+                           value="{{ enrollment.aadhaar_number or '' if edit_mode else '' }}" maxlength="12" placeholder="12 digits">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" style="font-size:0.78rem; font-weight:600; color:#64748b;">
+                        Mobile Number <span style="font-size:0.6rem; color:#94a3b8;">(optional)</span>
+                    </label>
+                    <input type="text" name="mobile_number" class="form-control form-control-sm" style="font-size:0.82rem;"
+                           value="{{ enrollment.mobile_number or '' if edit_mode else '' }}" maxlength="15" placeholder="10 digits">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" style="font-size:0.78rem; font-weight:600; color:#64748b;">
+                        Designation <span style="font-size:0.6rem; color:#94a3b8;">(optional)</span>
+                    </label>
+                    <input type="text" name="designation" class="form-control form-control-sm" style="font-size:0.82rem;"
+                           value="{{ enrollment.designation or '' if edit_mode else '' }}" placeholder="e.g. Helper, Driver">
+                </div>
+            </div>
+
+            <!-- Remarks -->
+            <div class="mb-3">
+                <label class="form-label" style="font-size:0.78rem; font-weight:600; color:#64748b;">
+                    Remarks <span style="font-size:0.6rem; color:#94a3b8;">(optional)</span>
+                </label>
+                <textarea name="remarks" class="form-control form-control-sm" style="font-size:0.82rem;" rows="2" placeholder="Any notes...">{{ enrollment.remarks or '' if edit_mode else '' }}</textarea>
+            </div>
+
+            <!-- Buttons -->
+            <div class="d-flex justify-content-between align-items-center mt-4 pt-3" style="border-top:1px solid #e2e8f0;">
+                <a href="{{ url_for('enrollment.enrollment_home') }}" class="btn btn-outline-secondary btn-sm" style="font-size:0.78rem;">
+                    <i class="bi bi-arrow-left me-1"></i>Back
+                </a>
+                <div class="d-flex gap-2">
+                    {% if not edit_mode %}
+                    <button type="submit" name="action" value="save_add" class="btn btn-outline-primary btn-sm" style="font-size:0.78rem;">
+                        <i class="bi bi-plus-circle me-1"></i>Save & Add Another
+                    </button>
+                    {% endif %}
+                    <button type="submit" name="action" value="save" class="btn btn-primary btn-sm" style="font-size:0.78rem;">
+                        <i class="bi bi-check-lg me-1"></i>{% if edit_mode %}Update{% else %}Save{% endif %}
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+</div>
+{% endblock %}

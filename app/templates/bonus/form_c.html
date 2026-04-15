@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Form C — {{ run.fy_label }}{% endblock %}
+{% block page_header %}Form C — Bonus Paid Register{% endblock %}
+
+{% block content %}
+<style>
+    @page { size: A4 landscape; margin: 10mm; }
+    @media print {
+        @page { size: A4 landscape; margin: 10mm; }
+        html, body { background:#fff !important;
+            -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        .sidebar, .top-navbar, .no-print { display: none !important; }
+        .main-content { margin-left: 0 !important; padding: 0 !important; width: 100% !important; }
+        .page-content { padding: 0 !important; }
+        .fc-page { box-shadow: none !important; border: none !important; padding: 6px !important; }
+        .fc-table th, .fc-table td { font-size: 8.5px !important; padding: 3px 4px !important; }
+    }
+    .fc-page { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:20px; }
+    .fc-title { text-align:center; margin-bottom:12px; }
+    .fc-title h3 { font-size:1.2rem; font-weight:700; margin:0; letter-spacing:1px; }
+    .fc-title h4 { font-size:0.95rem; font-weight:700; margin:2px 0; }
+    .fc-title p  { font-size:0.78rem; margin:1px 0; color:#475569; }
+    .fc-info { font-size:0.78rem; margin-bottom:12px; }
+    .fc-info div { margin-bottom:3px; }
+    .fc-table { width:100%; border-collapse:collapse; font-size:0.75rem; }
+    .fc-table th { background:#f1f5f9; border:1px solid #475569; padding:5px 6px; text-align:center; font-size:0.72rem; font-weight:700; }
+    .fc-table td { border:1px solid #94a3b8; padding:4px 6px; vertical-align:middle; }
+    .fc-table .text-right { text-align:right; }
+    .fc-table .text-center { text-align:center; }
+    .fc-table .total-row { background:#d9ead3; font-weight:700; }
+</style>
+
+<div class="no-print alert alert-warning py-2 px-3 mb-3" style="font-size:0.82rem;">
+    <i class="bi bi-info-circle-fill me-1"></i>
+    <strong>Printing / Save as PDF:</strong> Click <b>Print / PDF</b>, set
+    <b>Layout = Landscape</b> and <b>Paper size = A4</b>.
+</div>
+
+<div class="no-print mb-3 d-flex gap-2">
+    <a href="{{ url_for('bonus.bonus_view', run_id=run.id) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+    <button onclick="window.print()" class="btn btn-sm btn-primary"><i class="bi bi-printer"></i> Print / PDF</button>
+</div>
+
+<div class="fc-page">
+    <div class="fc-title">
+        <h3>FORM C</h3>
+        <h4>[See Rule 4(c)]</h4>
+        <p>BONUS PAID REGISTER</p>
+        <p>(Under the Payment of Bonus Act, 1965)</p>
+    </div>
+
+    <div class="fc-info">
+        <div><strong>Name of the Establishment:</strong> {{ run.establishment.company_name.upper() }}</div>
+        <div><strong>Address:</strong> {{ run.establishment.address or '' }}</div>
+        <div><strong>Accounting Year:</strong> {{ run.fy_label }} (01-Apr-{{ run.start_year }} to 31-Mar-{{ run.end_year }})</div>
+        <div><strong>No. of Working Days:</strong> _______
+            &nbsp;|&nbsp; <strong>Bonus Percentage:</strong> {{ run.bonus_percentage }}%
+            &nbsp;|&nbsp; <strong>Wage Ceiling Applied:</strong> ₹{{ "{:,.0f}".format(run.effective_ceiling) }}
+            {% if run.payment_date %}&nbsp;|&nbsp; <strong>Date of Payment:</strong> {{ run.payment_date.strftime('%d-%m-%Y') }}{% endif %}
+        </div>
+    </div>
+
+    <table class="fc-table">
+        <thead>
+            <tr>
+                <th>Sr<br>No.</th>
+                <th>Name of the<br>Employee</th>
+                <th>Father's /<br>Husband's<br>Name</th>
+                <th>Designation</th>
+                <th>No. of days<br>worked in the<br>accounting year</th>
+                <th>Total salary<br>or wage in<br>respect of the<br>accounting year<br>(Basic+DA)</th>
+                <th>Amount of<br>bonus payable<br>under section<br>10 or section 11<br>(₹)</th>
+                <th>Deductions, if<br>any, on a/c of<br>Puja bonus or<br>other customary<br>bonus</th>
+                <th>Deductions<br>on account of<br>financial loss,<br>if any, caused<br>by misconduct<br>of the employee</th>
+                <th>Amount<br>actually<br>paid<br>(₹)</th>
+                <th>Date on<br>which<br>paid</th>
+                <th>Signature /<br>Thumb impression<br>of the employee</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% set ns = namespace(t_wage=0, t_bonus=0, t_paid=0) %}
+            {% for e in entries %}
+            <tr>
+                <td class="text-center">{{ loop.index }}</td>
+                <td><strong>{{ e.employee.name }}</strong></td>
+                <td>{{ e.employee.father_name or '' }}</td>
+                <td>{{ e.employee.designation or '' }}</td>
+                <td class="text-center">{{ e.total_days_worked|int }}</td>
+                <td class="text-right">{{ "{:,.0f}".format(e.total_basic_da) }}</td>
+                <td class="text-right"><strong>{{ "{:,.0f}".format(e.final_bonus_ceiling) }}</strong></td>
+                <td></td>
+                <td></td>
+                <td class="text-right"><strong>{{ "{:,.0f}".format(e.final_bonus_ceiling) }}</strong></td>
+                <td class="text-center">{{ run.payment_date.strftime('%d-%m-%Y') if run.payment_date else '' }}</td>
+                <td></td>
+            </tr>
+            {% set ns.t_wage = ns.t_wage + e.total_basic_da %}
+            {% set ns.t_bonus = ns.t_bonus + e.final_bonus_ceiling %}
+            {% set ns.t_paid = ns.t_paid + e.final_bonus_ceiling %}
+            {% endfor %}
+            <tr class="total-row">
+                <td colspan="5" class="text-center"><strong>TOTAL ({{ entries|length }} Employees)</strong></td>
+                <td class="text-right">{{ "{:,.0f}".format(ns.t_wage) }}</td>
+                <td class="text-right">{{ "{:,.0f}".format(ns.t_bonus) }}</td>
+                <td></td>
+                <td></td>
+                <td class="text-right">{{ "{:,.0f}".format(ns.t_paid) }}</td>
+                <td></td>
+                <td></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div style="margin-top:40px; display:flex; justify-content:space-between; font-size:0.8rem;">
+        <div>
+            <div style="border-top:1px solid #333; padding-top:4px; min-width:200px;">
+                Signature of Employer
+            </div>
+        </div>
+        <div style="text-align:right;">
+            <div>Date: ______________</div>
+            <div>Place: _____________</div>
+        </div>
+    </div>
+
+    <div style="margin-top:14px; font-size:0.7rem; color:#64748b; text-align:center;">
+        Generated: {{ generated_on }} | Vaishnavi Consultant
+    </div>
+</div>
+{% endblock %}

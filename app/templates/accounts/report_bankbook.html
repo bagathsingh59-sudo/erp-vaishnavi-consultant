@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Bank Book — {{ fy_label }}{% endblock %}
+{% block page_header %}Bank Book{% endblock %}
+
+{% block content %}
+<div style="max-width:1000px; margin:0 auto;">
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb" style="font-size:0.78rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('accounts.accounts_home') }}" class="text-decoration-none">Accounts</a></li>
+        <li class="breadcrumb-item active">Bank Book — {{ fy_label }}</li>
+    </ol>
+</nav>
+
+<!-- Bank Account Selector -->
+{% if bank_accounts|length > 1 %}
+<div class="d-flex gap-2 mb-3">
+    {% for ba in bank_accounts %}
+    <a href="{{ url_for('accounts.report_bank_book', account_id=ba.id) }}" class="btn btn-sm {% if account and account.id == ba.id %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="font-size:0.72rem;">
+        <i class="bi bi-bank me-1"></i>{{ ba.name }}
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if account %}
+<div class="table-container">
+    <div class="table-header" style="background:#2563eb;">
+        <div class="table-title" style="color:#fff;"><i class="bi bi-bank"></i> {{ account.name }} <span style="font-size:0.65rem; opacity:0.8; margin-left:8px;">FY {{ fy_label }}</span></div>
+        <button onclick="window.print()" class="btn btn-sm btn-light no-print" style="font-size:0.68rem;"><i class="bi bi-printer me-1"></i>Print</button>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" style="font-size:0.75rem;">
+            <thead><tr style="background:#f8fafc;">
+                <th style="width:85px;">Date</th><th style="width:70px;">Voucher</th><th>Particulars</th>
+                <th style="width:100px; text-align:right;">Deposit (₹)</th><th style="width:100px; text-align:right;">Withdrawal (₹)</th><th style="width:120px; text-align:right;">Balance (₹)</th>
+            </tr></thead>
+            <tbody>
+                <tr style="background:#f0fdf4; font-weight:600;">
+                    <td></td><td></td><td>Opening Balance</td>
+                    <td style="text-align:right;">{% if ob > 0 %}{{ "{:,.0f}".format(ob) }}{% endif %}</td><td></td>
+                    <td style="text-align:right;">{{ "{:,.0f}".format(ob) }} Dr</td>
+                </tr>
+                {% for row in ledger_rows %}
+                <tr>
+                    <td>{{ row.date.strftime('%d-%m-%Y') }}</td>
+                    <td>
+                        {% if row.voucher.voucher_type in ('receipt', 'part_payment') %}<span class="badge bg-success bg-opacity-10 text-success" style="font-size:0.6rem;">{{ row.voucher.voucher_number }}{% if row.voucher.voucher_type == 'part_payment' %} (Part){% endif %}</span>
+                        {% else %}<span class="badge bg-danger bg-opacity-10 text-danger" style="font-size:0.6rem;">{{ row.voucher.voucher_number }}</span>{% endif %}
+                    </td>
+                    <td>{{ row.particulars or '—' }}</td>
+                    <td style="text-align:right; {% if row.debit %}color:#16a34a; font-weight:600;{% endif %}">{% if row.debit %}{{ "{:,.0f}".format(row.debit) }}{% endif %}</td>
+                    <td style="text-align:right; {% if row.credit %}color:#dc2626; font-weight:600;{% endif %}">{% if row.credit %}{{ "{:,.0f}".format(row.credit) }}{% endif %}</td>
+                    <td style="text-align:right; font-weight:600;">{{ "{:,.0f}".format(row.balance) }} {{ row.balance_type }}</td>
+                </tr>
+                {% endfor %}
+                {% if not ledger_rows %}<tr><td colspan="6" class="text-center text-muted py-3">No transactions.</td></tr>{% endif %}
+            </tbody>
+            <tfoot>
+                <tr style="background:#eff6ff; font-weight:700; border-top:2px solid #2563eb; font-size:0.82rem;">
+                    <td colspan="3" style="text-align:right;">Closing Balance</td><td></td><td></td>
+                    <td style="text-align:right;">{{ "{:,.0f}".format(closing) }} {{ closing_type }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="text-center text-muted py-5">No bank account found.</div>
+{% endif %}
+</div>
+{% endblock %}

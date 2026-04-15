@@ -1,0 +1,514 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if mode == 'edit' else 'Add New' }} Establishment - Vaishnavi Consultant{% endblock %}
+{% block page_header %}{{ 'Edit' if mode == 'edit' else 'Add New' }} Establishment{% endblock %}
+
+{% block content %}
+<style>
+    .setup-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+    .setup-section { padding:20px 24px; border-bottom:1px solid #f1f5f9; }
+    .setup-section:last-child { border-bottom:none; }
+    .section-num { display:inline-flex; width:28px; height:28px; align-items:center; justify-content:center; background:var(--primary); color:#fff; border-radius:8px; font-size:0.72rem; font-weight:700; margin-right:10px; }
+    .section-title { font-size:0.92rem; font-weight:700; color:#1e293b; display:flex; align-items:center; }
+    .section-desc { font-size:0.72rem; color:#94a3b8; margin-top:2px; margin-left:38px; }
+    .check-card { border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; text-align:center; cursor:pointer; transition:all 0.15s; }
+    .check-card:hover { border-color:var(--primary); background:#f0f4ff; }
+    .check-card.active { border-color:var(--primary); background:#eff6ff; box-shadow:0 0 0 2px rgba(79,70,229,0.15); }
+    .check-card .icon { font-size:1.3rem; margin-bottom:4px; }
+    .check-card .label { font-size:0.72rem; font-weight:600; color:#334155; }
+    .check-card input[type=checkbox] { display:none; }
+    .license-row { display:flex; gap:10px; align-items:center; margin-bottom:8px; padding:8px 12px; background:#fefce8; border:1px solid #fde68a; border-radius:8px; }
+    .license-row input { flex:1; }
+    .cred-row { display:flex; gap:10px; align-items:center; margin-bottom:8px; padding:10px 14px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; }
+    .cred-row select, .cred-row input { flex:1; }
+    .btn-add-row { font-size:0.75rem; padding:4px 12px; border:1px dashed #94a3b8; background:transparent; color:#64748b; border-radius:6px; cursor:pointer; }
+    .btn-add-row:hover { border-color:var(--primary); color:var(--primary); }
+    .btn-remove { width:28px; height:28px; border:none; background:#fee2e2; color:#dc2626; border-radius:6px; font-size:0.75rem; cursor:pointer; flex-shrink:0; }
+    .btn-remove:hover { background:#fecaca; }
+    .reg-toggle { display:flex; align-items:center; gap:10px; padding:10px 14px; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:8px; }
+    .reg-toggle.active { border-color:#16a34a; background:#f0fdf4; }
+    .reg-toggle input[type=text] { flex:1; }
+    .config-panel { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px; margin-top:12px; }
+    .config-panel h6 { font-size:0.78rem; font-weight:700; color:var(--primary); margin-bottom:10px; }
+    .bottom-bar { position:sticky; bottom:0; background:#fff; border-top:2px solid #e2e8f0; padding:14px 24px; display:flex; justify-content:space-between; align-items:center; z-index:10; box-shadow:0 -2px 10px rgba(0,0,0,0.05); border-radius:0 0 12px 12px; }
+</style>
+
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb" style="font-size:0.85rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('establishment.dashboard') }}" class="text-decoration-none">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('establishment.establishment_list') }}" class="text-decoration-none">Establishments</a></li>
+        <li class="breadcrumb-item active">{{ 'Edit' if mode == 'edit' else 'Add New' }}</li>
+    </ol>
+</nav>
+
+<form method="POST" autocomplete="off" id="estForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="setup-card">
+
+        <!-- ===== SECTION 1: Company Details ===== -->
+        <div class="setup-section">
+            <div class="section-title"><span class="section-num">1</span> Company Details</div>
+            <div class="section-desc">Basic identification of the establishment</div>
+            <div class="row g-3 mt-2">
+                <div class="col-md-6">
+                    <label class="form-label">Company Name <span class="text-danger">*</span></label>
+                    <input type="text" name="company_name" class="form-control" required
+                           placeholder="Enter company / establishment name"
+                           value="{{ est.company_name if est else '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">PAN Number</label>
+                    <input type="text" name="pan_number" class="form-control" maxlength="10"
+                           placeholder="ABCDE1234F" style="text-transform:uppercase;"
+                           value="{{ est.pan_number if est and est.pan_number else '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Date of Registration</label>
+                    <input type="date" name="date_of_registration" class="form-control"
+                           value="{{ est.date_of_registration.strftime('%Y-%m-%d') if est and est.date_of_registration else '' }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Type of Industry</label>
+                    <select name="type_of_industry" class="form-select" id="industrySelect" onchange="toggleOtherIndustry()">
+                        <option value="">Select</option>
+                        {% set industries = [
+                            'Manufacturing', 'IT / Software', 'Construction', 'Trading',
+                            'Textile', 'Hotel / Restaurant', 'Hospital / Healthcare',
+                            'Education', 'Transport', 'Agriculture', 'Banking / Finance',
+                            'Retail', 'Real Estate', 'Security Services', 'Cleaning / Housekeeping',
+                            'NGO / Trust', 'Government', 'Other'
+                        ] %}
+                        {% for ind in industries %}
+                        <option value="{{ ind }}" {% if est and est.type_of_industry == ind %}selected{% endif %}
+                            {% if est and est.type_of_industry and est.type_of_industry not in industries and ind == 'Other' %}selected{% endif %}>{{ ind }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4" id="otherIndustryDiv" style="display:none;">
+                    <label class="form-label">Specify Industry</label>
+                    <input type="text" name="other_industry" class="form-control" placeholder="Enter industry type"
+                           value="{{ est.type_of_industry if est and est.type_of_industry and est.type_of_industry not in industries else '' }}">
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label">Address</label>
+                    <textarea name="address" class="form-control" rows="2" placeholder="Full address">{{ est.address if est and est.address else '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== SECTION 2: Contact Information ===== -->
+        <div class="setup-section">
+            <div class="section-title"><span class="section-num">2</span> Contact Information</div>
+            <div class="section-desc">Primary contact person for this establishment</div>
+            <div class="row g-3 mt-2">
+                <div class="col-md-4">
+                    <label class="form-label">Contact Person Name</label>
+                    <input type="text" name="contact_person" class="form-control" placeholder="Name"
+                           value="{{ est.contact_person if est and est.contact_person else '' }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Phone Number</label>
+                    <input type="tel" name="contact_phone" class="form-control" placeholder="10-digit mobile"
+                           value="{{ est.contact_phone if est and est.contact_phone else '' }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="contact_email" class="form-control" placeholder="Email address"
+                           value="{{ est.contact_email if est and est.contact_email else '' }}">
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== SECTION 3: Registration Details ===== -->
+        <div class="setup-section">
+            <div class="section-title"><span class="section-num">3</span> Registration Details</div>
+            <div class="section-desc">Tick if registered, then enter the code number</div>
+            <div class="row g-3 mt-2">
+                <div class="col-md-6">
+                    <div class="reg-toggle {% if est and est.pf_code %}active{% endif %}" id="epfToggle">
+                        <div class="form-check" style="min-width:140px;">
+                            <input class="form-check-input" type="checkbox" id="hasEpf" name="has_epf" value="1"
+                                   {% if est and est.pf_code %}checked{% endif %} onchange="toggleRegField('epf')">
+                            <label class="form-check-label" for="hasEpf" style="font-weight:600; font-size:0.85rem;">
+                                <i class="bi bi-shield-check text-success me-1"></i> EPF Registered
+                            </label>
+                        </div>
+                        <input type="text" name="pf_code" class="form-control form-control-sm" id="epfCodeInput"
+                               placeholder="PF Code (e.g., BGBNG12345670000012)" style="text-transform:uppercase;
+                               display:{% if est and est.pf_code %}block{% else %}none{% endif %};"
+                               value="{{ est.pf_code if est and est.pf_code else '' }}">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="reg-toggle {% if est and est.esic_code %}active{% endif %}" id="esicToggle">
+                        <div class="form-check" style="min-width:140px;">
+                            <input class="form-check-input" type="checkbox" id="hasEsic" name="has_esic" value="1"
+                                   {% if est and est.esic_code %}checked{% endif %} onchange="toggleRegField('esic')">
+                            <label class="form-check-label" for="hasEsic" style="font-weight:600; font-size:0.85rem;">
+                                <i class="bi bi-hospital text-primary me-1"></i> ESIC Registered
+                            </label>
+                        </div>
+                        <input type="text" name="esic_code" class="form-control form-control-sm" id="esicCodeInput"
+                               placeholder="ESIC Code (e.g., 53001234560001234)"
+                               style="display:{% if est and est.esic_code %}block{% else %}none{% endif %};"
+                               value="{{ est.esic_code if est and est.esic_code else '' }}">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">GST Number</label>
+                    <input type="text" name="gst_number" class="form-control" maxlength="15"
+                           placeholder="e.g., 29ABCDE1234F1Z5" style="text-transform:uppercase;"
+                           value="{{ est.gst_number if est and est.gst_number else '' }}">
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== SECTION 4: Service & Fee Details ===== -->
+        <div class="setup-section">
+            <div class="section-title"><span class="section-num">4</span> Service & Fee Details</div>
+            <div class="section-desc">Your service arrangement with this client</div>
+            <div class="row g-3 mt-2">
+                <div class="col-md-3">
+                    <label class="form-label">Service Type</label>
+                    <select name="service_type" class="form-select">
+                        <option value="">Select</option>
+                        <option value="With Records" {% if est and est.service_type == 'With Records' %}selected{% endif %}>With Records</option>
+                        <option value="Without Records" {% if est and est.service_type == 'Without Records' %}selected{% endif %}>Without Records</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Fee Cycle</label>
+                    <select name="fee_type" class="form-select">
+                        <option value="">Select</option>
+                        <option value="Monthly" {% if est and est.fee_type == 'Monthly' %}selected{% endif %}>Monthly</option>
+                        <option value="Quarterly" {% if est and est.fee_type == 'Quarterly' %}selected{% endif %}>Quarterly</option>
+                        <option value="Yearly" {% if est and est.fee_type == 'Yearly' %}selected{% endif %}>Yearly</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Fee Amount (₹)</label>
+                    <input type="number" name="fee_amount" class="form-control" placeholder="e.g., 5000" step="1" min="0"
+                           value="{{ est.fee_amount|int if est and est.fee_amount else '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">TDS Applicable?</label>
+                    <select name="tds_applicable" class="form-select" id="tdsSelect" onchange="toggleTds()">
+                        <option value="no" {% if not est or not est.tds_applicable %}selected{% endif %}>No</option>
+                        <option value="yes" {% if est and est.tds_applicable %}selected{% endif %}>Yes</option>
+                    </select>
+                </div>
+                <div class="col-md-3" id="tdsRateDiv" style="display:{% if est and est.tds_applicable %}block{% else %}none{% endif %};">
+                    <label class="form-label">TDS Rate (%)</label>
+                    <input type="number" name="tds_rate" class="form-control" placeholder="10" step="0.01" min="0" max="100"
+                           value="{{ est.tds_rate if est and est.tds_rate else '10' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Min Wage — for Bonus (₹)</label>
+                    <input type="number" name="bonus_min_wage" class="form-control" step="0.01" min="0"
+                           placeholder="e.g. 10500" value="{{ est.bonus_min_wage if est and est.bonus_min_wage else '' }}">
+                    <small class="text-muted">Bonus wage ceiling floor. Blank = use ₹7,000.</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== SECTION 5: Registration Expiry Alerts ===== -->
+        <div class="setup-section" style="background:#fffef5;">
+            <div class="section-title"><span class="section-num" style="background:#d97706;">5</span> Registration Expiry Alerts</div>
+            <div class="section-desc">Track licence/registration expiry dates. Alerts appear 60 days before expiry.</div>
+            <div id="licenseContainer" class="mt-3">
+                {% if est %}
+                    {% for lic in est.license_expiries %}
+                    <div class="license-row">
+                        <input type="text" name="license_name[]" class="form-control form-control-sm" placeholder="Licence Name (e.g., Labour License)"
+                               value="{{ lic.license_name }}">
+                        <input type="date" name="license_date[]" class="form-control form-control-sm" style="max-width:180px;"
+                               value="{{ lic.expiry_date.strftime('%Y-%m-%d') }}">
+                        <button type="button" class="btn-remove" onclick="this.parentElement.remove()"><i class="bi bi-trash"></i></button>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+            <button type="button" class="btn-add-row mt-2" onclick="addLicenseRow()">
+                <i class="bi bi-plus-circle me-1"></i> Add License / Registration
+            </button>
+        </div>
+
+        <!-- ===== SECTION 6: Statutory Applicability ===== -->
+        <div class="setup-section">
+            <div class="section-title"><span class="section-num" style="background:#2563eb;">6</span> Statutory Applicability</div>
+            <div class="section-desc">Tick what is applicable for this establishment (this controls payroll calculations)</div>
+            <div class="row g-2 mt-2" id="statutoryChecks">
+                {% set checks = [
+                    ('epf_applicable', 'EPF', 'bi-shield-check', '#16a34a'),
+                    ('esic_applicable', 'ESIC', 'bi-hospital', '#2563eb'),
+                    ('pt_applicable', 'Prof. Tax', 'bi-bank', '#7c3aed'),
+                    ('ot_applicable', 'Overtime', 'bi-clock-history', '#ea580c'),
+                    ('paid_holiday_type_check', 'Paid Holiday', 'bi-calendar-heart', '#dc2626'),
+                    ('bonus_applicable', 'Bonus', 'bi-gift', '#d97706'),
+                    ('gratuity_applicable', 'Gratuity', 'bi-award', '#0891b2'),
+                    ('paid_leave_applicable', 'Paid Leave', 'bi-calendar-check', '#059669'),
+                    ('tds_salary_applicable', 'TDS', 'bi-percent', '#475569'),
+                    ('advance_applicable', 'Advance', 'bi-cash-stack', '#be185d'),
+                    ('lwf_applicable', 'LWF', 'bi-people', '#6d28d9'),
+                ] %}
+                {% for name, label, icon, color in checks %}
+                {% set is_checked = sf.get(name, false) %}
+                <div class="col-auto">
+                    <label class="check-card {% if is_checked %}active{% endif %}" id="card_{{ name }}" onclick="toggleCheck('{{ name }}')">
+                        <input type="checkbox" name="{{ name }}" value="1"
+                               {% if is_checked %}checked{% endif %}>
+                        <div class="icon" style="color:{{ color }};"><i class="bi {{ icon }}"></i></div>
+                        <div class="label">{{ label }}</div>
+                    </label>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- PT State Selection (shown if PT checked) -->
+            <div id="ptStateDiv" class="mt-3" style="display:{% if sf.get('pt_applicable') %}block{% else %}none{% endif %};">
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <label class="form-label" style="font-size:0.8rem;">Professional Tax State</label>
+                        <select name="pt_state" class="form-select form-select-sm">
+                            {% for state in ['karnataka', 'maharashtra', 'west_bengal', 'andhra_pradesh', 'telangana', 'tamil_nadu', 'gujarat', 'madhya_pradesh', 'kerala', 'odisha', 'jharkhand', 'assam', 'meghalaya', 'tripura', 'sikkim', 'manipur', 'mizoram', 'nagaland'] %}
+                            <option value="{{ state }}" {% if config and config.pt_state == state %}selected{% endif %}>{{ state.replace('_', ' ').title() }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">PT slab will auto-apply based on state</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== SECTION 7: Portal Login Details ===== -->
+        <div class="setup-section" style="background:#f0f9ff;">
+            <div class="section-title"><span class="section-num" style="background:#0284c7;">7</span> Portal Login Details</div>
+            <div class="section-desc">Store login credentials for government portals (for record-keeping)</div>
+            <div id="credContainer" class="mt-3">
+                {% if est %}
+                    {% for cred in est.credentials %}
+                    <div class="cred-row">
+                        <select name="cred_portal[]" class="form-select form-select-sm" style="max-width:180px;">
+                            {% for p in ['EPF Portal', 'ESIC Portal', 'Shram Suvidha', 'TRACES', 'Income Tax', 'GST Portal', 'State LWF', 'Other'] %}
+                            <option value="{{ p }}" {% if cred.portal_name == p %}selected{% endif %}>{{ p }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="text" name="cred_username[]" class="form-control form-control-sm" placeholder="User ID" value="{{ cred.username }}">
+                        <input type="text" name="cred_password[]" class="form-control form-control-sm" placeholder="Password" value="{{ cred.password }}">
+                        <input type="text" name="cred_remarks[]" class="form-control form-control-sm" placeholder="Remarks (optional)" value="{{ cred.remarks or '' }}" style="max-width:160px;">
+                        <button type="button" class="btn-remove" onclick="this.parentElement.remove()"><i class="bi bi-trash"></i></button>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+            <button type="button" class="btn-add-row mt-2" onclick="addCredRow()">
+                <i class="bi bi-plus-circle me-1"></i> Add Portal Login
+            </button>
+        </div>
+
+        <!-- ===== SECTION 8: One-Time Statutory Settings ===== -->
+        <div class="setup-section">
+            <div class="section-title"><span class="section-num" style="background:#7c3aed;">8</span> Statutory Rate Settings</div>
+            <div class="section-desc">One-time setup of EPF/ESIC rates and ceilings (government statutory rates)</div>
+
+            <!-- EPF Settings -->
+            <div class="config-panel mt-3" id="epfConfigPanel" style="display:{% if sf.get('epf_applicable') %}block{% else %}none{% endif %};">
+                <h6><i class="bi bi-shield-check me-1"></i> EPF Configuration</h6>
+                <div class="row g-2">
+                    <div class="col-md-3">
+                        <label class="form-label" style="font-size:0.75rem;">Contribution Type</label>
+                        <select name="epf_contribution_type" class="form-select form-select-sm" id="epfContribType" onchange="toggleEpfCeiling()">
+                            <option value="ceiling" {% if not config or config.epf_contribution_type == 'ceiling' %}selected{% endif %}>Ceiling Slab</option>
+                            <option value="higher" {% if config and config.epf_contribution_type == 'higher' %}selected{% endif %}>Higher Deduction</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2" id="epfCeilingDiv">
+                        <label class="form-label" style="font-size:0.75rem;">Wage Ceiling (₹)</label>
+                        <input type="number" name="epf_wage_ceiling" class="form-control form-control-sm"
+                               value="{{ config.epf_wage_ceiling|int if config else 15000 }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label" style="font-size:0.75rem;">Employee Rate (%)</label>
+                        <input type="number" name="epf_employee_rate" class="form-control form-control-sm" step="0.01"
+                               value="{{ config.epf_employee_rate if config else 12.0 }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label" style="font-size:0.75rem;">ER A/c 01 (%)</label>
+                        <input type="number" name="epf_ac01_rate" class="form-control form-control-sm" step="0.01"
+                               value="{{ config.epf_ac01_rate if config else 3.67 }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label" style="font-size:0.75rem;">EPS 8.33 (%)</label>
+                        <input type="number" name="epf_eps_rate" class="form-control form-control-sm" step="0.01"
+                               value="{{ config.epf_eps_rate if config else 8.33 }}">
+                    </div>
+                </div>
+                <div class="row g-2 mt-1">
+                    <div class="col-md-2">
+                        <label class="form-label" style="font-size:0.75rem;">Admin (%)</label>
+                        <input type="number" name="epf_admin_rate" class="form-control form-control-sm" step="0.01"
+                               value="{{ config.epf_admin_rate if config else 0.50 }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label" style="font-size:0.75rem;">EDLI (%)</label>
+                        <input type="number" name="epf_edli_rate" class="form-control form-control-sm" step="0.01"
+                               value="{{ config.epf_edli_rate if config else 0.50 }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label" style="font-size:0.75rem;">Admin Min (₹)</label>
+                        <input type="number" name="epf_admin_min" class="form-control form-control-sm"
+                               value="{{ config.epf_admin_min|int if config else 500 }}">
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <div class="form-check" style="padding:6px 0;">
+                            <input class="form-check-input" type="checkbox" name="epf_employer_in_ctc" id="epfCtc"
+                                   {% if config and config.epf_employer_in_ctc %}checked{% endif %}>
+                            <label class="form-check-label" for="epfCtc" style="font-size:0.75rem;">Employer share in CTC</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ESIC Settings -->
+            <div class="config-panel mt-3" id="esicConfigPanel" style="display:{% if sf.get('esic_applicable') %}block{% else %}none{% endif %};">
+                <h6><i class="bi bi-hospital me-1"></i> ESIC Configuration</h6>
+                <div class="row g-2">
+                    <div class="col-md-3">
+                        <label class="form-label" style="font-size:0.75rem;">Employee Rate (%)</label>
+                        <input type="number" name="esic_employee_rate" class="form-control form-control-sm" step="0.01"
+                               value="{{ config.esic_employee_rate if config else 0.75 }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" style="font-size:0.75rem;">Employer Rate (%)</label>
+                        <input type="number" name="esic_employer_rate" class="form-control form-control-sm" step="0.01"
+                               value="{{ config.esic_employer_rate if config else 3.25 }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" style="font-size:0.75rem;">Wage Ceiling (₹)</label>
+                        <input type="number" name="esic_wage_ceiling" class="form-control form-control-sm"
+                               value="{{ config.esic_wage_ceiling|int if config else 21000 }}">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ===== BOTTOM ACTION BAR (outside card so always visible) ===== -->
+    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:16px 24px; margin-top:16px; margin-bottom:40px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+        <div>
+            <a href="{{ url_for('bulk.import_establishments') }}" class="btn btn-warning btn-sm px-4" style="font-weight:600;">
+                <i class="bi bi-upload me-1"></i> Bulk Upload Establishments
+            </a>
+        </div>
+        <div class="d-flex gap-2">
+            {% if mode == 'edit' %}
+            <button type="button" class="btn btn-danger btn-sm px-4" style="font-weight:600;" onclick="confirmDelete()">
+                <i class="bi bi-trash me-1"></i> Delete
+            </button>
+            {% endif %}
+            <a href="{{ url_for('establishment.establishment_list') }}" class="btn btn-outline-secondary btn-sm px-4">
+                <i class="bi bi-x-lg me-1"></i> Cancel
+            </a>
+            <button type="submit" class="btn btn-primary btn-sm px-5" style="font-weight:600;">
+                <i class="bi bi-check-lg me-1"></i> {{ 'Update Establishment' if mode == 'edit' else 'Save Establishment' }}
+            </button>
+        </div>
+    </div>
+</form>
+
+{% if mode == 'edit' %}
+<form id="deleteForm" method="POST" action="{{ url_for('establishment.establishment_delete', id=est.id) }}" style="display:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Toggle registration code fields
+function toggleRegField(type) {
+    var checked = document.getElementById('has' + type.charAt(0).toUpperCase() + type.slice(1)).checked;
+    var input = document.getElementById(type + 'CodeInput');
+    var toggle = document.getElementById(type + 'Toggle');
+    input.style.display = checked ? 'block' : 'none';
+    toggle.classList.toggle('active', checked);
+    if (!checked) input.value = '';
+}
+
+// Toggle TDS rate field
+function toggleTds() {
+    document.getElementById('tdsRateDiv').style.display =
+        document.getElementById('tdsSelect').value === 'yes' ? 'block' : 'none';
+}
+
+// Toggle Other Industry field
+function toggleOtherIndustry() {
+    document.getElementById('otherIndustryDiv').style.display =
+        document.getElementById('industrySelect').value === 'Other' ? 'block' : 'none';
+}
+toggleOtherIndustry();
+
+// Statutory check cards
+function toggleCheck(name) {
+    var card = document.getElementById('card_' + name);
+    var cb = card.querySelector('input[type=checkbox]');
+    cb.checked = !cb.checked;
+    card.classList.toggle('active', cb.checked);
+
+    // Show/hide related panels
+    if (name === 'epf_applicable') {
+        document.getElementById('epfConfigPanel').style.display = cb.checked ? 'block' : 'none';
+    }
+    if (name === 'esic_applicable') {
+        document.getElementById('esicConfigPanel').style.display = cb.checked ? 'block' : 'none';
+    }
+    if (name === 'pt_applicable') {
+        document.getElementById('ptStateDiv').style.display = cb.checked ? 'block' : 'none';
+    }
+}
+
+// EPF ceiling toggle
+function toggleEpfCeiling() {
+    document.getElementById('epfCeilingDiv').style.display =
+        document.getElementById('epfContribType').value === 'higher' ? 'none' : 'block';
+}
+toggleEpfCeiling();
+
+// Add license row
+function addLicenseRow() {
+    var c = document.getElementById('licenseContainer');
+    var row = document.createElement('div');
+    row.className = 'license-row';
+    row.innerHTML = '<input type="text" name="license_name[]" class="form-control form-control-sm" placeholder="Licence Name (e.g., Labour License)">' +
+        '<input type="date" name="license_date[]" class="form-control form-control-sm" style="max-width:180px;">' +
+        '<button type="button" class="btn-remove" onclick="this.parentElement.remove()"><i class="bi bi-trash"></i></button>';
+    c.appendChild(row);
+}
+
+// Add credential row
+function addCredRow() {
+    var c = document.getElementById('credContainer');
+    var row = document.createElement('div');
+    row.className = 'cred-row';
+    row.innerHTML = '<select name="cred_portal[]" class="form-select form-select-sm" style="max-width:180px;">' +
+        '<option value="EPF Portal">EPF Portal</option><option value="ESIC Portal">ESIC Portal</option>' +
+        '<option value="Shram Suvidha">Shram Suvidha</option><option value="TRACES">TRACES</option>' +
+        '<option value="Income Tax">Income Tax</option><option value="GST Portal">GST Portal</option>' +
+        '<option value="State LWF">State LWF</option><option value="Other">Other</option></select>' +
+        '<input type="text" name="cred_username[]" class="form-control form-control-sm" placeholder="User ID">' +
+        '<input type="text" name="cred_password[]" class="form-control form-control-sm" placeholder="Password">' +
+        '<input type="text" name="cred_remarks[]" class="form-control form-control-sm" placeholder="Remarks (optional)" style="max-width:160px;">' +
+        '<button type="button" class="btn-remove" onclick="this.parentElement.remove()"><i class="bi bi-trash"></i></button>';
+    c.appendChild(row);
+}
+
+// Delete confirmation
+function confirmDelete() {
+    if (confirm('Are you sure you want to delete this establishment? This action cannot be undone.')) {
+        document.getElementById('deleteForm').submit();
+    }
+}
+</script>
+{% endblock %}

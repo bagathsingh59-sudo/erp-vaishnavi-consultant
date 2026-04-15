@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}TDS Report — {{ fy_label }}{% endblock %}
+{% block page_header %}TDS Report{% endblock %}
+
+{% block content %}
+<div style="max-width:900px; margin:0 auto;">
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb" style="font-size:0.78rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('accounts.accounts_home') }}" class="text-decoration-none">Accounts</a></li>
+        <li class="breadcrumb-item active">TDS Report — {{ fy_label }}</li>
+    </ol>
+</nav>
+<div class="table-container">
+    <div class="table-header" style="background:#1e293b;">
+        <div class="table-title" style="color:#fff;"><i class="bi bi-receipt-cutoff"></i> TDS Deducted by Clients <span style="font-size:0.65rem; opacity:0.8; margin-left:8px;">FY {{ fy_label }} — For IT Return</span></div>
+        <button onclick="window.print()" class="btn btn-sm btn-light no-print" style="font-size:0.68rem;"><i class="bi bi-printer me-1"></i>Print</button>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" style="font-size:0.75rem;">
+            <thead>
+                <tr style="background:#f8fafc;">
+                    <th style="width:40px;">#</th>
+                    <th style="width:90px;">Date</th>
+                    <th>Client Name</th>
+                    <th style="width:130px;">Reference</th>
+                    <th style="width:110px; text-align:right;">TDS Amount (₹)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ row.date.strftime('%d-%m-%Y') }}</td>
+                    <td style="font-weight:600;">{{ row.client }}</td>
+                    <td style="font-size:0.68rem; color:#64748b;">{{ row.reference }}</td>
+                    <td style="text-align:right; font-weight:600;">{{ "{:,.0f}".format(row.amount) }}</td>
+                </tr>
+                {% endfor %}
+                {% if not rows %}
+                <tr><td colspan="5" class="text-center text-muted py-4">No TDS entries found in this period.</td></tr>
+                {% endif %}
+            </tbody>
+            <tfoot>
+                <tr style="background:#f1f5f9; font-weight:700; font-size:0.82rem; border-top:2px solid #1e293b;">
+                    <td colspan="4" style="text-align:right;">Total TDS Receivable</td>
+                    <td style="text-align:right;">{{ "{:,.0f}".format(total) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    <div style="padding:10px 16px; background:#fefce8; border-top:1px solid #fde68a; font-size:0.62rem; color:#92400e;">
+        <i class="bi bi-info-circle me-1"></i>This report shows TDS deducted by your clients on Professional Fee. Use this for claiming TDS credit in your IT Return (Form 26AS / AIS reconciliation).
+    </div>
+</div>
+</div>
+{% endblock %}

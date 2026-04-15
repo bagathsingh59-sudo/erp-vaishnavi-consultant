@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}Salary Templates - {{ est.company_name }}{% endblock %}
+{% block page_header %}Salary Templates{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb" style="font-size:0.85rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('establishment.establishment_view', id=est.id) }}" class="text-decoration-none">{{ est.company_name }}</a></li>
+        <li class="breadcrumb-item active">Salary Templates</li>
+    </ol>
+</nav>
+
+<!-- Header Banner -->
+<div style="background:linear-gradient(135deg, #7c3aed, #4f46e5); color:#fff; padding:16px 24px; border-radius:var(--radius); margin-bottom:24px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+    <div style="display:flex; align-items:center; gap:14px;">
+        <div style="width:44px; height:44px; background:rgba(255,255,255,0.15); border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.3rem;">
+            <i class="bi bi-file-earmark-ruled"></i>
+        </div>
+        <div>
+            <div style="font-weight:700; font-size:1rem;">Salary Templates</div>
+            <div style="opacity:0.8; font-size:0.78rem;">{{ est.company_name }} | {{ templates|length }} template(s)</div>
+        </div>
+    </div>
+    <div style="display:flex; gap:8px;">
+        <a href="{{ url_for('payroll.salary_revision', est_id=est.id) }}" class="btn btn-warning btn-sm" style="font-weight:600;">
+            <i class="bi bi-arrow-repeat me-1"></i> Bulk Revision
+        </a>
+        <a href="{{ url_for('payroll.salary_template_add', est_id=est.id) }}" class="btn btn-light btn-sm" style="font-weight:600;">
+            <i class="bi bi-plus-lg me-1"></i> Create Template
+        </a>
+    </div>
+</div>
+
+{% if not templates %}
+<!-- Empty State -->
+<div style="text-align:center; padding:60px 20px; background:#fff; border:2px dashed #e2e8f0; border-radius:12px;">
+    <div style="font-size:3rem; color:#cbd5e1; margin-bottom:12px;"><i class="bi bi-file-earmark-ruled"></i></div>
+    <div style="font-size:1.1rem; font-weight:700; color:#334155; margin-bottom:6px;">No Salary Templates Yet</div>
+    <div style="font-size:0.85rem; color:#64748b; margin-bottom:20px; max-width:450px; margin-left:auto; margin-right:auto;">
+        Create reusable templates like "Unskilled Worker", "Skilled Worker", "Supervisor" etc.
+        Then apply them to employees in one click instead of entering salary details individually.
+    </div>
+    <a href="{{ url_for('payroll.salary_template_add', est_id=est.id) }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i> Create First Template
+    </a>
+</div>
+{% else %}
+
+<!-- Template Cards -->
+<div class="row g-3">
+    {% for tmpl in templates %}
+    <div class="col-md-6 col-lg-4">
+        <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:0; overflow:hidden; height:100%; display:flex; flex-direction:column; transition:box-shadow 0.2s;" onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,0.1)'" onmouseout="this.style.boxShadow='none'">
+            <!-- Card Header -->
+            <div style="padding:16px 18px 12px; border-bottom:1px solid #f1f5f9;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div>
+                        <div style="font-weight:700; font-size:1rem; color:#1e293b;">{{ tmpl.name }}</div>
+                        <div style="display:flex; gap:6px; margin-top:4px; flex-wrap:wrap;">
+                            {% if tmpl.salary_type == 'daily_wages' %}
+                            <span style="background:#fef3c7; color:#92400e; font-size:0.65rem; padding:2px 8px; border-radius:8px; font-weight:600;">Daily Wages</span>
+                            {% elif tmpl.salary_type == 'monthly_package' %}
+                            <span style="background:#dbeafe; color:#1e40af; font-size:0.65rem; padding:2px 8px; border-radius:8px; font-weight:600;">CTC Package</span>
+                            {% else %}
+                            <span style="background:#dcfce7; color:#166534; font-size:0.65rem; padding:2px 8px; border-radius:8px; font-weight:600;">Monthly Fixed</span>
+                            {% endif %}
+                            {% if tmpl.weekly_off_policy %}
+                            <span style="background:#f1f5f9; color:#475569; font-size:0.65rem; padding:2px 8px; border-radius:8px; font-weight:600;">WO: {{ tmpl.weekly_off_policy|title }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        {% if tmpl.salary_type == 'daily_wages' and tmpl.daily_rate %}
+                        <div style="font-size:1.2rem; font-weight:700; color:#4f46e5;">{{ "{:,.0f}".format(tmpl.daily_rate) }}</div>
+                        <div style="font-size:0.62rem; color:#94a3b8;">per day</div>
+                        {% else %}
+                        <div style="font-size:1.2rem; font-weight:700; color:#4f46e5;">{{ "{:,.0f}".format(tmpl.gross_salary) }}</div>
+                        <div style="font-size:0.62rem; color:#94a3b8;">gross/month</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Head Breakup (if available) -->
+            {% if tmpl.head_values %}
+            <div style="padding:8px 18px; flex:1;">
+                {% for th in tmpl.head_values %}
+                <div style="display:flex; justify-content:space-between; padding:3px 0; font-size:0.78rem; border-bottom:1px solid #f8fafc;">
+                    <span style="color:#64748b;">{{ th.salary_head.short_code }}</span>
+                    <span style="font-weight:600; color:#334155;">{{ "{:,.0f}".format(th.amount) }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Card Footer -->
+            <div style="padding:12px 18px; border-top:1px solid #f1f5f9; background:#f8fafc; display:flex; justify-content:space-between; align-items:center;">
+                <div style="font-size:0.72rem; color:#64748b;">
+                    <i class="bi bi-people me-1"></i> {{ tmpl._emp_count }} employee(s)
+                </div>
+                <div style="display:flex; gap:6px;">
+                    <button type="button" class="btn btn-primary btn-sm" style="font-size:0.72rem; padding:3px 10px;"
+                            onclick="openApplyModal({{ tmpl.id }}, '{{ tmpl.name }}')">
+                        <i class="bi bi-lightning me-1"></i> Apply
+                    </button>
+                    <a href="{{ url_for('payroll.salary_template_edit', tmpl_id=tmpl.id) }}" class="btn btn-outline-secondary btn-sm" style="font-size:0.72rem; padding:3px 10px;">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    <form method="POST" action="{{ url_for('payroll.salary_template_delete', tmpl_id=tmpl.id) }}"
+                          onsubmit="return confirm('Delete template \'{{ tmpl.name }}\'?');" style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline-danger btn-sm" style="font-size:0.72rem; padding:3px 10px;">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Apply Template Modal -->
+<div class="modal fade" id="applyModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" id="applyForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header" style="background:linear-gradient(135deg, #7c3aed, #4f46e5); color:#fff;">
+                    <h5 class="modal-title" style="font-size:0.95rem; font-weight:700;">
+                        <i class="bi bi-lightning me-1"></i> Apply Template: <span id="applyTmplName"></span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label" style="font-weight:600;">Effective From <span class="text-danger">*</span></label>
+                        <input type="date" name="effective_from" class="form-control" required style="max-width:250px;">
+                    </div>
+
+                    <div class="mb-2" style="font-weight:600; font-size:0.85rem; color:#334155;">
+                        Select Employees to Apply Template:
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <label style="font-size:0.78rem; cursor:pointer; color:#4f46e5; font-weight:600;">
+                            <input type="checkbox" id="selectAllEmps" onchange="toggleAllEmps(this)"> Select All
+                        </label>
+                        <span style="font-size:0.72rem; color:#94a3b8; margin-left:12px;" id="selectedCount">0 selected</span>
+                    </div>
+                    <div style="max-height:350px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:8px; padding:8px;">
+                        {% set active_emps = [] %}
+                        {% for emp in est.employees if emp.is_active %}
+                        <label style="display:flex; align-items:center; gap:8px; padding:6px 10px; border-bottom:1px solid #f8fafc; cursor:pointer; font-size:0.82rem;" class="emp-checkbox-row">
+                            <input type="checkbox" name="employee_ids" value="{{ emp.id }}" class="emp-checkbox" onchange="updateSelectedCount()">
+                            <span style="font-weight:600; color:#1e293b;">{{ emp.name }}</span>
+                            <code style="font-size:0.68rem; color:#94a3b8;">{{ emp.uan_number or emp.esic_ip_number or emp.emp_code }}</code>
+                            {% set cur_sal = emp.salaries|selectattr('is_current')|first %}
+                            {% if cur_sal %}
+                            <span style="margin-left:auto; font-size:0.72rem; color:#64748b;">
+                                Current: ₹{{ "{:,.0f}".format(cur_sal.gross_salary) }}
+                                {% if cur_sal.salary_template_id %}
+                                <span style="background:#f1f5f9; padding:1px 6px; border-radius:6px; font-size:0.6rem;">Template</span>
+                                {% endif %}
+                            </span>
+                            {% else %}
+                            <span style="margin-left:auto; font-size:0.72rem; color:#ef4444;">No salary assigned</span>
+                            {% endif %}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-lightning me-1"></i> Apply Template to Selected
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+function openApplyModal(tmplId, tmplName) {
+    document.getElementById('applyTmplName').textContent = tmplName;
+    document.getElementById('applyForm').action = '/salary-template/' + tmplId + '/apply-bulk';
+    // Uncheck all
+    document.querySelectorAll('.emp-checkbox').forEach(cb => cb.checked = false);
+    document.getElementById('selectAllEmps').checked = false;
+    updateSelectedCount();
+    new bootstrap.Modal(document.getElementById('applyModal')).show();
+}
+
+function toggleAllEmps(master) {
+    document.querySelectorAll('.emp-checkbox').forEach(cb => cb.checked = master.checked);
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const count = document.querySelectorAll('.emp-checkbox:checked').length;
+    document.getElementById('selectedCount').textContent = count + ' selected';
+}
+</script>
+{% endblock %}

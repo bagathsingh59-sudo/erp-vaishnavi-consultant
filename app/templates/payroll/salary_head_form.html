@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if mode == 'edit' else 'Add' }} Salary Head - Vaishnavi Consultant{% endblock %}
+{% block page_header %}{{ 'Edit' if mode == 'edit' else 'Add' }} Salary Head{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb" style="font-size:0.85rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('establishment.establishment_list') }}" class="text-decoration-none">Establishments</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('establishment.establishment_view', id=est.id) }}" class="text-decoration-none">{{ est.company_name }}</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('payroll.salary_heads', est_id=est.id) }}" class="text-decoration-none">Salary Heads</a></li>
+        <li class="breadcrumb-item active">{{ 'Edit' if mode == 'edit' else 'Add' }}</li>
+    </ol>
+</nav>
+
+<form method="POST" autocomplete="off">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="form-card">
+        <div class="form-section">
+            <div class="form-section-title"><i class="bi bi-list-columns-reverse"></i> Salary Head Details</div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Head Name <span class="text-danger">*</span></label>
+                    <input type="text" name="name" class="form-control" required
+                           value="{{ head.name if head else '' }}" placeholder="e.g., Basic, Dearness Allowance, HRA">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Short Code <span class="text-danger">*</span></label>
+                    <input type="text" name="short_code" class="form-control" required style="text-transform:uppercase;"
+                           value="{{ head.short_code if head else '' }}" placeholder="e.g., BASIC, DA, HRA">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Type <span class="text-danger">*</span></label>
+                    <select name="head_type" class="form-select">
+                        <option value="earning" {% if head and head.head_type == 'earning' %}selected{% endif %}>Earning (+)</option>
+                        <option value="deduction" {% if head and head.head_type == 'deduction' %}selected{% endif %}>Deduction (-)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="form-section-title"><i class="bi bi-calculator"></i> Calculation Method</div>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Calculation Type</label>
+                    <select name="calc_type" class="form-select" id="calcType" onchange="togglePercent()">
+                        <option value="fixed" {% if head and head.calc_type == 'fixed' %}selected{% endif %}>Fixed Amount</option>
+                        <option value="percent" {% if head and head.calc_type == 'percent' %}selected{% endif %}>Percentage of Another Head</option>
+                    </select>
+                </div>
+                <div class="col-md-4" id="percentValueDiv" style="display:none;">
+                    <label class="form-label">Percentage (%)</label>
+                    <input type="number" name="percent_value" class="form-control" step="0.01"
+                           value="{{ head.percent_value if head and head.percent_value else '' }}" placeholder="e.g., 50">
+                </div>
+                <div class="col-md-4" id="percentOfDiv" style="display:none;">
+                    <label class="form-label">Percentage Of</label>
+                    <select name="percent_of_head_id" class="form-select">
+                        <option value="">-- Select Head --</option>
+                        {% for eh in existing_heads %}
+                            <option value="{{ eh.id }}" {% if head and head.percent_of_head_id == eh.id %}selected{% endif %}>
+                                {{ eh.name }} ({{ eh.short_code }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="form-section-title"><i class="bi bi-toggles"></i> Options</div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="form-check" style="padding:10px 0;">
+                        <input class="form-check-input" type="checkbox" name="is_for_compliance" id="forCompliance"
+                               {% if head and head.is_for_compliance %}checked{% endif %}>
+                        <label class="form-check-label" for="forCompliance">
+                            <strong>Include in Compliance Calculation</strong><br>
+                            <small class="text-muted">Check for Basic and DA — used for EPF/ESIC calculation</small>
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check" style="padding:10px 0;">
+                        <input class="form-check-input" type="checkbox" name="is_in_gross" id="inGross"
+                               {% if not head or head.is_in_gross %}checked{% endif %}>
+                        <label class="form-check-label" for="inGross">
+                            <strong>Include in Gross Salary</strong><br>
+                            <small class="text-muted">Uncheck only for special allowances not part of gross</small>
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check" style="padding:10px 0;">
+                        <input class="form-check-input" type="checkbox" name="exclude_from_esic" id="excludeEsic"
+                               {% if head and head.exclude_from_esic %}checked{% endif %}>
+                        <label class="form-check-label" for="excludeEsic">
+                            <strong>Exclude from ESIC Wages</strong><br>
+                            <small class="text-muted">Check for Wash Allowance — not included in ESIC calculation</small>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="form-section" style="border-bottom:none; background:#f8fafc;">
+            <div class="d-flex gap-3 justify-content-end">
+                <a href="{{ url_for('payroll.salary_heads', est_id=est.id) }}" class="btn btn-light px-4">
+                    <i class="bi bi-x-lg me-1"></i> Cancel
+                </a>
+                <button type="submit" class="btn btn-primary px-4">
+                    <i class="bi bi-check-lg me-1"></i> {{ 'Update' if mode == 'edit' else 'Save' }} Salary Head
+                </button>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function togglePercent() {
+        var isPercent = document.getElementById('calcType').value === 'percent';
+        document.getElementById('percentValueDiv').style.display = isPercent ? 'block' : 'none';
+        document.getElementById('percentOfDiv').style.display = isPercent ? 'block' : 'none';
+    }
+    togglePercent();
+</script>
+{% endblock %}

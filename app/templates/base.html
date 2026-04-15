@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Vaishnavi Consultant{% endblock %}</title>
+
+    <!-- Favicon — Lord Venkateshwara Namam -->
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/namam.svg') }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <!-- Clerk JS (for session management on all pages) -->
+    {% if config.CLERK_PUBLISHABLE_KEY and not config.CLERK_PUBLISHABLE_KEY.startswith('pk_test_XXXX') %}
+    <script
+        async
+        crossorigin="anonymous"
+        data-clerk-publishable-key="{{ config.CLERK_PUBLISHABLE_KEY }}"
+        src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js">
+    </script>
+    {% endif %}
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo" style="background:none; box-shadow:none;">
+                <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="Vaishnavi Namam"
+                     style="width:42px; height:42px; filter:drop-shadow(0 2px 8px rgba(255,69,0,0.4));">
+            </div>
+            <h5 class="sidebar-title">Vaishnavi Consultant</h5>
+            <small class="sidebar-subtitle">Jai Shriman Narayana</small>
+        </div>
+
+        <div class="sidebar-nav">
+            <a href="{{ url_for('establishment.dashboard') }}"
+               class="sidebar-link {% if request.endpoint == 'establishment.dashboard' %}active{% endif %}">
+                <i class="bi bi-house-door-fill"></i>
+                <span>Dashboard</span>
+            </a>
+
+            {% if selected_est %}
+            <!-- ========== ESTABLISHMENT SELECTED — SCOPED VIEW ========== -->
+            <div style="margin: 10px 12px; padding: 10px 12px; background: linear-gradient(135deg, #4f46e5, #7c3aed); border-radius: 8px; color: white;">
+                <div style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; margin-bottom: 3px;">Working On</div>
+                <div style="font-size: 0.82rem; font-weight: 600; line-height: 1.3;">{{ selected_est.display_name }}</div>
+                {% if selected_est.pf_code %}
+                <div style="font-size: 0.68rem; opacity: 0.85; margin-top: 2px;">{{ selected_est.pf_code }}</div>
+                {% endif %}
+                <a href="{{ url_for('establishment.deselect_establishment') }}"
+                   style="display: inline-block; margin-top: 6px; font-size: 0.68rem; color: #fbbf24; text-decoration: none;">
+                    <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+                </a>
+            </div>
+
+            <a href="{{ url_for('establishment.client_dashboard') }}"
+               class="sidebar-link {% if request.endpoint == 'establishment.client_dashboard' %}active{% endif %}">
+                <i class="bi bi-speedometer2"></i>
+                <span>Client Overview</span>
+            </a>
+
+            <div class="sidebar-section-title">MANAGEMENT</div>
+
+            <a href="{{ url_for('establishment.establishment_view', id=selected_est.id) }}"
+               class="sidebar-link {% if request.endpoint == 'establishment.establishment_view' %}active{% endif %}">
+                <i class="bi bi-building"></i>
+                <span>Establishment Info</span>
+            </a>
+
+            <a href="{{ url_for('employee.employee_list') }}"
+               class="sidebar-link {% if request.endpoint and 'employee' in request.endpoint %}active{% endif %}">
+                <i class="bi bi-people"></i>
+                <span>Employees</span>
+            </a>
+
+            <a href="{{ url_for('payroll.payroll_config', est_id=selected_est.id) }}"
+               class="sidebar-link {% if request.endpoint == 'payroll.payroll_config' %}active{% endif %}">
+                <i class="bi bi-gear"></i>
+                <span>Payroll Config</span>
+            </a>
+
+            <div class="sidebar-section-title">PAYROLL</div>
+
+            <a href="{{ url_for('payroll.payroll_list') }}"
+               class="sidebar-link {% if request.endpoint and 'payroll' in request.endpoint and request.args.get('tab', 'payroll') == 'payroll' and request.endpoint == 'payroll.payroll_list' %}active{% endif %}">
+                <i class="bi bi-calculator"></i>
+                <span>Salary Processing</span>
+            </a>
+
+            <a href="{{ url_for('payroll.payroll_list', tab='payslips') }}"
+               class="sidebar-link {% if request.args.get('tab') == 'payslips' %}active{% endif %}">
+                <i class="bi bi-receipt"></i>
+                <span>Pay Slips</span>
+            </a>
+
+            <div class="sidebar-section-title">COMPLIANCE</div>
+
+            <a href="{{ url_for('payroll.payroll_list', tab='epf') }}"
+               class="sidebar-link {% if request.args.get('tab') == 'epf' %}active{% endif %}">
+                <i class="bi bi-shield-check"></i>
+                <span>EPF Returns</span>
+            </a>
+
+            <a href="{{ url_for('payroll.payroll_list', tab='esic') }}"
+               class="sidebar-link {% if request.args.get('tab') == 'esic' %}active{% endif %}">
+                <i class="bi bi-hospital"></i>
+                <span>ESIC Returns</span>
+            </a>
+
+            <div class="sidebar-section-title">REPORTS</div>
+
+            <a href="{{ url_for('reports.quick_reports') }}"
+               class="sidebar-link {% if request.endpoint == 'reports.quick_reports' %}active{% endif %}">
+                <i class="bi bi-lightning-charge-fill"></i>
+                <span>Quick Reports</span>
+            </a>
+
+            <a href="{{ url_for('reports.bulk_bd') }}"
+               class="sidebar-link {% if request.endpoint == 'reports.bulk_bd' %}active{% endif %}">
+                <i class="bi bi-file-earmark-pdf-fill"></i>
+                <span>Bulk Form B+D PDF</span>
+            </a>
+
+            <a href="{{ url_for('bonus.bonus_list') }}"
+               class="sidebar-link {% if request.endpoint and request.endpoint.startswith('bonus.') %}active{% endif %}">
+                <i class="bi bi-cash-coin"></i>
+                <span>Bonus</span>
+            </a>
+
+            {# Document Vault — disabled for now, will enable after 3-6 months #}
+
+            <a href="{{ url_for('payroll.payroll_list', tab='reports') }}"
+               class="sidebar-link {% if request.args.get('tab') == 'reports' %}active{% endif %}">
+                <i class="bi bi-file-earmark-bar-graph"></i>
+                <span>Reports</span>
+            </a>
+
+            <a href="{{ url_for('payroll.payroll_list', tab='compliance') }}"
+               class="sidebar-link {% if request.args.get('tab') == 'compliance' %}active{% endif %}">
+                <i class="bi bi-clipboard-data"></i>
+                <span>Compliance Statement</span>
+            </a>
+
+            <a href="{{ url_for('payroll.payroll_list', tab='reimbursement') }}"
+               class="sidebar-link {% if request.args.get('tab') == 'reimbursement' %}active{% endif %}">
+                <i class="bi bi-envelope-paper"></i>
+                <span>Reimbursement</span>
+            </a>
+
+            {% else %}
+            <!-- ========== NO ESTABLISHMENT SELECTED — GLOBAL VIEW ========== -->
+            <div class="sidebar-section-title">MANAGEMENT</div>
+
+            {% endif %}
+
+            <!-- ========== ACCOUNTS — ADMIN ONLY ========== -->
+            {% if clerk_user and clerk_user.is_admin %}
+            <div class="sidebar-section-title">ACCOUNTS</div>
+
+            <a href="{{ url_for('accounts.accounts_home') }}"
+               class="sidebar-link {% if request.endpoint and 'accounts' in (request.endpoint or '') %}active{% endif %}">
+                <i class="bi bi-book-half"></i>
+                <span>Accounts</span>
+            </a>
+            {% endif %}
+
+            {% if not selected_est %}
+
+            <a href="{{ url_for('establishment.establishment_list') }}"
+               class="sidebar-link {% if 'establishment' in (request.endpoint or '') and request.endpoint != 'establishment.dashboard' %}active{% endif %}">
+                <i class="bi bi-building-fill"></i>
+                <span>All Establishments</span>
+            </a>
+
+            <a href="{{ url_for('employee.employee_list') }}"
+               class="sidebar-link {% if request.endpoint and 'employee' in request.endpoint %}active{% endif %}">
+                <i class="bi bi-people-fill"></i>
+                <span>All Employees</span>
+            </a>
+
+            <div style="margin: 15px 12px; padding: 12px; background: #f8fafc; border-radius: 8px; border: 1px dashed #cbd5e1; text-align: center;">
+                <i class="bi bi-info-circle text-primary" style="font-size: 1.2rem;"></i>
+                <p style="font-size: 0.72rem; color: #64748b; margin: 6px 0 0;">Select an establishment from Dashboard to access Payroll, Reports & Compliance</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- UAN & ESIC TRACKER — All users -->
+        <div class="sidebar-section-title" style="font-size:0.6rem; color:#64748b; padding:6px 16px; text-transform:uppercase; letter-spacing:0.5px;">ENROLLMENT</div>
+        <a href="{{ url_for('enrollment.enrollment_home') }}"
+           class="sidebar-link {% if request.endpoint and 'enrollment' in (request.endpoint or '') %}active{% endif %}"
+           style="color:#7c3aed;">
+            <i class="bi bi-person-vcard" style="color:#7c3aed;"></i>
+            <span>UAN & ESIC Tracker</span>
+        </a>
+
+        <!-- DAILY MIS — All users (Admin + Staff) -->
+        <div class="sidebar-section-title" style="font-size:0.6rem; color:#64748b; padding:6px 16px; text-transform:uppercase; letter-spacing:0.5px;">DAILY MIS</div>
+        <a href="{{ url_for('daily_mis.mis_home') }}"
+           class="sidebar-link {% if request.endpoint and 'daily_mis' in (request.endpoint or '') %}active{% endif %}"
+           style="color:#0891b2;">
+            <i class="bi bi-journal-check" style="color:#0891b2;"></i>
+            <span>Daily MIS</span>
+        </a>
+
+        <!-- TOOLS Section — Always visible -->
+        <div class="sidebar-section-title" style="font-size:0.6rem; color:#64748b; padding:6px 16px; text-transform:uppercase; letter-spacing:0.5px;">TOOLS</div>
+
+        <a href="javascript:void(0)" onclick="document.getElementById('epfCalcGlobal') && new bootstrap.Modal(document.getElementById('epfCalcGlobal')).show()"
+           class="sidebar-link" style="color:#7c3aed;">
+            <i class="bi bi-calculator-fill" style="color:#7c3aed;"></i>
+            <span>EPF Delay Calculator</span>
+        </a>
+
+        <a href="javascript:void(0)" onclick="document.getElementById('compCalcModal') && (document.getElementById('compCalcModal').style.display='flex')"
+           class="sidebar-link" style="color:#059669;">
+            <i class="bi bi-clipboard2-data-fill" style="color:#059669;"></i>
+            <span>Compliance Calculator</span>
+        </a>
+
+        <a href="javascript:void(0)" onclick="document.getElementById('quickCalcModal') && (document.getElementById('quickCalcModal').style.display='flex')"
+           class="sidebar-link" style="color:#0891b2;">
+            <i class="bi bi-plus-slash-minus" style="color:#0891b2;"></i>
+            <span>Calculator</span>
+        </a>
+
+        <!-- REPORTS Section -->
+        <div class="sidebar-section-title" style="font-size:0.6rem; color:#64748b; padding:6px 16px; text-transform:uppercase; letter-spacing:0.5px;">REPORTS</div>
+
+        <a href="{{ url_for('establishment.client_dues') }}" class="sidebar-link" style="color:#dc2626;">
+            <i class="bi bi-exclamation-diamond-fill" style="color:#dc2626;"></i>
+            <span>Client Dues</span>
+        </a>
+
+        <a href="{{ url_for('establishment.activity_log') }}" class="sidebar-link" style="color:#6366f1;">
+            <i class="bi bi-clock-history" style="color:#6366f1;"></i>
+            <span>Activity Log</span>
+        </a>
+
+        <!-- SYSTEM Section — Admin Only -->
+        {% if clerk_user and clerk_user.is_admin %}
+        <div style="margin-top:4px;">
+            <div class="sidebar-section-title" style="font-size:0.6rem; color:#64748b; padding:6px 16px; text-transform:uppercase; letter-spacing:0.5px;">SYSTEM</div>
+            <a href="{{ url_for('admin.user_list') }}"
+               class="sidebar-link {% if request.endpoint and 'admin.' in (request.endpoint or '') %}active{% endif %}">
+                <i class="bi bi-person-gear"></i>
+                <span>User Management</span>
+            </a>
+            <a href="{{ url_for('backup.backup_home') }}"
+               class="sidebar-link {% if request.endpoint and 'backup' in request.endpoint %}active{% endif %}">
+                <i class="bi bi-database-down"></i>
+                <span>Database Backup</span>
+            </a>
+            <a href="/apidocs/" target="_blank"
+               class="sidebar-link">
+                <i class="bi bi-braces"></i>
+                <span>API Docs (Swagger)</span>
+            </a>
+        </div>
+        {% endif %}
+
+        <div class="sidebar-footer">
+            <small>&copy; 2026 Vaishnavi Consultant</small>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Top Navbar -->
+        <nav class="top-navbar">
+            <button class="btn btn-link sidebar-toggle" id="sidebarToggle">
+                <i class="bi bi-list"></i>
+            </button>
+            <div class="top-navbar-title">
+                {% block page_header %}Dashboard{% endblock %}
+            </div>
+            <div class="top-navbar-right">
+                {% if selected_est %}
+                <span class="badge bg-primary me-2" style="font-size: 0.75rem;">
+                    <i class="bi bi-building me-1"></i>{{ selected_est.display_name }}
+                </span>
+                {% endif %}
+                <button type="button" class="btn btn-sm no-print" data-bs-toggle="modal" data-bs-target="#epfCalcGlobal"
+                        style="background:linear-gradient(135deg,#4338ca,#7c3aed); color:#fff; font-size:0.68rem; padding:3px 10px; border-radius:15px; border:none;"
+                        title="EPF Delay Calculator (7Q & 14B)">
+                    <i class="bi bi-calculator"></i>
+                </button>
+                {% if clerk_user %}
+                <span class="text-muted" style="font-size:0.78rem;">
+                    <i class="bi bi-person-circle me-1"></i>{{ clerk_user.name }}
+                    {% if clerk_user.is_admin %}
+                    <span class="badge bg-danger ms-1" style="font-size:0.55rem; padding:2px 6px; vertical-align:middle;">ADMIN</span>
+                    {% else %}
+                    <span class="badge bg-secondary ms-1" style="font-size:0.55rem; padding:2px 6px; vertical-align:middle;">USER</span>
+                    {% endif %}
+                </span>
+                <a href="{{ url_for('auth.logout_page') }}" class="btn btn-sm btn-outline-secondary ms-2 no-print"
+                   style="font-size:0.65rem; padding:2px 10px; border-radius:12px;" title="Logout"
+                   onclick="return confirm('Are you sure you want to logout?');">
+                    <i class="bi bi-box-arrow-right"></i>
+                </a>
+                {% else %}
+                <span class="text-muted"><i class="bi bi-person-circle"></i> Admin</span>
+                {% endif %}
+            </div>
+        </nav>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="px-4 pt-3">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                            {% if category == 'success' %}
+                                <i class="bi bi-check-circle-fill me-2"></i>
+                            {% elif category == 'warning' %}
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            {% elif category == 'info' %}
+                                <i class="bi bi-info-circle-fill me-2"></i>
+                            {% else %}
+                                <i class="bi bi-x-circle-fill me-2"></i>
+                            {% endif %}
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Quick Navigation Bar (always visible) -->
+        <div class="no-print" style="padding:6px 24px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <a href="{{ url_for('establishment.dashboard') }}" class="btn btn-sm btn-outline-secondary" style="font-size:0.72rem; padding:2px 10px;">
+                <i class="bi bi-house-door me-1"></i>Main Dashboard
+            </a>
+            {% if selected_est %}
+            <a href="{{ url_for('establishment.client_dashboard') }}" class="btn btn-sm btn-outline-primary" style="font-size:0.72rem; padding:2px 10px;">
+                <i class="bi bi-speedometer2 me-1"></i>{{ selected_est.display_name }}
+            </a>
+            <a href="{{ url_for('payroll.payroll_list') }}" class="btn btn-sm btn-outline-secondary" style="font-size:0.72rem; padding:2px 10px;">
+                <i class="bi bi-calculator me-1"></i>Payroll
+            </a>
+            <a href="{{ url_for('employee.employee_list') }}" class="btn btn-sm btn-outline-secondary" style="font-size:0.72rem; padding:2px 10px;">
+                <i class="bi bi-people me-1"></i>Employees
+            </a>
+            {% endif %}
+            <a href="{{ url_for('accounts.accounts_home') }}" class="btn btn-sm btn-outline-success" style="font-size:0.72rem; padding:2px 10px;">
+                <i class="bi bi-journal-bookmark-fill me-1"></i>Accounts
+            </a>
+        </div>
+
+        <!-- Page Content -->
+        <div class="page-content">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <!-- EPF Delay Calculator Modal (Global — available on every page) -->
+    <div class="modal fade" id="epfCalcGlobal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered" style="max-width:520px;">
+        <div class="modal-content" style="border:none; border-radius:12px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+          <div style="background:linear-gradient(135deg,#4338ca,#7c3aed); color:#fff; padding:14px 20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <div style="font-size:0.95rem; font-weight:700;"><i class="bi bi-calculator me-2"></i>EPF Delay Calculator</div>
+                <div style="font-size:0.62rem; opacity:0.8;">Interest u/s 7Q (12% p.a.) &amp; Damages u/s 14B (1% per month)</div>
+              </div>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" style="font-size:0.65rem;"></button>
+            </div>
+          </div>
+          <div style="padding:16px 20px;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;">
+              <div style="grid-column:1/-1;">
+                <label style="font-size:0.65rem; font-weight:600; color:#64748b; text-transform:uppercase;">EPF Contribution Amount (₹)</label>
+                <input type="number" id="gc_epf_amt" class="form-control form-control-sm" placeholder="e.g., 9442" style="font-size:0.92rem; font-weight:700;" oninput="gcRun()">
+              </div>
+              <div>
+                <label style="font-size:0.65rem; font-weight:600; color:#64748b; text-transform:uppercase;">Wage Month</label>
+                <input type="month" id="gc_wage_month" class="form-control form-control-sm" style="font-size:0.82rem;" onchange="gcDue(); gcRun()">
+              </div>
+              <div>
+                <label style="font-size:0.65rem; font-weight:600; color:#64748b; text-transform:uppercase;">Actual Payment Date</label>
+                <input type="date" id="gc_pay_date" class="form-control form-control-sm" style="font-size:0.82rem;" onchange="gcRun()">
+              </div>
+            </div>
+            <div id="gc_due_bar" style="display:none; background:#f1f5f9; border-radius:6px; padding:6px 12px; margin-bottom:14px; font-size:0.72rem; display:flex; justify-content:space-between; align-items:center;">
+              <span style="color:#64748b;"><i class="bi bi-calendar-check me-1"></i>Due Date (Auto):</span>
+              <span id="gc_due_txt" style="font-weight:700; color:#1e293b;">—</span>
+            </div>
+            <div id="gc_results" style="display:none;">
+              <div style="display:flex; gap:8px; margin-bottom:8px;">
+                <div style="flex:1; background:#f8fafc; border-left:3px solid #6366f1; border-radius:4px; padding:6px 10px;">
+                  <div style="font-size:0.58rem; color:#64748b; text-transform:uppercase;">Delay Period</div>
+                  <div id="gc_days" style="font-size:0.92rem; font-weight:700; color:#1e293b;">—</div>
+                </div>
+                <div style="flex:1; background:#f8fafc; border-left:3px solid #6366f1; border-radius:4px; padding:6px 10px;">
+                  <div style="font-size:0.58rem; color:#64748b; text-transform:uppercase;">Delay in Months</div>
+                  <div id="gc_months" style="font-size:0.92rem; font-weight:700; color:#1e293b;">—</div>
+                </div>
+              </div>
+              <div id="gc_int_row" style="background:#f8fafc; border-left:3px solid #6366f1; border-radius:4px; padding:6px 10px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                  <div style="font-size:0.72rem; color:#475569;">Interest @ 12% p.a. <span style="font-size:0.6rem; color:#94a3b8;">(Section 7Q)</span></div>
+                  <div id="gc_int_f" style="font-size:0.55rem; color:#94a3b8;">—</div>
+                </div>
+                <div id="gc_int_v" style="font-size:0.95rem; font-weight:700; color:#7c3aed;">₹0</div>
+              </div>
+              <div id="gc_dmg_row" style="background:#f8fafc; border-left:3px solid #6366f1; border-radius:4px; padding:6px 10px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                  <div style="font-size:0.72rem; color:#475569;">Damages @ 1% per month <span style="font-size:0.6rem; color:#94a3b8;">(Section 14B)</span></div>
+                  <div id="gc_dmg_f" style="font-size:0.55rem; color:#94a3b8;">—</div>
+                </div>
+                <div id="gc_dmg_v" style="font-size:0.95rem; font-weight:700; color:#7c3aed;">₹0</div>
+              </div>
+              <div id="gc_pen_row" style="background:#fef2f2; border-left:3px solid #dc2626; border-radius:4px; padding:8px 10px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+                <div style="font-size:0.78rem; font-weight:700; color:#991b1b;">Total Interest + Damages</div>
+                <div id="gc_pen_v" style="font-size:1.05rem; font-weight:800; color:#dc2626;">₹0</div>
+              </div>
+              <div id="gc_grand_row" style="background:#f0fdf4; border-left:3px solid #16a34a; border-radius:4px; padding:8px 10px; display:flex; justify-content:space-between; align-items:center;">
+                <div style="font-size:0.78rem; font-weight:700; color:#166534;">Grand Total Payable</div>
+                <div id="gc_grand_v" style="font-size:1.1rem; font-weight:800; color:#16a34a;">₹0</div>
+              </div>
+              <div id="gc_ontime" style="display:none; background:#f0fdf4; border-radius:6px; padding:14px; text-align:center; margin-top:6px;">
+                <i class="bi bi-check-circle-fill" style="font-size:1.5rem; color:#16a34a;"></i>
+                <div style="font-size:0.82rem; font-weight:700; color:#166534; margin-top:4px;">Paid On Time — No Penalty</div>
+              </div>
+            </div>
+            <div id="gc_empty" style="text-align:center; padding:20px; color:#94a3b8;">
+              <i class="bi bi-calculator" style="font-size:2rem; opacity:0.3;"></i>
+              <div style="font-size:0.72rem; margin-top:6px;">Enter EPF amount, wage month &amp; payment date</div>
+            </div>
+          </div>
+          <div style="background:#f8fafc; padding:8px 20px; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-size:0.55rem; color:#94a3b8;"><i class="bi bi-info-circle me-1"></i>For reference only. Verify with EPFO portal.</div>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal" style="font-size:0.7rem;">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- QUICK COMPLIANCE CALCULATOR                 -->
+    <!-- ============================================ -->
+    <div id="compCalcModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.45); z-index:99998; justify-content:center; align-items:flex-start; padding-top:40px; overflow-y:auto;"
+         onclick="if(event.target===this)this.style.display='none'">
+        <div style="background:#fff; border-radius:16px; width:95%; max-width:480px; box-shadow:0 20px 60px rgba(0,0,0,0.3); overflow:hidden; margin-bottom:40px;">
+            <!-- Header -->
+            <div style="background:linear-gradient(135deg,#059669,#10b981); padding:16px 20px; color:#fff; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div style="font-weight:700; font-size:1rem;"><i class="bi bi-clipboard2-data me-2"></i>Quick Compliance Calculator</div>
+                    <div style="font-size:0.7rem; opacity:0.85;">EPF + ESIC — Instant Calculation</div>
+                </div>
+                <button onclick="document.getElementById('compCalcModal').style.display='none'"
+                        style="background:rgba(255,255,255,0.2); border:none; color:#fff; width:30px; height:30px; border-radius:50%; font-size:1.1rem; cursor:pointer;">&times;</button>
+            </div>
+
+            <!-- Input Section -->
+            <div style="padding:18px 20px;">
+                <!-- Row 1: Gross + EPF Wages -->
+                <div style="display:flex; gap:12px; margin-bottom:12px;">
+                    <div style="flex:1;">
+                        <label style="font-size:0.72rem; font-weight:600; color:#475569; display:block; margin-bottom:3px;">Gross Salary (₹)</label>
+                        <input type="number" id="cc_gross" class="form-control form-control-sm" placeholder="e.g., 15000"
+                               style="font-weight:600; font-size:0.9rem;" oninput="ccCalc()">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-size:0.72rem; font-weight:600; color:#475569; display:block; margin-bottom:3px;">EPF Wages (₹) <small style="color:#94a3b8;">(Basic+DA)</small></label>
+                        <input type="number" id="cc_epf_wages" class="form-control form-control-sm" placeholder="e.g., 15000"
+                               style="font-weight:600; font-size:0.9rem;" oninput="ccCalc()">
+                        <small style="font-size:0.6rem; color:#94a3b8;">Max ceiling: ₹15,000</small>
+                    </div>
+                </div>
+
+                <!-- Row 2: Due Month + No. of Employees -->
+                <div style="display:flex; gap:12px; margin-bottom:14px;">
+                    <div style="flex:1;">
+                        <label style="font-size:0.72rem; font-weight:600; color:#475569; display:block; margin-bottom:3px;">Wage Month</label>
+                        <input type="month" id="cc_wage_month" class="form-control form-control-sm"
+                               style="font-size:0.85rem;" onchange="ccDueDate()">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-size:0.72rem; font-weight:600; color:#475569; display:block; margin-bottom:3px;">Payable Date (Auto)</label>
+                        <div id="cc_due_date" style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; padding:6px 10px; font-size:0.88rem; font-weight:700; color:#166534; text-align:center;">—</div>
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <div style="border-top:2px solid #e2e8f0; margin:6px 0 14px; position:relative;">
+                    <span style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:#fff; padding:0 10px; font-size:0.7rem; font-weight:700; color:#059669;">AUTO CALCULATION</span>
+                </div>
+
+                <!-- Result Cards -->
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+                    <!-- EPF Employee -->
+                    <div style="background:#faf5ff; border:1px solid #e9d5ff; border-radius:8px; padding:10px;">
+                        <div style="font-size:0.62rem; color:#7c3aed; font-weight:600; text-transform:uppercase;">EPF Employee (12%)</div>
+                        <div id="cc_epf_ee" style="font-size:1.2rem; font-weight:800; color:#6d28d9;">₹0</div>
+                    </div>
+                    <!-- EPF Employer -->
+                    <div style="background:#faf5ff; border:1px solid #e9d5ff; border-radius:8px; padding:10px;">
+                        <div style="font-size:0.62rem; color:#7c3aed; font-weight:600; text-transform:uppercase;">EPF Employer (13%)</div>
+                        <div id="cc_epf_er" style="font-size:1.2rem; font-weight:800; color:#6d28d9;">₹0</div>
+                        <div id="cc_epf_detail" style="font-size:0.55rem; color:#a78bfa; margin-top:2px;"></div>
+                    </div>
+                    <!-- ESIC Employee -->
+                    <div style="background:#f0fdfa; border:1px solid #99f6e4; border-radius:8px; padding:10px;">
+                        <div style="font-size:0.62rem; color:#0d9488; font-weight:600; text-transform:uppercase;">ESIC Employee (0.75%)</div>
+                        <div id="cc_esic_ee" style="font-size:1.2rem; font-weight:800; color:#0f766e;">₹0</div>
+                    </div>
+                    <!-- ESIC Employer -->
+                    <div style="background:#f0fdfa; border:1px solid #99f6e4; border-radius:8px; padding:10px;">
+                        <div style="font-size:0.62rem; color:#0d9488; font-weight:600; text-transform:uppercase;">ESIC Employer (3.25%)</div>
+                        <div id="cc_esic_er" style="font-size:1.2rem; font-weight:800; color:#0f766e;">₹0</div>
+                    </div>
+                </div>
+
+                <!-- ESIC Note -->
+                <div id="cc_esic_note" style="display:none; font-size:0.65rem; color:#b45309; background:#fffbeb; border-radius:5px; padding:5px 8px; margin-bottom:8px; text-align:center;">
+                    <i class="bi bi-info-circle me-1"></i>Gross exceeds ₹21,000 — ESIC not applicable
+                </div>
+
+                <!-- Total Payable -->
+                <div style="background:linear-gradient(135deg,#059669,#10b981); border-radius:10px; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <div style="color:rgba(255,255,255,0.85); font-size:0.78rem; font-weight:600;">Total EPF + ESIC Payable</div>
+                    <div id="cc_total" style="color:#fff; font-size:1.4rem; font-weight:800;">₹0</div>
+                </div>
+
+                <!-- Delay Calculator Section -->
+                <div style="border:1px solid #fde68a; border-radius:10px; overflow:hidden;">
+                    <div style="background:#fffbeb; padding:10px 14px; display:flex; justify-content:space-between; align-items:center;">
+                        <div style="font-size:0.78rem; font-weight:700; color:#92400e;">
+                            <i class="bi bi-clock-history me-1"></i>Delay Penalty (If Late)
+                        </div>
+                        <div id="cc_delay_badge" style="display:none; font-size:0.65rem; font-weight:700; background:#dc2626; color:#fff; padding:2px 8px; border-radius:10px;"></div>
+                    </div>
+                    <div style="padding:12px 14px;">
+                        <div style="display:flex; gap:10px; margin-bottom:10px;">
+                            <div style="flex:1;">
+                                <label style="font-size:0.68rem; font-weight:600; color:#475569;">Payment Date</label>
+                                <input type="date" id="cc_pay_date" class="form-control form-control-sm"
+                                       style="font-size:0.85rem;" onchange="ccDelay()">
+                            </div>
+                            <div style="flex:1;">
+                                <label style="font-size:0.68rem; font-weight:600; color:#475569;">Delay Days</label>
+                                <div id="cc_delay_days" style="font-size:1.1rem; font-weight:800; color:#16a34a; padding-top:4px;">0 days</div>
+                            </div>
+                        </div>
+                        <!-- Penalty Results -->
+                        <div id="cc_penalty_section" style="display:none;">
+                            <div style="display:flex; gap:8px;">
+                                <div style="flex:1; background:#fef2f2; border-radius:6px; padding:8px;">
+                                    <div style="font-size:0.6rem; color:#991b1b; font-weight:600;">Interest (7Q) @ 12% p.a.</div>
+                                    <div id="cc_interest" style="font-size:1rem; font-weight:800; color:#dc2626;">₹0</div>
+                                </div>
+                                <div style="flex:1; background:#fef2f2; border-radius:6px; padding:8px;">
+                                    <div style="font-size:0.6rem; color:#991b1b; font-weight:600;">Damages (14B) @ 1%/month</div>
+                                    <div id="cc_damages" style="font-size:1rem; font-weight:800; color:#dc2626;">₹0</div>
+                                </div>
+                            </div>
+                            <div style="margin-top:8px; background:#fef2f2; border:1px solid #fecaca; border-radius:6px; padding:8px; text-align:center;">
+                                <span style="font-size:0.68rem; color:#991b1b; font-weight:600;">Total Penalty:</span>
+                                <span id="cc_penalty_total" style="font-size:1.1rem; font-weight:800; color:#dc2626; margin-left:6px;">₹0</span>
+                            </div>
+                        </div>
+                        <div id="cc_ontime" style="display:none; text-align:center; padding:8px; background:#f0fdf4; border-radius:6px;">
+                            <i class="bi bi-check-circle-fill" style="color:#16a34a;"></i>
+                            <span style="font-size:0.78rem; font-weight:600; color:#166534; margin-left:4px;">Paid On Time — No Penalty</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="padding:8px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+                <div style="font-size:0.55rem; color:#94a3b8;"><i class="bi bi-info-circle me-1"></i>EPF ceiling ₹15,000 | ESIC ceiling ₹21,000 | For reference only</div>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('compCalcModal').style.display='none'"
+                        style="font-size:0.7rem;">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    function ccCalc(){
+        var gross=parseFloat(document.getElementById('cc_gross').value)||0;
+        var epfWages=parseFloat(document.getElementById('cc_epf_wages').value)||0;
+
+        // Cap EPF wages at ceiling
+        var epfBase=Math.min(epfWages, 15000);
+
+        // EPF Employee: 12%
+        var epfEE=Math.round(epfBase*12/100);
+        // EPF Employer breakdown
+        var epfAc01=Math.round(epfBase*3.67/100);
+        var epfEPS=Math.round(epfBase*8.33/100);
+        var epfAdminCalc=Math.round(epfBase*0.50/100);
+        var epfAdmin=Math.max(epfAdminCalc, 500); // Minimum ₹500 Admin Charge
+        var epfEDLI=Math.round(epfBase*0.50/100);
+        var epfER=epfAc01+epfEPS+epfAdmin+epfEDLI;
+
+        document.getElementById('cc_epf_ee').textContent='\u20B9'+epfEE.toLocaleString('en-IN');
+        document.getElementById('cc_epf_er').textContent='\u20B9'+epfER.toLocaleString('en-IN');
+        var adminNote=epfAdminCalc<500?'(Min \u20B9500)':'';
+        document.getElementById('cc_epf_detail').textContent='A/c01:'+epfAc01+' | EPS:'+epfEPS+' | Admin:'+epfAdmin+adminNote+' | EDLI:'+epfEDLI;
+
+        // ESIC
+        var esicEE=0, esicER=0;
+        if(gross<=21000 && gross>0){
+            esicEE=Math.round(gross*0.75/100+0.49);
+            esicER=Math.round(gross*3.25/100+0.49);
+            document.getElementById('cc_esic_note').style.display='none';
+        } else if(gross>21000){
+            document.getElementById('cc_esic_note').style.display='block';
+        } else {
+            document.getElementById('cc_esic_note').style.display='none';
+        }
+        document.getElementById('cc_esic_ee').textContent='\u20B9'+esicEE.toLocaleString('en-IN');
+        document.getElementById('cc_esic_er').textContent='\u20B9'+esicER.toLocaleString('en-IN');
+
+        // Total
+        var total=epfEE+epfER+esicEE+esicER;
+        document.getElementById('cc_total').textContent='\u20B9'+total.toLocaleString('en-IN');
+
+        // Recalculate delay if payment date is set
+        ccDelay();
+    }
+
+    function ccDueDate(){
+        var wm=document.getElementById('cc_wage_month').value;
+        if(!wm){document.getElementById('cc_due_date').textContent='\u2014';return;}
+        var p=wm.split('-').map(Number), y=p[0], m=p[1]+1;
+        if(m>12){m=1;y++;}
+        var d=new Date(y,m-1,15);
+        var opts={day:'2-digit',month:'short',year:'numeric'};
+        document.getElementById('cc_due_date').textContent=d.toLocaleDateString('en-IN',opts);
+        // Auto-recalculate delay
+        ccDelay();
+    }
+
+    function ccDelay(){
+        var wm=document.getElementById('cc_wage_month').value;
+        var pd=document.getElementById('cc_pay_date').value;
+        if(!wm||!pd){
+            document.getElementById('cc_penalty_section').style.display='none';
+            document.getElementById('cc_ontime').style.display='none';
+            document.getElementById('cc_delay_badge').style.display='none';
+            document.getElementById('cc_delay_days').textContent='0 days';
+            document.getElementById('cc_delay_days').style.color='#16a34a';
+            return;
+        }
+        var p=wm.split('-').map(Number), y=p[0], m=p[1]+1;
+        if(m>12){m=1;y++;}
+        var dueDate=new Date(y,m-1,15);
+        var payDate=new Date(pd);
+        var diff=Math.ceil((payDate-dueDate)/(1000*60*60*24));
+        var delayDays=Math.max(0, diff);
+
+        document.getElementById('cc_delay_days').textContent=delayDays>0?delayDays+' days':'On Time';
+        document.getElementById('cc_delay_days').style.color=delayDays>0?'#dc2626':'#16a34a';
+
+        if(delayDays>0){
+            document.getElementById('cc_delay_badge').style.display='inline-block';
+            document.getElementById('cc_delay_badge').textContent='DELAYED '+delayDays+' days';
+            document.getElementById('cc_penalty_section').style.display='block';
+            document.getElementById('cc_ontime').style.display='none';
+
+            // Get EPF total (EE + ER) with Admin min ₹500
+            var epfWages=parseFloat(document.getElementById('cc_epf_wages').value)||0;
+            var epfBase=Math.min(epfWages, 15000);
+            var _adm=Math.max(Math.round(epfBase*0.50/100),500);
+            var epfTotal=Math.round(epfBase*12/100)+Math.round(epfBase*3.67/100)+Math.round(epfBase*8.33/100)+_adm+Math.round(epfBase*0.50/100);
+
+            // Interest (7Q): 12% p.a., daily
+            var interest=Math.round((epfTotal*12*delayDays)/(100*365));
+            // Damages (14B): 1% per month
+            var months=Math.ceil(delayDays/30);
+            var damages=Math.round(epfTotal*1*months/100);
+            var totalP=interest+damages;
+
+            document.getElementById('cc_interest').textContent='\u20B9'+interest.toLocaleString('en-IN');
+            document.getElementById('cc_damages').textContent='\u20B9'+damages.toLocaleString('en-IN');
+            document.getElementById('cc_penalty_total').textContent='\u20B9'+totalP.toLocaleString('en-IN');
+        } else {
+            document.getElementById('cc_delay_badge').style.display='none';
+            document.getElementById('cc_penalty_section').style.display='none';
+            document.getElementById('cc_ontime').style.display='block';
+        }
+    }
+    </script>
+
+    <!-- ============================================ -->
+    <!-- REGULAR CALCULATOR (Quick Math)             -->
+    <!-- ============================================ -->
+    <div id="quickCalcModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.45); z-index:99999; justify-content:center; align-items:center;"
+         onclick="if(event.target===this)this.style.display='none'">
+        <div style="background:#fff; border-radius:16px; width:320px; box-shadow:0 20px 60px rgba(0,0,0,0.3); overflow:hidden; user-select:none;">
+            <!-- Header -->
+            <div style="background:linear-gradient(135deg,#0891b2,#06b6d4); padding:14px 18px; color:#fff; display:flex; justify-content:space-between; align-items:center;">
+                <div style="font-weight:700; font-size:0.95rem;"><i class="bi bi-plus-slash-minus me-2"></i>Calculator</div>
+                <button onclick="document.getElementById('quickCalcModal').style.display='none'"
+                        style="background:rgba(255,255,255,0.2); border:none; color:#fff; width:28px; height:28px; border-radius:50%; font-size:1rem; cursor:pointer;">&times;</button>
+            </div>
+
+            <!-- Display -->
+            <div style="padding:12px 16px; background:#0f172a;">
+                <div id="calcExpr" style="font-size:0.72rem; color:#64748b; height:18px; text-align:right; overflow:hidden; white-space:nowrap;"></div>
+                <div id="calcDisplay" style="font-size:2rem; font-weight:700; color:#f1f5f9; text-align:right; line-height:1.2; min-height:42px; overflow:hidden; word-break:break-all;">0</div>
+            </div>
+
+            <!-- Memory Bar -->
+            <div style="padding:4px 8px; background:#1e293b; display:flex; gap:4px;">
+                <button class="qcMem" onclick="qcMemAction('MC')" title="Memory Clear">MC</button>
+                <button class="qcMem" onclick="qcMemAction('MR')" title="Memory Recall">MR</button>
+                <button class="qcMem" onclick="qcMemAction('M+')" title="Memory Add">M+</button>
+                <button class="qcMem" onclick="qcMemAction('M-')" title="Memory Subtract">M−</button>
+                <div id="calcMemInd" style="flex:1; text-align:right; font-size:0.6rem; color:#64748b; align-self:center;">
+                    <span id="calcMemLabel" style="display:none;">M</span>
+                </div>
+            </div>
+
+            <!-- Buttons Grid -->
+            <div style="padding:8px; background:#f1f5f9; display:grid; grid-template-columns:repeat(4,1fr); gap:6px;">
+                <!-- Row 1 -->
+                <button class="qcBtn qcFunc" onclick="qcAction('C')">C</button>
+                <button class="qcBtn qcFunc" onclick="qcAction('back')"><i class="bi bi-backspace"></i></button>
+                <button class="qcBtn qcFunc" onclick="qcAction('%')">%</button>
+                <button class="qcBtn qcOp" onclick="qcAction('/')">÷</button>
+                <!-- Row 2 -->
+                <button class="qcBtn qcNum" onclick="qcAction('7')">7</button>
+                <button class="qcBtn qcNum" onclick="qcAction('8')">8</button>
+                <button class="qcBtn qcNum" onclick="qcAction('9')">9</button>
+                <button class="qcBtn qcOp" onclick="qcAction('*')">×</button>
+                <!-- Row 3 -->
+                <button class="qcBtn qcNum" onclick="qcAction('4')">4</button>
+                <button class="qcBtn qcNum" onclick="qcAction('5')">5</button>
+                <button class="qcBtn qcNum" onclick="qcAction('6')">6</button>
+                <button class="qcBtn qcOp" onclick="qcAction('-')">−</button>
+                <!-- Row 4 -->
+                <button class="qcBtn qcNum" onclick="qcAction('1')">1</button>
+                <button class="qcBtn qcNum" onclick="qcAction('2')">2</button>
+                <button class="qcBtn qcNum" onclick="qcAction('3')">3</button>
+                <button class="qcBtn qcOp" onclick="qcAction('+')">+</button>
+                <!-- Row 5 -->
+                <button class="qcBtn qcFunc" onclick="qcAction('+-')">+/−</button>
+                <button class="qcBtn qcNum" onclick="qcAction('0')">0</button>
+                <button class="qcBtn qcNum" onclick="qcAction('.')">.</button>
+                <button class="qcBtn qcEq" onclick="qcAction('=')">=</button>
+            </div>
+
+            <!-- History (last 3 calculations) -->
+            <div id="calcHistory" style="padding:6px 12px; background:#f8fafc; border-top:1px solid #e2e8f0; max-height:70px; overflow-y:auto; display:none;">
+                <div style="font-size:0.6rem; color:#94a3b8; font-weight:600; margin-bottom:2px;">HISTORY</div>
+                <div id="calcHistList" style="font-size:0.7rem; color:#64748b;"></div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+    .qcBtn{border:none;border-radius:10px;padding:14px 0;font-size:1.15rem;font-weight:600;cursor:pointer;transition:all 0.1s;font-family:'Inter',sans-serif;}
+    .qcBtn:active{transform:scale(0.94);opacity:0.8;}
+    .qcNum{background:#fff;color:#0f172a;box-shadow:0 1px 3px rgba(0,0,0,0.08);}
+    .qcNum:hover{background:#e2e8f0;}
+    .qcFunc{background:#e2e8f0;color:#475569;}
+    .qcFunc:hover{background:#cbd5e1;}
+    .qcOp{background:#0891b2;color:#fff;font-size:1.3rem;}
+    .qcOp:hover{background:#0e7490;}
+    .qcEq{background:linear-gradient(135deg,#059669,#10b981);color:#fff;font-size:1.4rem;}
+    .qcEq:hover{background:linear-gradient(135deg,#047857,#059669);}
+    .qcMem{border:none;background:transparent;color:#94a3b8;font-size:0.68rem;font-weight:600;padding:4px 8px;border-radius:4px;cursor:pointer;font-family:'Inter',sans-serif;}
+    .qcMem:hover{background:rgba(255,255,255,0.1);color:#e2e8f0;}
+    </style>
+
+    <script>
+    (function(){
+        var expr='', current='0', op='', prev='', newNum=true, mem=0;
+        var history=[];
+
+        function disp(){ document.getElementById('calcDisplay').textContent=current; }
+        function exprDisp(t){ document.getElementById('calcExpr').textContent=t||''; }
+
+        function fmt(n){
+            if(n===''||n===undefined||n===null)return '0';
+            var num=parseFloat(n);
+            if(isNaN(num))return '0';
+            // Format with commas (Indian style for large numbers)
+            var s=num.toString();
+            if(s.length>12) s=num.toExponential(6);
+            return s;
+        }
+
+        function calc(a,o,b){
+            a=parseFloat(a);b=parseFloat(b);
+            if(isNaN(a)||isNaN(b))return b||a||0;
+            switch(o){
+                case'+':return a+b;
+                case'-':return a-b;
+                case'*':return a*b;
+                case'/':return b===0?'Error':a/b;
+                default:return b;
+            }
+        }
+
+        function addHist(expr,result){
+            history.unshift(expr+' = '+result);
+            if(history.length>5) history.pop();
+            var el=document.getElementById('calcHistList');
+            var hDiv=document.getElementById('calcHistory');
+            if(history.length>0){
+                hDiv.style.display='block';
+                el.innerHTML=history.map(function(h){return '<div>'+h+'</div>';}).join('');
+            }
+        }
+
+        window.qcAction=function(key){
+            if(key==='C'){
+                expr='';current='0';op='';prev='';newNum=true;
+                disp();exprDisp('');return;
+            }
+            if(key==='back'){
+                if(current.length>1) current=current.slice(0,-1);
+                else current='0';
+                disp();return;
+            }
+            if(key==='+-'){
+                if(current!=='0'&&current!=='Error'){
+                    current=current.charAt(0)==='-'?current.slice(1):'-'+current;
+                }
+                disp();return;
+            }
+            if(key==='%'){
+                var n=parseFloat(current);
+                if(!isNaN(n)){
+                    if(prev&&op){
+                        // X + Y% means X + (X*Y/100)
+                        current=fmt(parseFloat(prev)*n/100);
+                    } else {
+                        current=fmt(n/100);
+                    }
+                }
+                disp();return;
+            }
+            if('0123456789.'.indexOf(key)>=0){
+                if(newNum){current='';newNum=false;}
+                if(key==='.'&&current.indexOf('.')>=0)return;
+                if(key==='.'&&(current===''||current==='0'))current='0';
+                current+=key;
+                if(current.length>15)current=current.slice(0,15);
+                disp();return;
+            }
+            if('+-*/'.indexOf(key)>=0){
+                if(prev&&op&&!newNum){
+                    var r=calc(prev,op,current);
+                    if(r==='Error'){current='Error';disp();prev='';op='';return;}
+                    current=fmt(r);disp();
+                }
+                prev=current;op=key;newNum=true;
+                var opSymbol=key==='*'?'×':key==='/'?'÷':key;
+                exprDisp(prev+' '+opSymbol);
+                return;
+            }
+            if(key==='='){
+                if(prev&&op){
+                    var expression=prev+(op==='*'?' × ':op==='/'?' ÷ ':' '+op+' ')+current;
+                    var r=calc(prev,op,current);
+                    if(r==='Error'){current='Error';disp();addHist(expression,'Error');prev='';op='';return;}
+                    current=fmt(r);
+                    addHist(expression,current);
+                    exprDisp(expression+' =');
+                    prev='';op='';newNum=true;
+                    disp();
+                }
+                return;
+            }
+        };
+
+        window.qcMemAction=function(action){
+            var n=parseFloat(current)||0;
+            var label=document.getElementById('calcMemLabel');
+            switch(action){
+                case'MC':mem=0;label.style.display='none';break;
+                case'MR':current=fmt(mem);newNum=true;disp();break;
+                case'M+':mem+=n;label.style.display='inline';break;
+                case'M-':mem-=n;label.style.display='inline';break;
+            }
+        };
+
+        // Keyboard support when calculator is open
+        document.addEventListener('keydown',function(e){
+            var modal=document.getElementById('quickCalcModal');
+            if(!modal||modal.style.display==='none')return;
+            var k=e.key;
+            if('0123456789.+-*/'.indexOf(k)>=0){e.preventDefault();qcAction(k);}
+            else if(k==='Enter'||k==='='){e.preventDefault();qcAction('=');}
+            else if(k==='Backspace'){e.preventDefault();qcAction('back');}
+            else if(k==='Escape'){e.preventDefault();modal.style.display='none';}
+            else if(k==='Delete'||k==='c'||k==='C'){e.preventDefault();qcAction('C');}
+        });
+    })();
+    </script>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Sidebar Toggle -->
+    <script>
+        document.getElementById('sidebarToggle').addEventListener('click', function() {
+            document.getElementById('sidebar').classList.toggle('collapsed');
+            document.querySelector('.main-content').classList.toggle('expanded');
+        });
+    </script>
+
+    <!-- Clerk Session Monitor & Form Protection -->
+    {% if config.CLERK_PUBLISHABLE_KEY and not config.CLERK_PUBLISHABLE_KEY.startswith('pk_test_XXXX') %}
+    <script>
+    (function(){
+        // Track if user has modified any form (so we don't wipe their data)
+        var _formDirty = false;
+        document.addEventListener('input', function(e){
+            // Only mark dirty if the input is inside an actual <form> with a submit button
+            // (skip search boxes, filters, and other non-form inputs)
+            if(e.target && e.target.form && e.target.form.querySelector('button[type="submit"], input[type="submit"]')){
+                _formDirty = true;
+            }
+        }, true);
+        // Reset dirty flag when form is submitted (so no popup after saving)
+        document.addEventListener('submit', function(){ _formDirty = false; }, true);
+        // Warn before navigating away if form is dirty
+        window.addEventListener('beforeunload', function(e){
+            if(_formDirty){
+                e.preventDefault();
+                e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+                return e.returnValue;
+            }
+        });
+
+        // Give up waiting for Clerk after 30 attempts (30 seconds)
+        var attempts = 0;
+        var checkInterval = setInterval(function(){
+            attempts++;
+            if(attempts > 30){
+                clearInterval(checkInterval);
+                console.warn('Clerk JS did not load within 30s — continuing without session monitor');
+                return;
+            }
+            if(window.Clerk && window.Clerk.loaded){
+                clearInterval(checkInterval);
+
+                // Monitor session state — but DO NOT redirect on transient token refreshes.
+                // Only redirect if user is clearly signed out AND not editing a form.
+                // The server-side grace period (8h) will handle auth; we just keep the
+                // browser on the current page so form data isn't wiped.
+                var _signOutCheckTimer = null;
+                window.Clerk.addListener(function(){
+                    // Debounce: wait 5s to confirm sign-out is real, not a transient refresh
+                    if(_signOutCheckTimer) clearTimeout(_signOutCheckTimer);
+                    if(!window.Clerk.user){
+                        _signOutCheckTimer = setTimeout(function(){
+                            // Re-check after 5s. If still signed out AND form is clean, redirect.
+                            if(!window.Clerk.user && !_formDirty){
+                                window.location.href = '/login';
+                            } else if(!window.Clerk.user && _formDirty){
+                                // Form dirty — show warning banner instead of wiping data
+                                if(!document.getElementById('_clerkWarnBanner')){
+                                    var b = document.createElement('div');
+                                    b.id = '_clerkWarnBanner';
+                                    b.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#fbbf24;color:#78350f;padding:10px 16px;text-align:center;font-weight:600;font-size:0.85rem;z-index:99999;box-shadow:0 2px 8px rgba(0,0,0,0.15);';
+                                    b.innerHTML = '⚠ Your session expired. Please <a href="/login" style="color:#1e3a8a;text-decoration:underline;">re-login in a new tab</a> and then come back and submit your form. Your data is safe.';
+                                    document.body.appendChild(b);
+                                }
+                            }
+                        }, 5000);
+                    }
+                });
+
+                // ── FORM PROTECTION: Refresh Clerk token before any form submit ──
+                // Clerk JWTs expire every ~60 seconds. If a user spends more time
+                // filling a form, the JWT may be expired when they click Submit.
+                // This intercepts all form submissions, refreshes the token first,
+                // then submits the form with a fresh JWT cookie.
+                document.addEventListener('submit', function(e){
+                    var form = e.target;
+                    // Skip if already refreshed (prevent infinite loop)
+                    if(form.dataset.clerkRefreshed === 'true') return;
+                    // Only intercept POST forms (not GET search forms)
+                    if(form.method && form.method.toUpperCase() !== 'POST') return;
+
+                    e.preventDefault();
+
+                    // Try to get a fresh session token from Clerk
+                    if(window.Clerk.session && window.Clerk.session.getToken){
+                        window.Clerk.session.getToken().then(function(token){
+                            // Token refreshed — cookie updated automatically by Clerk
+                            form.dataset.clerkRefreshed = 'true';
+                            form.submit();
+                        }).catch(function(err){
+                            console.warn('Clerk token refresh failed:', err);
+                            // Submit anyway — server-side session fallback will handle it
+                            form.dataset.clerkRefreshed = 'true';
+                            form.submit();
+                        });
+                    } else {
+                        // No session — submit anyway (server handles redirect)
+                        form.dataset.clerkRefreshed = 'true';
+                        form.submit();
+                    }
+                }, true); // Use capture phase to intercept before other handlers
+            }
+        }, 1000);
+    })();
+    </script>
+    {% endif %}
+
+    <!-- Global EPF Delay Calculator Script -->
+    <script>
+    function gcDue(){
+        var wm=document.getElementById('gc_wage_month').value;
+        if(!wm){document.getElementById('gc_due_txt').textContent='—';return;}
+        var p=wm.split('-').map(Number),y=p[0],m=p[1]+1;
+        if(m>12){m=1;y++;}
+        var d=new Date(y,m-1,15);
+        document.getElementById('gc_due_txt').textContent=d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+        document.getElementById('gc_due_bar').style.display='flex';
+    }
+    function gcRun(){
+        var amt=parseFloat(document.getElementById('gc_epf_amt').value)||0;
+        var wm=document.getElementById('gc_wage_month').value;
+        var pd=document.getElementById('gc_pay_date').value;
+        var res=document.getElementById('gc_results');
+        var emp=document.getElementById('gc_empty');
+        var ontime=document.getElementById('gc_ontime');
+        var rows=['gc_int_row','gc_dmg_row','gc_pen_row','gc_grand_row'];
+        var dayBox=document.getElementById('gc_days').parentElement.parentElement;
+
+        if(!amt||!wm||!pd){res.style.display='none';emp.style.display='block';return;}
+
+        var p=wm.split('-').map(Number),y=p[0],m=p[1]+1;
+        if(m>12){m=1;y++;}
+        var due=new Date(y,m-1,15);
+        var pay=new Date(pd);
+        var diff=Math.max(0,Math.ceil((pay-due)/(864e5)));
+        var dm=diff>0?Math.ceil(diff/30):0;
+
+        res.style.display='block';emp.style.display='none';
+
+        if(diff<=0){
+            ontime.style.display='block';
+            dayBox.style.display='none';
+            rows.forEach(function(id){document.getElementById(id).style.display='none';});
+            return;
+        }
+
+        ontime.style.display='none';
+        dayBox.style.display='flex';
+        rows.forEach(function(id){document.getElementById(id).style.display='flex';});
+
+        var interest=Math.round((amt*12*diff)/(100*365));
+        var damages=Math.round(amt*1*dm/100);
+        var total=interest+damages;
+        var grand=amt+total;
+        var fmt=function(n){return '\u20B9'+n.toLocaleString('en-IN');};
+
+        document.getElementById('gc_days').textContent=diff+' days';
+        document.getElementById('gc_months').textContent=dm+' month(s)';
+        document.getElementById('gc_int_v').textContent=fmt(interest);
+        document.getElementById('gc_int_f').textContent=fmt(amt)+' \u00D7 12% \u00D7 '+diff+' / 365';
+        document.getElementById('gc_dmg_v').textContent=fmt(damages);
+        document.getElementById('gc_dmg_f').textContent=fmt(amt)+' \u00D7 1% \u00D7 '+dm+' month(s)';
+        document.getElementById('gc_pen_v').textContent=fmt(total);
+        document.getElementById('gc_grand_v').textContent=fmt(grand);
+    }
+    </script>
+
+    <!-- Keyboard Shortcuts — ONLY on Accounts section pages -->
+    {% if request.blueprint == 'accounts' %}
+    <script>
+    (function(){
+        // Shortcut bar HTML (fixed at bottom of screen)
+        var bar = document.createElement('div');
+        bar.className = 'no-print';
+        bar.id = 'shortcut_bar';
+        bar.style.cssText = 'position:fixed; bottom:0; left:0; right:0; background:#1e293b; color:#fff; padding:4px 16px; display:flex; align-items:center; gap:16px; font-size:0.62rem; z-index:9999; flex-wrap:wrap;';
+        bar.innerHTML =
+            '<span style="opacity:0.5;"><i class="bi bi-keyboard me-1"></i>Shortcuts:</span>' +
+            '<span><kbd style="background:#475569;border-radius:3px;padding:1px 5px;font-size:0.6rem;">Esc</kbd> Back</span>' +
+            '<span><kbd style="background:#475569;border-radius:3px;padding:1px 5px;font-size:0.6rem;">F2</kbd> Calculator</span>' +
+            '<span><kbd style="background:#475569;border-radius:3px;padding:1px 5px;font-size:0.6rem;">F5</kbd> Pay EPF/ESIC</span>' +
+            '<span><kbd style="background:#475569;border-radius:3px;padding:1px 5px;font-size:0.6rem;">F6</kbd> Client Payment</span>' +
+            '<span><kbd style="background:#475569;border-radius:3px;padding:1px 5px;font-size:0.6rem;">F7</kbd> Accounts Home</span>' +
+            '<span><kbd style="background:#475569;border-radius:3px;padding:1px 5px;font-size:0.6rem;">F8</kbd> Day Book</span>' +
+            '<span><kbd style="background:#475569;border-radius:3px;padding:1px 5px;font-size:0.6rem;">Ctrl+P</kbd> Print</span>';
+        document.body.appendChild(bar);
+
+        // Add bottom padding to page content so bar doesn't overlap
+        var pc = document.querySelector('.page-content');
+        if(pc) pc.style.paddingBottom = '36px';
+
+        document.addEventListener('keydown', function(e){
+            // Skip if user is typing in input/textarea/select
+            var tag = (e.target.tagName||'').toLowerCase();
+            if(tag === 'input' || tag === 'textarea' || tag === 'select'){
+                // Only Escape works inside inputs (to blur/go back)
+                if(e.key === 'Escape'){
+                    e.target.blur();
+                    return;
+                }
+                return;
+            }
+
+            switch(e.key){
+                case 'Escape':
+                    e.preventDefault();
+                    // Close any open modal first
+                    var modal = document.querySelector('.modal.show');
+                    if(modal){
+                        var bsModal = bootstrap.Modal.getInstance(modal);
+                        if(bsModal) bsModal.hide();
+                        return;
+                    }
+                    // Go back
+                    window.history.back();
+                    break;
+
+                case 'F2':
+                    e.preventDefault();
+                    // Open EPF Delay Calculator
+                    var calcModal = new bootstrap.Modal(document.getElementById('epfCalcGlobal'));
+                    calcModal.show();
+                    break;
+
+                case 'F5':
+                    e.preventDefault();
+                    window.location.href = '{{ url_for("accounts.payment_entry") }}';
+                    break;
+
+                case 'F6':
+                    e.preventDefault();
+                    window.location.href = '{{ url_for("accounts.client_payment") }}';
+                    break;
+
+                case 'F7':
+                    e.preventDefault();
+                    window.location.href = '{{ url_for("accounts.accounts_home") }}';
+                    break;
+
+                case 'F8':
+                    e.preventDefault();
+                    window.location.href = '{{ url_for("accounts.report_daybook") }}';
+                    break;
+            }
+        });
+    })();
+    </script>
+    {% endif %}
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}Import Establishments - Vaishnavi Consultant{% endblock %}
+{% block page_header %}Import Establishments{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb" style="font-size:0.85rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('establishment.establishment_list') }}" class="text-decoration-none">Establishments</a></li>
+        <li class="breadcrumb-item active">Import from Excel</li>
+    </ol>
+</nav>
+
+<div class="row g-4">
+    <!-- Step 1: Download Template -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div style="width:42px; height:42px; background:var(--primary-light); border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.2rem; color:var(--primary); font-weight:700;">
+                        1
+                    </div>
+                    <div>
+                        <h6 style="margin:0; font-weight:700;">Download Template</h6>
+                        <small style="color:var(--text-secondary);">Get the Excel template with correct columns</small>
+                    </div>
+                </div>
+
+                <p style="font-size:0.85rem; color:var(--text-secondary); line-height:1.7;">
+                    Download our import template, fill in your establishment data, and upload it back.
+                    The template has all the correct column headers and a sample row for reference.
+                </p>
+
+                <a href="{{ url_for('bulk.download_template') }}" class="btn btn-outline-primary">
+                    <i class="bi bi-download me-2"></i>Download Import Template (.xlsx)
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 2: Upload File -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div style="width:42px; height:42px; background:#d1fae5; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.2rem; color:var(--success); font-weight:700;">
+                        2
+                    </div>
+                    <div>
+                        <h6 style="margin:0; font-weight:700;">Upload Filled Excel</h6>
+                        <small style="color:var(--text-secondary);">Upload your file to import establishments</small>
+                    </div>
+                </div>
+
+                <form method="POST" enctype="multipart/form-data" id="importForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <div class="upload-area" id="uploadArea"
+                         style="border:2px dashed var(--border-color); border-radius:var(--radius); padding:32px; text-align:center; cursor:pointer; transition:all 0.2s; margin-bottom:16px;"
+                         onclick="document.getElementById('fileInput').click();">
+                        <i class="bi bi-cloud-arrow-up" style="font-size:2.5rem; color:var(--text-light); display:block; margin-bottom:8px;"></i>
+                        <p style="margin:0; font-weight:600; color:var(--text-primary);" id="fileName">
+                            Click to select Excel file
+                        </p>
+                        <small style="color:var(--text-light);">Supports .xlsx and .xls files</small>
+                    </div>
+
+                    <input type="file" name="file" id="fileInput" accept=".xlsx,.xls"
+                           style="display:none;" onchange="handleFileSelect(this)">
+
+                    <button type="submit" class="btn btn-primary w-100" id="importBtn" disabled>
+                        <i class="bi bi-upload me-2"></i>Import Establishments
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Instructions Card -->
+<div class="card mt-4">
+    <div class="card-header">
+        <i class="bi bi-info-circle text-primary me-2"></i>Import Guidelines
+    </div>
+    <div class="card-body">
+        <div class="row g-4">
+            <div class="col-md-6">
+                <h6 style="font-weight:700; font-size:0.85rem; color:var(--text-primary);">Supported Formats</h6>
+                <ul style="font-size:0.85rem; color:var(--text-secondary); padding-left:18px;">
+                    <li><strong>Template format</strong> — Our standard import template</li>
+                    <li><strong>Your existing Excel</strong> — System auto-detects columns like companyName, epfCodeNumber, etc.</li>
+                    <li>Both <code>.xlsx</code> and <code>.xls</code> files are supported</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6 style="font-weight:700; font-size:0.85rem; color:var(--text-primary);">Important Notes</h6>
+                <ul style="font-size:0.85rem; color:var(--text-secondary); padding-left:18px;">
+                    <li><strong>Company Name</strong> is the only required field</li>
+                    <li><strong>Duplicates</strong> are automatically skipped (matched by company name)</li>
+                    <li>Dates can be in DD-MM-YYYY or DD/MM/YYYY format</li>
+                    <li>PAN & GST are auto-converted to uppercase</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function handleFileSelect(input) {
+        var fileName = document.getElementById('fileName');
+        var importBtn = document.getElementById('importBtn');
+        var uploadArea = document.getElementById('uploadArea');
+
+        if (input.files && input.files[0]) {
+            fileName.textContent = input.files[0].name;
+            fileName.style.color = 'var(--primary)';
+            importBtn.disabled = false;
+            uploadArea.style.borderColor = 'var(--primary)';
+            uploadArea.style.background = 'var(--primary-light)';
+        } else {
+            fileName.textContent = 'Click to select Excel file';
+            fileName.style.color = '';
+            importBtn.disabled = true;
+            uploadArea.style.borderColor = '';
+            uploadArea.style.background = '';
+        }
+    }
+
+    // Drag and drop
+    var uploadArea = document.getElementById('uploadArea');
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        this.style.borderColor = 'var(--primary)';
+        this.style.background = 'var(--primary-light)';
+    });
+    uploadArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        this.style.borderColor = '';
+        this.style.background = '';
+    });
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        var fileInput = document.getElementById('fileInput');
+        fileInput.files = e.dataTransfer.files;
+        handleFileSelect(fileInput);
+    });
+</script>
+{% endblock %}

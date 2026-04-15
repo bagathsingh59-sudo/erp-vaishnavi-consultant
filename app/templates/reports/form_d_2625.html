@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Form D (26-25) - Attendance Register - {{ payroll.period_display }}{% endblock %}
+{% block page_header %}Form D (26-25) — Attendance Register{% endblock %}
+
+{% block content %}
+<style>
+    /* Force LANDSCAPE — explicit dimensions (width > height) across all browsers */
+    @page {
+        size: 14in 8.5in;         /* Legal landscape: 14" wide x 8.5" tall */
+        margin: 8mm;
+    }
+    @media print {
+        @page {
+            size: 14in 8.5in landscape;
+            margin: 8mm;
+        }
+        html, body {
+            width: 14in;
+            background: #fff !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .sidebar, .top-navbar, .no-print { display: none !important; }
+        .main-content { margin-left: 0 !important; padding: 0 !important; width: 100% !important; }
+        .page-content { padding: 0 !important; }
+        .fd-page {
+            box-shadow: none !important;
+            border: none !important;
+            margin: 0 !important;
+            padding: 8px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow: visible !important;
+        }
+        .fd-table { width: 100% !important; page-break-inside: auto; }
+        .fd-table th, .fd-table td { font-size: 7.5px !important; padding: 2px !important; }
+        .fd-table thead { display: table-header-group; }
+        .fd-table tr { page-break-inside: avoid; }
+    }
+    .fd-page { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:20px; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.1); overflow-x:auto; }
+    .fd-table { width:100%; border-collapse:collapse; font-size:0.7rem; }
+    .fd-table th { background:#e8e8e8; font-weight:700; padding:4px 3px; border:1px solid #94a3b8; text-align:center; font-size:0.65rem; vertical-align:middle; }
+    .fd-table td { padding:3px; border:1px solid #cbd5e1; text-align:center; vertical-align:middle; }
+    .fd-table .rest { background:#fce4ec; color:#c62828; font-weight:700; }
+    .fd-table .holiday { background:#c8e6c9; color:#1b5e20; font-weight:700; }
+    .fd-table .absent { color:#c62828; }
+    .fd-table .total-row { background:#ffff00; font-weight:700; }
+    .fd-table .total-row td { border-top:2px solid #1e293b; border-bottom:2px solid #1e293b; }
+    .fd-table .month-sep { border-left:3px solid #2E5090 !important; }
+</style>
+
+<div class="no-print mb-3 d-flex justify-content-between align-items-center">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb" style="font-size:0.85rem; margin:0;">
+            <li class="breadcrumb-item"><a href="{{ url_for('payroll.payroll_list') }}" class="text-decoration-none">Salary Processing</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('payroll.payroll_process', payroll_id=payroll.id) }}" class="text-decoration-none">{{ payroll.period_display }}</a></li>
+            <li class="breadcrumb-item active">Form D (26-25)</li>
+        </ol>
+    </nav>
+    <div class="d-flex gap-2">
+        <button onclick="window.history.back()" style="background:#e5e7eb; color:#333; border:none; padding:6px 16px; border-radius:6px; cursor:pointer; font-size:0.82rem;"><i class="bi bi-arrow-left me-1"></i> Back to Payroll</button>
+        <a href="{{ url_for('reports.form_d_2625_excel', payroll_id=payroll.id) }}" class="btn btn-success btn-sm">
+            <i class="bi bi-file-earmark-excel me-1"></i> Download Excel
+        </a>
+        <button onclick="window.print()" class="btn btn-primary btn-sm">
+            <i class="bi bi-printer me-1"></i> Print / PDF
+        </button>
+    </div>
+</div>
+
+<div class="no-print alert alert-warning py-2 px-3 mb-3" style="font-size:0.82rem;">
+    <i class="bi bi-info-circle-fill me-1"></i>
+    <strong>Printing / Save as PDF:</strong> Click <b>Print / PDF</b>, then in the print dialog set
+    <b>Layout = Landscape</b> and <b>Paper size = Legal</b> for the correct format.
+</div>
+
+{% set month_names = ['', 'January','February','March','April','May','June','July','August','September','October','November','December'] %}
+{% if payroll.month == 1 %}
+    {% set prev_month = 12 %}
+    {% set prev_year = payroll.year - 1 %}
+{% else %}
+    {% set prev_month = payroll.month - 1 %}
+    {% set prev_year = payroll.year %}
+{% endif %}
+{% set prev_month_name = month_names[prev_month] %}
+
+<div class="fd-page">
+    <!-- Title -->
+    <div style="text-align:center; margin-bottom:12px;">
+        <h3 style="font-size:1.1rem; font-weight:700; margin:0; letter-spacing:1px;">FORM D</h3>
+        <h4 style="font-size:0.95rem; font-weight:700; margin:2px 0;">FORMAT OF ATTENDANCE REGISTER (26-25 Cycle)</h4>
+    </div>
+
+    <!-- Establishment Info -->
+    <div style="font-size:0.78rem; margin-bottom:8px;">
+        <div style="display:flex; justify-content:space-between; flex-wrap:wrap;">
+            <div><strong>Name of Establishment:</strong> {{ est.company_name }}</div>
+            <div><strong>Name of Owner:</strong> {{ est.address or '' }}</div>
+            <div><strong>LIN</strong> _______________</div>
+        </div>
+        <div style="margin-top:4px;">
+            <strong>For the Period From</strong>
+            26.{{ "%02d"|format(prev_month) }}.{{ prev_year }}
+            <strong>To</strong>
+            25.{{ "%02d"|format(payroll.month) }}.{{ payroll.year }}
+        </div>
+    </div>
+
+    <!-- Table -->
+    <table class="fd-table">
+        <thead>
+            <tr>
+                <th rowspan="2" style="min-width:60px;">Emp.<br>Code</th>
+                <th rowspan="2" style="min-width:130px; text-align:left;">Name</th>
+                <th rowspan="2" style="min-width:70px;">Designation</th>
+                <th rowspan="2" style="min-width:65px;">Place of<br>Work</th>
+                {% for i in range(num_cols) %}
+                    <th class="{% if i in rest_indices %}rest{% elif i in holiday_indices %}holiday{% endif %}{% if date_list[i][2] == 1 %} month-sep{% endif %}"
+                        style="min-width:22px;"
+                        title="{{ "%02d"|format(date_list[i][2]) }}/{{ "%02d"|format(date_list[i][1]) }}/{{ date_list[i][0] }}">{{ date_list[i][2] }}</th>
+                {% endfor %}
+                <th rowspan="2" style="min-width:55px;">Summary<br>No. Of<br>Days</th>
+                <th rowspan="2" style="min-width:55px;">Remarks<br>No of<br>hours</th>
+                <th rowspan="2" style="min-width:80px;">Signature of<br>Register Keeper</th>
+            </tr>
+            <tr>
+                {% for i in range(num_cols) %}
+                <th style="font-size:0.55rem; color:#94a3b8;"></th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% set ns = namespace(t_days=0, t_hours=0) %}
+
+            {% for att in attendance %}
+            <tr>
+                <td style="font-size:0.7rem;">{{ att.emp.internal_emp_code if att.emp.use_internal_code and att.emp.internal_emp_code else att.emp.emp_code }}</td>
+                <td style="text-align:left; font-weight:600; white-space:nowrap;">{{ att.emp.name.upper() }}</td>
+                <td style="font-size:0.65rem;">{{ att.emp.designation or '' }}</td>
+                <td></td>
+
+                {% for i in range(num_cols) %}
+                    {% set mark = att.marks.get(i, '') %}
+                    <td class="{% if mark == 'R' %}rest{% elif mark == 'H' %}holiday{% elif mark == 'A' %}absent{% endif %}{% if date_list[i][2] == 1 %} month-sep{% endif %}">
+                        {{ mark }}
+                    </td>
+                {% endfor %}
+
+                <td style="font-weight:700;">{{ att.days_present|int }}</td>
+                <td>{{ att.hours }}</td>
+                <td></td>
+            </tr>
+            {% set ns.t_days = ns.t_days + att.days_present|int %}
+            {% set ns.t_hours = ns.t_hours + att.hours %}
+            {% endfor %}
+
+            <!-- Totals -->
+            <tr class="total-row">
+                <td colspan="4"></td>
+                {% for i in range(num_cols) %}
+                <td></td>
+                {% endfor %}
+                <td style="font-size:0.9rem;">{{ ns.t_days }}</td>
+                <td style="font-size:0.9rem;">{{ ns.t_hours }}</td>
+                <td></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Month indicator legend -->
+    <div style="margin-top:10px; font-size:0.7rem; color:#64748b; display:flex; gap:20px; align-items:center;">
+        <span><span style="display:inline-block; width:12px; height:12px; background:#fce4ec; border:1px solid #c62828; vertical-align:middle; margin-right:3px;"></span> R = Rest Day</span>
+        <span><span style="display:inline-block; width:12px; height:12px; background:#c8e6c9; border:1px solid #1b5e20; vertical-align:middle; margin-right:3px;"></span> H = Holiday</span>
+        <span><span style="display:inline-block; width:3px; height:12px; background:#2E5090; vertical-align:middle; margin-right:3px;"></span> Month Change ({{ prev_month_name[:3] }} &rarr; {{ month_names[payroll.month][:3] }})</span>
+    </div>
+
+    <div style="margin-top:16px; display:flex; justify-content:space-between; font-size:0.68rem; color:#94a3b8;">
+        <div>Generated: {{ generated_on }}</div>
+        <div>Vaishnavi Consultant</div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,610 @@
+{% extends "base.html" %}
+
+{% block title %}Monthly Statement to Client - {{ payroll.period_display }} - {{ est.company_name }}{% endblock %}
+{% block page_header %}Monthly Statement to Client{% endblock %}
+
+{% block content %}
+<style>
+    @page {
+        size: legal landscape;
+        margin: 8mm;
+    }
+    @media print {
+        .sidebar, .top-navbar, .no-print { display: none !important; }
+        .main-content { margin-left: 0 !important; padding: 0 !important; }
+        .page-content { padding: 0 !important; }
+        .stmt-page { box-shadow: none !important; border: none !important; margin: 0 !important; }
+        body { background: #fff !important; font-size: 11px !important; }
+        .stmt-table th, .stmt-table td { padding: 4px 6px !important; font-size: 10px !important; }
+        .page-break { page-break-before: always; }
+    }
+
+    .stmt-page {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 32px;
+        margin-bottom: 24px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .stmt-header {
+        text-align: center;
+        border-bottom: 2px solid #1e293b;
+        padding-bottom: 16px;
+        margin-bottom: 20px;
+    }
+    .stmt-firm-name {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #1e293b;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+    }
+    .stmt-firm-sub {
+        font-size: 0.75rem;
+        color: #64748b;
+        margin-top: 2px;
+    }
+    .stmt-title {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #4338ca;
+        margin-top: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .stmt-client-info {
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 16px;
+        font-size: 0.82rem;
+        color: #334155;
+    }
+    .stmt-client-info .label {
+        font-weight: 600;
+        color: #1e293b;
+        min-width: 80px;
+        display: inline-block;
+    }
+    .stmt-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.78rem;
+    }
+    .stmt-table th {
+        background: #f1f5f9;
+        color: #1e293b;
+        font-weight: 600;
+        padding: 6px 8px;
+        border: 1px solid #cbd5e1;
+        text-align: center;
+        white-space: nowrap;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+    }
+    .stmt-table td {
+        padding: 5px 8px;
+        border: 1px solid #e2e8f0;
+        white-space: nowrap;
+    }
+    .stmt-table .text-right { text-align: right; }
+    .stmt-table .text-center { text-align: center; }
+    .stmt-table .total-row {
+        background: #f8fafc;
+        font-weight: 700;
+        border-top: 2px solid #1e293b;
+    }
+    .stmt-table .total-row td {
+        border-bottom: 2px solid #1e293b;
+        padding: 8px;
+    }
+    .stmt-section {
+        margin-top: 28px;
+    }
+    .stmt-section-title {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #1e293b;
+        border-bottom: 1px solid #cbd5e1;
+        padding-bottom: 6px;
+        margin-bottom: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .summary-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+    }
+    .summary-box {
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        overflow: hidden;
+    }
+    .summary-box-header {
+        background: #f1f5f9;
+        padding: 8px 14px;
+        font-weight: 700;
+        font-size: 0.78rem;
+        color: #1e293b;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .summary-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8rem;
+    }
+    .summary-table td {
+        padding: 6px 14px;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .summary-table .label-col {
+        color: #475569;
+        width: 60%;
+    }
+    .summary-table .value-col {
+        text-align: right;
+        font-weight: 600;
+        color: #1e293b;
+    }
+    .summary-table .grand-total td {
+        border-top: 2px solid #1e293b;
+        font-weight: 700;
+        font-size: 0.85rem;
+        padding: 8px 14px;
+        background: #f8fafc;
+    }
+    .stmt-footer {
+        margin-top: 32px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.75rem;
+        color: #94a3b8;
+    }
+    .stmt-sign-area {
+        margin-top: 48px;
+        display: flex;
+        justify-content: space-between;
+    }
+    .stmt-sign-box {
+        text-align: center;
+        font-size: 0.78rem;
+        color: #475569;
+    }
+    .stmt-sign-box .sign-line {
+        border-top: 1px solid #94a3b8;
+        width: 180px;
+        margin: 0 auto 4px;
+    }
+</style>
+
+<!-- Print Button -->
+<div class="no-print mb-3 d-flex justify-content-between align-items-center">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb" style="font-size:0.85rem; margin:0;">
+            <li class="breadcrumb-item"><a href="{{ url_for('payroll.payroll_list') }}" class="text-decoration-none">Salary Processing</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('payroll.payroll_process', payroll_id=payroll.id) }}" class="text-decoration-none">{{ payroll.period_display }}</a></li>
+            <li class="breadcrumb-item active">Statement</li>
+        </ol>
+    </nav>
+    <div class="d-flex gap-2">
+        <button onclick="window.history.back()" style="background:#e5e7eb; color:#333; border:none; padding:6px 16px; border-radius:6px; cursor:pointer; font-size:0.82rem;"><i class="bi bi-arrow-left me-1"></i> Back to Payroll</button>
+        <button onclick="window.print()" class="btn btn-primary">
+            <i class="bi bi-printer me-1"></i> Print Statement
+        </button>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SALARY STATEMENT PAGE -->
+<!-- ============================================================ -->
+<div class="stmt-page">
+
+    <!-- HEADER: Firm & Client Details -->
+    <div class="stmt-header">
+        <div class="stmt-firm-name">Vaishnavi Consultant</div>
+        <div class="stmt-firm-sub">Compliance & Payroll Consultants</div>
+        <div class="stmt-title">Monthly Statement to Client</div>
+    </div>
+
+    <!-- CLIENT INFO -->
+    <div class="stmt-client-info">
+        <div style="flex:1;">
+            <div><span class="label">Client:</span> {{ est.company_name }}</div>
+            {% if est.address %}
+            <div><span class="label">Address:</span> {{ est.address }}</div>
+            {% endif %}
+            {% if est.contact_person %}
+            <div><span class="label">Contact:</span> {{ est.contact_person }}{% if est.contact_phone %} | {{ est.contact_phone }}{% endif %}</div>
+            {% endif %}
+        </div>
+        <div style="text-align:right;">
+            <div><span class="label">Period:</span> <strong>{{ payroll.period_display }}</strong></div>
+            <div><span class="label">Working Days:</span> {{ payroll.working_days }}</div>
+            {% if est.pf_code %}
+            <div><span class="label">PF Code:</span> {{ est.pf_code }}</div>
+            {% endif %}
+            {% if est.esic_code %}
+            <div><span class="label">ESIC Code:</span> {{ est.esic_code }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- EMPLOYEE-WISE SALARY STATEMENT TABLE -->
+    <!-- ============================================================ -->
+    <div style="overflow-x:auto;">
+        <table class="stmt-table">
+            <thead>
+                <tr>
+                    <th rowspan="2">Sl</th>
+                    <th rowspan="2" style="min-width:130px; text-align:left;">Employee Name</th>
+                    <th rowspan="2">UAN /<br>ESIC IP</th>
+                    <th colspan="3" style="background:#e0e7ff;">Attendance</th>
+                    {% for head in heads %}
+                    <th rowspan="2" title="{{ head.name }}">{{ head.short_code }}</th>
+                    {% endfor %}
+                    <th rowspan="2" style="background:#dcfce7;">Earned<br>Gross</th>
+                    {% if config.ot_applicable %}
+                    <th rowspan="2">OT</th>
+                    {% endif %}
+                    {% if config.epf_applicable %}
+                    <th rowspan="2" style="background:#fef3c7;">EPF<br>EE</th>
+                    {% endif %}
+                    {% if config.esic_applicable %}
+                    <th rowspan="2" style="background:#fef3c7;">ESIC<br>EE</th>
+                    {% endif %}
+                    {% if config.pt_applicable %}
+                    <th rowspan="2" style="background:#fef3c7;">PT</th>
+                    {% endif %}
+                    <th rowspan="2" style="background:#fef3c7;">Other<br>Ded</th>
+                    <th rowspan="2" style="background:#fef3c7;">Total<br>Ded</th>
+                    <th rowspan="2" style="background:#dcfce7;">Net<br>Pay</th>
+                </tr>
+                <tr>
+                    <th style="background:#e0e7ff; font-size:0.65rem;">Pres</th>
+                    <th style="background:#e0e7ff; font-size:0.65rem;">Abs</th>
+                    <th style="background:#e0e7ff; font-size:0.65rem;">Pay<br>Days</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set ns = namespace(
+                    t_present=0, t_absent=0, t_payable=0,
+                    t_earned=0, t_ot=0,
+                    t_epf_ee=0, t_esic_ee=0, t_pt=0, t_other_ded=0, t_total_ded=0, t_net=0
+                ) %}
+                {% set head_totals = {} %}
+
+                {% for entry in entries %}
+                <tr>
+                    <td class="text-center" style="color:#94a3b8;">{{ loop.index }}</td>
+                    <td style="text-align:left;">
+                        <div style="font-weight:600; font-size:0.78rem;">{{ entry.employee.name }}</div>
+                        {% if entry.employee.designation %}
+                        <div style="font-size:0.65rem; color:#94a3b8;">{{ entry.employee.designation }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="text-center" style="font-size:0.7rem; color:#64748b;">
+                        {% if entry.employee.uan_number %}{{ entry.employee.uan_number }}{% endif %}
+                        {% if entry.employee.uan_number and entry.employee.esic_ip_number %}<br>{% endif %}
+                        {% if entry.employee.esic_ip_number %}{{ entry.employee.esic_ip_number }}{% endif %}
+                        {% if not entry.employee.uan_number and not entry.employee.esic_ip_number %}---{% endif %}
+                    </td>
+                    <td class="text-center">{{ entry.days_present|int if entry.days_present == entry.days_present|int else entry.days_present }}</td>
+                    <td class="text-center">{{ entry.days_absent|int if entry.days_absent == entry.days_absent|int else entry.days_absent }}</td>
+                    <td class="text-center" style="font-weight:600;">{{ entry.total_payable_days|int if entry.total_payable_days == entry.total_payable_days|int else entry.total_payable_days }}</td>
+
+                    {# Head-wise earned amounts #}
+                    {% for head in heads %}
+                    <td class="text-right">
+                        {% if head.id in entry.head_amounts %}
+                            {{ "{:,.0f}".format(entry.head_amounts[head.id].earned_amount) }}
+                            {% if head_totals.update({head.id: (head_totals.get(head.id, 0) + entry.head_amounts[head.id].earned_amount)}) %}{% endif %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+
+                    <td class="text-right" style="font-weight:600; background:#f0fdf4;">{{ "{:,.0f}".format(entry.earned_gross) }}</td>
+                    {% if config.ot_applicable %}
+                    <td class="text-right">{{ "{:,.0f}".format(entry.ot_amount) }}</td>
+                    {% endif %}
+                    {% if config.epf_applicable %}
+                    <td class="text-right" style="color:#dc2626;">{{ "{:,.0f}".format(entry.epf_employee) }}</td>
+                    {% endif %}
+                    {% if config.esic_applicable %}
+                    <td class="text-right" style="color:#dc2626;">{{ "{:,.0f}".format(entry.esic_employee) }}</td>
+                    {% endif %}
+                    {% if config.pt_applicable %}
+                    <td class="text-right" style="color:#dc2626;">{{ "{:,.0f}".format(entry.professional_tax) }}</td>
+                    {% endif %}
+                    <td class="text-right">{{ "{:,.0f}".format(entry.other_deduction) if entry.other_deduction else "-" }}</td>
+                    <td class="text-right" style="font-weight:600; color:#dc2626;">{{ "{:,.0f}".format(entry.total_deductions) }}</td>
+                    <td class="text-right" style="font-weight:700; background:#f0fdf4;">{{ "{:,.0f}".format(entry.net_pay) }}</td>
+                </tr>
+                {% set ns.t_present = ns.t_present + entry.days_present %}
+                {% set ns.t_absent = ns.t_absent + entry.days_absent %}
+                {% set ns.t_payable = ns.t_payable + entry.total_payable_days %}
+                {% set ns.t_earned = ns.t_earned + entry.earned_gross %}
+                {% set ns.t_ot = ns.t_ot + entry.ot_amount %}
+                {% set ns.t_epf_ee = ns.t_epf_ee + entry.epf_employee %}
+                {% set ns.t_esic_ee = ns.t_esic_ee + entry.esic_employee %}
+                {% set ns.t_pt = ns.t_pt + entry.professional_tax %}
+                {% set ns.t_other_ded = ns.t_other_ded + entry.other_deduction %}
+                {% set ns.t_total_ded = ns.t_total_ded + entry.total_deductions %}
+                {% set ns.t_net = ns.t_net + entry.net_pay %}
+                {% endfor %}
+
+                <!-- TOTALS ROW -->
+                <tr class="total-row">
+                    <td></td>
+                    <td style="text-align:left; font-size:0.82rem;">TOTAL ({{ entries|length }} Employees)</td>
+                    <td></td>
+                    <td class="text-center">{{ ns.t_present|int if ns.t_present == ns.t_present|int else ns.t_present }}</td>
+                    <td class="text-center">{{ ns.t_absent|int if ns.t_absent == ns.t_absent|int else ns.t_absent }}</td>
+                    <td class="text-center">{{ ns.t_payable|int if ns.t_payable == ns.t_payable|int else ns.t_payable }}</td>
+                    {% for head in heads %}
+                    <td class="text-right">{{ "{:,.0f}".format(head_totals.get(head.id, 0)) }}</td>
+                    {% endfor %}
+                    <td class="text-right" style="background:#f0fdf4;">{{ "{:,.0f}".format(ns.t_earned) }}</td>
+                    {% if config.ot_applicable %}
+                    <td class="text-right">{{ "{:,.0f}".format(ns.t_ot) }}</td>
+                    {% endif %}
+                    {% if config.epf_applicable %}
+                    <td class="text-right" style="color:#dc2626;">{{ "{:,.0f}".format(ns.t_epf_ee) }}</td>
+                    {% endif %}
+                    {% if config.esic_applicable %}
+                    <td class="text-right" style="color:#dc2626;">{{ "{:,.0f}".format(ns.t_esic_ee) }}</td>
+                    {% endif %}
+                    {% if config.pt_applicable %}
+                    <td class="text-right" style="color:#dc2626;">{{ "{:,.0f}".format(ns.t_pt) }}</td>
+                    {% endif %}
+                    <td class="text-right">{{ "{:,.0f}".format(ns.t_other_ded) }}</td>
+                    <td class="text-right" style="color:#dc2626;">{{ "{:,.0f}".format(ns.t_total_ded) }}</td>
+                    <td class="text-right" style="background:#f0fdf4;">{{ "{:,.0f}".format(ns.t_net) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- FOOTER for statement page -->
+    <div class="stmt-footer" style="margin-top:24px;">
+        <div>Date: {{ generated_on }}</div>
+        <div>Vaishnavi Consultant</div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SUMMARY PAGE (separate page for printing — compact single page) -->
+<!-- ============================================================ -->
+<div class="stmt-page page-break" style="padding:14px 20px;">
+
+    <!-- Mini header -->
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #1e293b; padding-bottom:4px; margin-bottom:6px;">
+        <div>
+            <div style="font-size:0.85rem; font-weight:700; color:#1e293b; letter-spacing:0.5px; text-transform:uppercase;">Vaishnavi Consultant</div>
+            <div style="font-size:0.6rem; color:#64748b;">Compliance & Payroll Consultants</div>
+        </div>
+        <div style="text-align:right;">
+            <div style="font-size:0.75rem; font-weight:700; color:#1e293b;">{{ est.company_name }}</div>
+            <div style="font-size:0.65rem; color:#64748b;">{{ payroll.period_display }} | Working Days: {{ payroll.working_days }}</div>
+        </div>
+    </div>
+
+    <div style="text-align:center; margin-bottom:6px;">
+        <div style="font-size:0.78rem; font-weight:700; color:#4338ca; text-transform:uppercase; letter-spacing:0.5px;">Payroll Summary & Statutory Contributions</div>
+    </div>
+
+    <!-- PAYROLL SUMMARY — compact cards -->
+    <div style="font-size:0.68rem; font-weight:700; color:#1e293b; border-bottom:1px solid #cbd5e1; padding-bottom:2px; margin-bottom:5px; text-transform:uppercase;">
+        Payroll Summary
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:5px; margin-bottom:8px;">
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:4px; padding:4px; text-align:center;">
+            <div style="font-size:0.55rem; color:#64748b; text-transform:uppercase; font-weight:600;">Employees</div>
+            <div style="font-size:0.92rem; font-weight:700; color:#1e293b;">{{ entries|length }}</div>
+        </div>
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:4px; padding:4px; text-align:center;">
+            <div style="font-size:0.55rem; color:#64748b; text-transform:uppercase; font-weight:600;">Total Gross</div>
+            <div style="font-size:0.82rem; font-weight:700; color:#1e293b;">{{ "{:,.0f}".format(payroll.total_gross) }}</div>
+        </div>
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:4px; padding:4px; text-align:center;">
+            <div style="font-size:0.55rem; color:#64748b; text-transform:uppercase; font-weight:600;">Total Deductions</div>
+            <div style="font-size:0.82rem; font-weight:700; color:#dc2626;">{{ "{:,.0f}".format(ns.t_total_ded) }}</div>
+        </div>
+        <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:4px; padding:4px; text-align:center;">
+            <div style="font-size:0.55rem; color:#16a34a; text-transform:uppercase; font-weight:600;">Net Payable</div>
+            <div style="font-size:0.92rem; font-weight:700; color:#16a34a;">{{ "{:,.0f}".format(payroll.total_net_pay) }}</div>
+        </div>
+    </div>
+
+    <!-- EPF & ESIC side by side — compact -->
+    {% if config.epf_applicable or config.esic_applicable %}
+    <div style="font-size:0.68rem; font-weight:700; color:#1e293b; border-bottom:1px solid #cbd5e1; padding-bottom:2px; margin-bottom:5px; text-transform:uppercase;">
+        Statutory Contribution Details
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        {% if config.epf_applicable %}
+        <!-- EPF -->
+        <div style="border:1px solid #e2e8f0; border-radius:4px; overflow:hidden;">
+            <div style="background:#f1f5f9; padding:3px 8px; font-weight:700; font-size:0.66rem; color:#1e293b; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between;">
+                <span>EPF Payable Summary</span>
+                {% if est.pf_code %}<span style="font-weight:400; color:#64748b;">{{ est.pf_code }}</span>{% endif %}
+            </div>
+            <table style="width:100%; border-collapse:collapse; font-size:0.66rem;">
+                <tr style="background:#fefce8;">
+                    <td colspan="2" style="padding:1px 8px; font-weight:600; font-size:0.62rem;">A. Employee Share</td>
+                </tr>
+                <tr>
+                    <td style="padding:1px 8px 1px 14px; color:#475569;">EPF Contribution ({{ config.epf_employee_rate }}%)</td>
+                    <td style="padding:1px 8px; text-align:right; font-weight:600;">{{ "{:,.0f}".format(payroll.total_epf_employee) }}</td>
+                </tr>
+                <tr style="background:#fefce8;">
+                    <td colspan="2" style="padding:1px 8px; font-weight:600; font-size:0.62rem;">B. Employer Share</td>
+                </tr>
+                <tr>
+                    <td style="padding:1px 8px 1px 14px; color:#475569;">EPF A/c 01 ({{ config.epf_ac01_rate }}%)</td>
+                    <td style="padding:1px 8px; text-align:right; font-weight:600;">{{ "{:,.0f}".format(payroll.total_epf_ac01) }}</td>
+                </tr>
+                <tr>
+                    <td style="padding:1px 8px 1px 14px; color:#475569;">EPS A/c 10 ({{ config.epf_eps_rate }}%)</td>
+                    <td style="padding:1px 8px; text-align:right; font-weight:600;">{{ "{:,.0f}".format(payroll.total_epf_eps) }}</td>
+                </tr>
+                <tr>
+                    <td style="padding:1px 8px 1px 14px; color:#475569;">Admin ({{ config.epf_admin_rate }}%) <small style="color:#94a3b8;">min ₹{{ "{:,.0f}".format(config.epf_admin_min) }}</small></td>
+                    <td style="padding:1px 8px; text-align:right; font-weight:600;">
+                        {{ "{:,.0f}".format(payroll.total_epf_admin) }}
+                        {% if payroll.total_epf_admin == config.epf_admin_min %}<span style="font-size:0.55rem; color:#dc2626;"> (Min.)</span>{% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:1px 8px 1px 14px; color:#475569;">EDLI ({{ config.epf_edli_rate }}%)</td>
+                    <td style="padding:1px 8px; text-align:right; font-weight:600;">{{ "{:,.0f}".format(payroll.total_epf_edli) }}</td>
+                </tr>
+                <tr style="border-top:1px solid #e2e8f0;">
+                    <td style="padding:1px 8px 1px 14px; font-weight:600;">Total Employer (13%)</td>
+                    <td style="padding:1px 8px; text-align:right; font-weight:700;">{{ "{:,.0f}".format(payroll.total_epf_employer) }}</td>
+                </tr>
+                <tr style="background:#f8fafc; border-top:2px solid #1e293b;">
+                    <td style="padding:3px 8px; font-weight:700; font-size:0.68rem;">TOTAL EPF (A + B)</td>
+                    <td style="padding:3px 8px; text-align:right; font-weight:700; font-size:0.72rem;">{{ "{:,.0f}".format(payroll.total_epf_employee + payroll.total_epf_employer) }}</td>
+                </tr>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if config.esic_applicable %}
+        <!-- ESIC -->
+        <div style="border:1px solid #e2e8f0; border-radius:4px; overflow:hidden;">
+            <div style="background:#f1f5f9; padding:3px 8px; font-weight:700; font-size:0.66rem; color:#1e293b; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between;">
+                <span>ESIC Payable Summary</span>
+                {% if est.esic_code %}<span style="font-weight:400; color:#64748b;">{{ est.esic_code }}</span>{% endif %}
+            </div>
+            <table style="width:100%; border-collapse:collapse; font-size:0.66rem;">
+                <tr style="background:#fefce8;">
+                    <td colspan="2" style="padding:1px 8px; font-weight:600; font-size:0.62rem;">A. Employee Share</td>
+                </tr>
+                <tr>
+                    <td style="padding:1px 8px 1px 14px; color:#475569;">ESIC Employee ({{ config.esic_employee_rate }}%)</td>
+                    <td style="padding:1px 8px; text-align:right; font-weight:600;">{{ "{:,.0f}".format(payroll.total_esic_employee) }}</td>
+                </tr>
+                <tr style="background:#fefce8;">
+                    <td colspan="2" style="padding:1px 8px; font-weight:600; font-size:0.62rem;">B. Employer Share</td>
+                </tr>
+                <tr>
+                    <td style="padding:1px 8px 1px 14px; color:#475569;">ESIC Employer ({{ config.esic_employer_rate }}%)</td>
+                    <td style="padding:1px 8px; text-align:right; font-weight:600;">{{ "{:,.0f}".format(payroll.total_esic_employer) }}</td>
+                </tr>
+                <tr style="background:#f8fafc; border-top:2px solid #1e293b;">
+                    <td style="padding:3px 8px; font-weight:700; font-size:0.68rem;">TOTAL ESIC (A + B)</td>
+                    <td style="padding:3px 8px; text-align:right; font-weight:700; font-size:0.72rem;">{{ "{:,.0f}".format(payroll.total_esic_employee + payroll.total_esic_employer) }}</td>
+                </tr>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Monthly Compliance & Fee Payable -->
+    {% set total_epf_payable = (payroll.total_epf_employee + payroll.total_epf_employer) if config.epf_applicable else 0 %}
+    {% set total_esic_payable = (payroll.total_esic_employee + payroll.total_esic_employer) if config.esic_applicable else 0 %}
+    {% set total_pt_payable = payroll.total_pt if config.pt_applicable else 0 %}
+    {% set professional_fee = est.fee_amount if est.fee_amount else 0 %}
+    {% set other_charges = payroll.other_charges_amount if payroll.other_charges_amount else 0 %}
+    {% set epf_interest = payroll.epf_interest_14b if payroll.epf_interest_14b else 0 %}
+    {% set epf_damages = payroll.epf_damages_7q if payroll.epf_damages_7q else 0 %}
+    {% set epf_penalty = epf_interest + epf_damages %}
+    {% set total_payable = total_epf_payable + total_esic_payable + total_pt_payable + professional_fee + other_charges + epf_penalty %}
+
+    <div style="margin-top:8px; border:2px solid #1e293b; border-radius:5px; overflow:hidden;">
+        <div style="background:#1e293b; color:#fff; padding:4px 10px; font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">
+            Monthly Compliance & Fee Payable
+        </div>
+        <div style="padding:4px 10px;">
+            <table style="width:100%; border-collapse:collapse; font-size:0.72rem;">
+                {% if config.epf_applicable %}
+                <tr>
+                    <td style="padding:3px 6px; color:#475569;">Total EPF Payable (Employee + Employer)</td>
+                    <td style="padding:3px 6px; text-align:right; font-weight:600; color:#1e293b;">₹{{ "{:,.0f}".format(total_epf_payable) }}</td>
+                </tr>
+                {% endif %}
+                {% if config.esic_applicable %}
+                <tr>
+                    <td style="padding:3px 6px; color:#475569;">Total ESIC Payable (Employee + Employer)</td>
+                    <td style="padding:3px 6px; text-align:right; font-weight:600; color:#1e293b;">₹{{ "{:,.0f}".format(total_esic_payable) }}</td>
+                </tr>
+                {% endif %}
+                {% if config.pt_applicable %}
+                <tr>
+                    <td style="padding:3px 6px; color:#475569;">Total Professional Tax</td>
+                    <td style="padding:3px 6px; text-align:right; font-weight:600; color:#1e293b;">₹{{ "{:,.0f}".format(total_pt_payable) }}</td>
+                </tr>
+                {% endif %}
+                {% if epf_penalty > 0 %}
+                <tr style="background:#fef2f2;">
+                    <td style="padding:3px 6px; color:#991b1b; font-weight:600;">
+                        <i style="font-size:0.6rem;">⚠</i> EPF Late Payment Charges
+                        <span style="font-size:0.58rem; color:#dc2626; font-weight:400; margin-left:4px;">
+                            (Paid {{ payroll.epf_payment_date.strftime('%d-%m-%Y') if payroll.epf_payment_date else '' }} — {{ payroll.epf_delay_days }} days delayed)
+                        </span>
+                    </td>
+                    <td style="padding:3px 6px; text-align:right; font-weight:700; color:#dc2626;">₹{{ "{:,.0f}".format(epf_penalty) }}</td>
+                </tr>
+                <tr style="background:#fef2f2;">
+                    <td style="padding:1px 6px 1px 20px; font-size:0.6rem; color:#b91c1c;">
+                        Interest u/s 7Q: ₹{{ "{:,.0f}".format(epf_interest) }} | Damages u/s 14B: ₹{{ "{:,.0f}".format(epf_damages) }}
+                    </td>
+                    <td></td>
+                </tr>
+                {% endif %}
+                {% if professional_fee %}
+                <tr>
+                    <td style="padding:3px 6px; color:#475569; font-weight:600;">
+                        Consultancy / Professional Fee
+                        <span style="font-size:0.6rem; color:#94a3b8; font-weight:400; margin-left:4px;">({{ est.fee_type or 'Monthly' }})</span>
+                    </td>
+                    <td style="padding:3px 6px; text-align:right; font-weight:600; color:#1e293b;">₹{{ "{:,.0f}".format(professional_fee) }}</td>
+                </tr>
+                {% endif %}
+                {% if other_charges > 0 %}
+                <tr>
+                    <td style="padding:3px 6px; color:#475569; font-weight:600;">
+                        {{ payroll.other_charges_description or 'Other Charges' }}
+                        <span style="font-size:0.6rem; color:#94a3b8; font-weight:400; margin-left:4px;">(Other Income)</span>
+                    </td>
+                    <td style="padding:3px 6px; text-align:right; font-weight:600; color:#1e293b;">₹{{ "{:,.0f}".format(other_charges) }}</td>
+                </tr>
+                {% endif %}
+                <tr style="border-top:3px solid #1e293b; background:#f0fdf4;">
+                    <td style="padding:8px 6px; font-weight:800; font-size:1rem; color:#1e293b; text-transform:uppercase;">Total Payable</td>
+                    <td style="padding:8px 6px; text-align:right; font-weight:800; font-size:1.4rem; color:#1e293b;">₹{{ "{:,.0f}".format(total_payable) }}</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- SIGNATURE AREA — compact -->
+    <div style="margin-top:18px; display:flex; justify-content:space-between;">
+        <div style="text-align:center; font-size:0.68rem; color:#475569;">
+            <div style="border-top:1px solid #94a3b8; width:140px; margin:0 auto 2px;"></div>
+            <div>Prepared By</div>
+            <div style="font-size:0.58rem; color:#94a3b8;">Vaishnavi Consultant</div>
+        </div>
+        <div style="text-align:center; font-size:0.68rem; color:#475569;">
+            <div style="border-top:1px solid #94a3b8; width:140px; margin:0 auto 2px;"></div>
+            <div>Verified By</div>
+            <div style="font-size:0.58rem; color:#94a3b8;">{{ est.company_name }}</div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div style="margin-top:8px; display:flex; justify-content:space-between; font-size:0.62rem; color:#94a3b8;">
+        <div>Date: {{ generated_on }}</div>
+        <div>Vaishnavi Consultant | Confidential</div>
+    </div>
+</div>
+{% endblock %}

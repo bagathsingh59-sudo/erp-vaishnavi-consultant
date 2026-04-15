@@ -1,0 +1,541 @@
+{% extends "base.html" %}
+
+{% set tab_config = {
+    'payroll':       {'icon': 'bi-calculator',          'title': 'Salary Processing',       'subtitle': 'Create & Process Monthly Payrolls'},
+    'payslips':      {'icon': 'bi-receipt',              'title': 'Pay Slips',               'subtitle': 'Generate & Download Employee Pay Slips'},
+    'epf':           {'icon': 'bi-shield-check',         'title': 'EPF Returns',             'subtitle': 'EPF ECR Text / CSV for Portal Upload'},
+    'esic':          {'icon': 'bi-hospital',             'title': 'ESIC Returns',            'subtitle': 'ESIC MC Template for Portal Upload'},
+    'reports':       {'icon': 'bi-file-earmark-bar-graph','title': 'Reports & Downloads',    'subtitle': 'Salary Statement, Form B, Attendance Register'},
+    'compliance':    {'icon': 'bi-clipboard-data',       'title': 'Compliance Statement',    'subtitle': 'Monthly & Annual EPF/ESIC Compliance'},
+    'reimbursement': {'icon': 'bi-envelope-paper',       'title': 'Reimbursement',           'subtitle': 'EPF/ESIC Employer Share Reimbursement Letter'},
+} %}
+
+{% set current = tab_config.get(active_tab, tab_config['payroll']) %}
+
+{% block title %}{{ current.title }} - Vaishnavi Consultant{% endblock %}
+{% block page_header %}{{ current.title }}{% endblock %}
+
+{% block content %}
+
+<!-- Page Header Card -->
+<div class="card border-0 mb-4" style="border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+    <div class="card-body py-3 px-4">
+        <div class="row align-items-center">
+            <div class="col-md-5">
+                <h5 class="mb-1" style="font-weight: 700; color: #1e293b;">
+                    <i class="bi {{ current.icon }} text-primary me-2"></i>{{ current.title }}
+                </h5>
+                <p class="mb-0" style="font-size: 0.8rem; color: #64748b;">{{ current.subtitle }}</p>
+            </div>
+            <div class="col-md-7">
+                <div class="d-flex gap-2 align-items-center justify-content-md-end mt-2 mt-md-0 flex-wrap">
+                    <!-- Financial Year Filter -->
+                    <div class="btn-group btn-group-sm">
+                        {% for fy in [selected_fy - 1, selected_fy, selected_fy + 1] %}
+                        <a href="{{ url_for('payroll.payroll_list', fy=fy, tab=active_tab) }}"
+                           class="btn {% if fy == selected_fy %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="font-size: 0.72rem; white-space: nowrap;">
+                            FY {{ fy }}-{{ (fy + 1)|string }}
+                        </a>
+                        {% endfor %}
+                    </div>
+
+                    <span class="badge bg-primary bg-opacity-10 text-primary" style="font-size: 0.75rem; padding: 5px 10px;">
+                        {{ fy_display }} <span style="opacity: 0.7;">(Apr {{ selected_fy }} — Mar {{ selected_fy + 1 }})</span>
+                    </span>
+
+                    {% if active_tab == 'payroll' %}
+                    <a href="{{ url_for('payroll.payroll_create') }}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-plus-lg me-1"></i>New Payroll
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if payrolls %}
+
+    <!-- ==================== SALARY PROCESSING TAB ==================== -->
+    {% if active_tab == 'payroll' %}
+    <div class="card border-0" style="border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0" style="font-size: 0.82rem;">
+                    <thead style="background: #f8fafc;">
+                        <tr>
+                            <th>#</th>
+                            <th>Period</th>
+                            <th>Establishment</th>
+                            <th class="text-center">Employees</th>
+                            <th class="text-end">Gross</th>
+                            <th class="text-end">EPF (EE)</th>
+                            <th class="text-end">ESIC (EE)</th>
+                            <th class="text-end">Net Pay</th>
+                            <th class="text-center">Status</th>
+                            <th class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in payrolls %}
+                        <tr>
+                            <td class="text-muted">{{ loop.index }}</td>
+                            <td class="fw-semibold">{{ p.period_display }}</td>
+                            <td style="font-size: 0.8rem; color: #64748b;">{{ p.establishment.company_name }}</td>
+                            <td class="text-center"><span class="badge bg-primary bg-opacity-10 text-primary">{{ p.total_employees }}</span></td>
+                            <td class="text-end fw-semibold">{{ "₹{:,.0f}".format(p.total_gross) }}</td>
+                            <td class="text-end">{{ "₹{:,.0f}".format(p.total_epf_employee) }}</td>
+                            <td class="text-end">{{ "₹{:,.0f}".format(p.total_esic_employee) }}</td>
+                            <td class="text-end fw-bold" style="color: #059669;">{{ "₹{:,.0f}".format(p.total_net_pay) }}</td>
+                            <td class="text-center">
+                                {% if p.status == 'finalized' %}
+                                    <span class="badge bg-success" style="font-size: 0.68rem;">Finalized</span>
+                                {% elif p.status == 'processing' %}
+                                    <span class="badge bg-warning text-dark" style="font-size: 0.68rem;">Processing</span>
+                                {% else %}
+                                    <span class="badge bg-secondary" style="font-size: 0.68rem;">Draft</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div class="d-flex gap-1 justify-content-center">
+                                    <a href="{{ url_for('payroll.payroll_process', payroll_id=p.id) }}" class="btn btn-sm btn-outline-primary" style="font-size: 0.7rem; padding: 2px 8px;" title="Open">
+                                        <i class="bi bi-box-arrow-up-right"></i> Open
+                                    </a>
+                                    {% if p.status in ['processing', 'finalized'] %}
+                                    <a href="{{ url_for('payroll.payroll_statement', payroll_id=p.id) }}" class="btn btn-sm btn-outline-secondary" style="font-size: 0.7rem; padding: 2px 8px;" title="Statement" target="_blank">
+                                        <i class="bi bi-file-text"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% if p.status in ['draft', 'processing'] %}
+                                    <form method="POST" action="{{ url_for('payroll.payroll_delete', payroll_id=p.id) }}" style="display:inline;">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" style="font-size: 0.7rem; padding: 2px 8px;" title="Delete"
+                                                onclick="return confirm('Delete payroll for {{ p.period_display }}?')">
+                                            <i class="bi bi-trash3"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== PAY SLIPS TAB ==================== -->
+    {% elif active_tab == 'payslips' %}
+    <div class="row g-3">
+        {% for p in payrolls %}
+        {% if p.status in ['processing', 'finalized'] %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 h-100" style="border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h6 class="mb-0 fw-bold" style="color: #1e293b;">{{ p.period_display }}</h6>
+                        {% if p.status == 'finalized' %}
+                            <span class="badge bg-success" style="font-size: 0.65rem;">Finalized</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark" style="font-size: 0.65rem;">{{ p.status|capitalize }}</span>
+                        {% endif %}
+                    </div>
+                    <div style="font-size: 0.78rem; color: #64748b; margin-bottom: 10px;">
+                        <span class="me-3"><i class="bi bi-people me-1"></i>{{ p.total_employees }} employees</span>
+                        <span><i class="bi bi-currency-rupee me-1"></i>Net: {{ "₹{:,.0f}".format(p.total_net_pay) }}</span>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a href="{{ url_for('reports.payslip_form_xix', payroll_id=p.id) }}" class="btn btn-sm btn-outline-primary flex-fill" target="_blank">
+                            <i class="bi bi-file-earmark-ruled me-1"></i>Form XIX
+                        </a>
+                        <a href="{{ url_for('reports.payslip_professional', payroll_id=p.id) }}" class="btn btn-sm btn-primary flex-fill" target="_blank">
+                            <i class="bi bi-file-richtext me-1"></i>Professional
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    <!-- ==================== EPF RETURNS TAB ==================== -->
+    {% elif active_tab == 'epf' %}
+    <div class="row g-3">
+        {% for p in payrolls %}
+        {% if p.status in ['processing', 'finalized'] %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 h-100" style="border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border-left: 4px solid #2563eb;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h6 class="mb-0 fw-bold" style="color: #1e293b;">{{ p.period_display }}</h6>
+                        {% if p.status == 'finalized' %}
+                            <span class="badge bg-success" style="font-size: 0.65rem;">Finalized</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark" style="font-size: 0.65rem;">{{ p.status|capitalize }}</span>
+                        {% endif %}
+                    </div>
+                    <div style="font-size: 0.78rem; color: #64748b; margin-bottom: 6px;">
+                        <div class="row g-1">
+                            <div class="col-6"><span class="text-muted">EE (12%):</span> <strong>{{ "₹{:,.0f}".format(p.total_epf_employee) }}</strong></div>
+                            <div class="col-6"><span class="text-muted">ER Total:</span> <strong>{{ "₹{:,.0f}".format(p.total_epf_employer) }}</strong></div>
+                        </div>
+                        <div class="mt-1">
+                            <span class="text-muted">Total EPF:</span>
+                            <strong style="color: #2563eb; font-size: 0.9rem;">{{ "₹{:,.0f}".format(p.total_epf_employee + p.total_epf_employer) }}</strong>
+                        </div>
+                    </div>
+                    <hr style="margin: 8px 0;">
+                    <div class="d-flex gap-2">
+                        <a href="{{ url_for('reports.epf_ecr_view', payroll_id=p.id) }}" class="btn btn-sm btn-outline-secondary flex-fill" target="_blank">
+                            <i class="bi bi-eye me-1"></i>View
+                        </a>
+                        <a href="{{ url_for('reports.epf_ecr_text', payroll_id=p.id) }}" class="btn btn-sm btn-outline-primary flex-fill">
+                            <i class="bi bi-file-earmark-text me-1"></i>Text
+                        </a>
+                        <a href="{{ url_for('reports.epf_ecr_csv', payroll_id=p.id) }}" class="btn btn-sm btn-success flex-fill">
+                            <i class="bi bi-filetype-csv me-1"></i>CSV
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    <!-- ==================== ESIC RETURNS TAB ==================== -->
+    {% elif active_tab == 'esic' %}
+    <div class="row g-3">
+        {% for p in payrolls %}
+        {% if p.status in ['processing', 'finalized'] %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 h-100" style="border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border-left: 4px solid #059669;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h6 class="mb-0 fw-bold" style="color: #1e293b;">{{ p.period_display }}</h6>
+                        {% if p.status == 'finalized' %}
+                            <span class="badge bg-success" style="font-size: 0.65rem;">Finalized</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark" style="font-size: 0.65rem;">{{ p.status|capitalize }}</span>
+                        {% endif %}
+                    </div>
+                    <div style="font-size: 0.78rem; color: #64748b; margin-bottom: 6px;">
+                        <div class="row g-1">
+                            <div class="col-6"><span class="text-muted">EE (0.75%):</span> <strong>{{ "₹{:,.0f}".format(p.total_esic_employee) }}</strong></div>
+                            <div class="col-6"><span class="text-muted">ER (3.25%):</span> <strong>{{ "₹{:,.0f}".format(p.total_esic_employer) }}</strong></div>
+                        </div>
+                        <div class="mt-1">
+                            <span class="text-muted">Total ESIC:</span>
+                            <strong style="color: #059669; font-size: 0.9rem;">{{ "₹{:,.0f}".format(p.total_esic_employee + p.total_esic_employer) }}</strong>
+                        </div>
+                    </div>
+                    <hr style="margin: 8px 0;">
+                    <div class="d-flex gap-2">
+                        <a href="{{ url_for('reports.esic_view', payroll_id=p.id) }}" class="btn btn-sm btn-outline-secondary flex-fill" target="_blank">
+                            <i class="bi bi-eye me-1"></i>View
+                        </a>
+                        <a href="{{ url_for('reports.esic_excel', payroll_id=p.id) }}" class="btn btn-sm btn-success flex-fill">
+                            <i class="bi bi-file-earmark-excel me-1"></i>Download MC Template
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    <!-- ==================== REPORTS TAB ==================== -->
+    {% elif active_tab == 'reports' %}
+    <div class="row g-3">
+        {% for p in payrolls %}
+        {% if p.status in ['processing', 'finalized'] %}
+        <div class="col-12">
+            <div class="card border-0" style="border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+                <div class="card-body py-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h6 class="mb-0 fw-bold" style="color: #1e293b;">
+                                <i class="bi bi-calendar3 text-primary me-2"></i>{{ p.period_display }}
+                            </h6>
+                            <span style="font-size: 0.72rem; color: #64748b;">{{ p.total_employees }} employees | Gross: {{ "₹{:,.0f}".format(p.total_gross) }} | Net: {{ "₹{:,.0f}".format(p.total_net_pay) }}</span>
+                        </div>
+                        {% if p.status == 'finalized' %}
+                            <span class="badge bg-success">Finalized</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark">{{ p.status|capitalize }}</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="row g-2">
+                        <!-- Monthly Statement & Salary Registers -->
+                        <div class="col-md-4">
+                            <div style="padding: 10px; background: #f8fafc; border-radius: 8px;">
+                                <div style="font-size: 0.7rem; font-weight: 600; color: #64748b; text-transform: uppercase; margin-bottom: 6px;">
+                                    <i class="bi bi-file-earmark-text me-1"></i>Statements & Registers
+                                </div>
+                                <div class="d-flex gap-1 flex-wrap">
+                                    <a href="{{ url_for('payroll.payroll_statement', payroll_id=p.id) }}" class="btn btn-sm btn-outline-primary" target="_blank" style="font-size: 0.7rem;">
+                                        Monthly Statement
+                                    </a>
+                                    <a href="{{ url_for('reports.statement_format2', payroll_id=p.id) }}" class="btn btn-sm btn-outline-secondary" target="_blank" style="font-size: 0.7rem;">
+                                        Register F2
+                                    </a>
+                                    <a href="{{ url_for('reports.statement_format3', payroll_id=p.id) }}" class="btn btn-sm btn-outline-secondary" target="_blank" style="font-size: 0.7rem;">
+                                        Register F3
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Form B (Wage Register) -->
+                        <div class="col-md-4">
+                            <div style="padding: 10px; background: #f8fafc; border-radius: 8px;">
+                                <div style="font-size: 0.7rem; font-weight: 600; color: #64748b; text-transform: uppercase; margin-bottom: 6px;">
+                                    <i class="bi bi-file-earmark-ruled me-1"></i>Form B (Wage Register)
+                                </div>
+                                <div class="d-flex gap-1 flex-wrap">
+                                    <a href="{{ url_for('reports.form_b_view', payroll_id=p.id) }}" class="btn btn-sm btn-outline-secondary" target="_blank" style="font-size: 0.7rem;">
+                                        <i class="bi bi-eye me-1"></i>View
+                                    </a>
+                                    <a href="{{ url_for('reports.form_b_excel', payroll_id=p.id) }}" class="btn btn-sm btn-success" style="font-size: 0.7rem;">
+                                        <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Attendance Register -->
+                        <div class="col-md-4">
+                            <div style="padding: 10px; background: #f8fafc; border-radius: 8px;">
+                                <div style="font-size: 0.7rem; font-weight: 600; color: #64748b; text-transform: uppercase; margin-bottom: 6px;">
+                                    <i class="bi bi-calendar-check me-1"></i>Attendance Register
+                                </div>
+                                <div class="d-flex gap-1 flex-wrap">
+                                    <a href="{{ url_for('reports.attendance_view', payroll_id=p.id) }}" class="btn btn-sm btn-outline-secondary" target="_blank" style="font-size: 0.7rem;">
+                                        Professional
+                                    </a>
+                                    <a href="{{ url_for('reports.form_d_view', payroll_id=p.id) }}" class="btn btn-sm btn-outline-secondary" target="_blank" style="font-size: 0.7rem;">
+                                        Form D
+                                    </a>
+                                    <a href="{{ url_for('reports.form_d_2625_view', payroll_id=p.id) }}" class="btn btn-sm btn-outline-secondary" target="_blank" style="font-size: 0.7rem;">
+                                        D (26-25)
+                                    </a>
+                                    <a href="{{ url_for('reports.attendance_excel', payroll_id=p.id) }}" class="btn btn-sm btn-success" style="font-size: 0.7rem;">
+                                        <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    <!-- ==================== COMPLIANCE TAB ==================== -->
+    {% elif active_tab == 'compliance' %}
+
+    <!-- Annual Statement Button -->
+    {% if payrolls|length > 0 %}
+    <div class="mb-3">
+        <a href="{{ url_for('reports.compliance_annual', est_id=payrolls[0].establishment.id) }}" class="btn btn-primary" target="_blank">
+            <i class="bi bi-calendar-range me-1"></i>Generate Annual Compliance Statement
+        </a>
+    </div>
+    {% endif %}
+
+    <div class="row g-3">
+        {% for p in payrolls %}
+        {% if p.status in ['processing', 'finalized'] %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 h-100" style="border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border-left: 4px solid #7c3aed;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h6 class="mb-0 fw-bold" style="color: #1e293b;">{{ p.period_display }}</h6>
+                        {% if p.status == 'finalized' %}
+                            <span class="badge bg-success" style="font-size: 0.65rem;">Finalized</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark" style="font-size: 0.65rem;">{{ p.status|capitalize }}</span>
+                        {% endif %}
+                    </div>
+                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 8px;">
+                        <div>EPF: {{ "₹{:,.0f}".format(p.total_epf_employee + p.total_epf_employer) }} | ESIC: {{ "₹{:,.0f}".format(p.total_esic_employee + p.total_esic_employer) }}</div>
+                    </div>
+                    <a href="{{ url_for('reports.compliance_monthly', payroll_id=p.id) }}" class="btn btn-sm btn-primary w-100" target="_blank">
+                        <i class="bi bi-clipboard-data me-1"></i>Monthly Statement
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    <!-- ==================== REIMBURSEMENT TAB ==================== -->
+    {% elif active_tab == 'reimbursement' %}
+
+    <!-- Single Month Download -->
+    <h6 class="mb-3" style="font-weight: 600; color: #334155;">
+        <i class="bi bi-calendar3 text-warning me-2"></i>Single Month Reimbursement
+    </h6>
+    <div class="row g-3 mb-4">
+        {% for p in payrolls %}
+        {% if p.status in ['processing', 'finalized'] %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 h-100" style="border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border-left: 4px solid #d97706;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h6 class="mb-0 fw-bold" style="color: #1e293b;">{{ p.period_display }}</h6>
+                        {% if p.status == 'finalized' %}
+                            <span class="badge bg-success" style="font-size: 0.65rem;">Finalized</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark" style="font-size: 0.65rem;">{{ p.status|capitalize }}</span>
+                        {% endif %}
+                    </div>
+                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 8px;">
+                        <div>EPF ER: {{ "₹{:,.0f}".format(p.total_epf_employer) }} | ESIC ER: {{ "₹{:,.0f}".format(p.total_esic_employer) }}</div>
+                        <div class="mt-1"><strong>Total: {{ "₹{:,.0f}".format(p.total_epf_employer + p.total_esic_employer) }}</strong></div>
+                    </div>
+                    <a href="{{ url_for('reports.reimbursement_view', payroll_id=p.id) }}" class="btn btn-sm btn-warning w-100 text-dark" target="_blank">
+                        <i class="bi bi-envelope-paper me-1"></i>Reimbursement Letter
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    <!-- Multi-Month Selection -->
+    <h6 class="mb-3" style="font-weight: 600; color: #334155;">
+        <i class="bi bi-calendar-range text-primary me-2"></i>Multi-Month / Custom Period Reimbursement
+    </h6>
+    <div class="card border-0" style="border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+        <div class="card-body">
+            <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 12px;">
+                Select multiple months to generate a combined reimbursement letter for any period.
+            </p>
+            <form id="multiReimForm" method="GET" target="_blank">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0" style="font-size: 0.82rem;">
+                        <thead style="background: #fef3c7;">
+                            <tr>
+                                <th style="width: 40px;"><input type="checkbox" id="selectAllMonths" onchange="toggleAllMonths(this)"></th>
+                                <th>Period</th>
+                                <th class="text-center">Employees</th>
+                                <th class="text-end">EPF Employer</th>
+                                <th class="text-end">ESIC Employer</th>
+                                <th class="text-end">Total Refund</th>
+                                <th class="text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in payrolls %}
+                            {% if p.status in ['processing', 'finalized'] %}
+                            <tr>
+                                <td><input type="checkbox" name="payroll_ids" value="{{ p.id }}" class="month-check" onchange="updateMultiTotal()"></td>
+                                <td class="fw-semibold">{{ p.period_display }}</td>
+                                <td class="text-center">{{ p.total_employees }}</td>
+                                <td class="text-end">{{ "₹{:,.0f}".format(p.total_epf_employer) }}</td>
+                                <td class="text-end">{{ "₹{:,.0f}".format(p.total_esic_employer) }}</td>
+                                <td class="text-end fw-bold">{{ "₹{:,.0f}".format(p.total_epf_employer + p.total_esic_employer) }}</td>
+                                <td class="text-center">
+                                    {% if p.status == 'finalized' %}
+                                        <span class="badge bg-success" style="font-size: 0.65rem;">Finalized</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark" style="font-size: 0.65rem;">{{ p.status|capitalize }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
+                    <div style="font-size: 0.85rem;">
+                        Selected: <strong id="selectedCount">0</strong> month(s) |
+                        Total Refund: <strong id="selectedTotal" style="color: #d97706;">₹0</strong>
+                    </div>
+                    <button type="button" class="btn btn-warning btn-sm" onclick="generateMultiReim()" id="multiReimBtn" disabled>
+                        <i class="bi bi-envelope-paper me-1"></i>Generate Combined Letter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% endif %}
+
+{% else %}
+<!-- Empty State -->
+<div class="card border-0" style="border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+    <div class="card-body text-center py-5">
+        <div style="font-size: 3rem; color: #cbd5e1;"><i class="bi {{ current.icon }}"></i></div>
+        <h5 class="mt-3">No payrolls for {{ fy_display }}</h5>
+        <p class="text-muted">
+            {% if active_tab == 'payroll' %}
+                Create a new monthly payroll to start processing salaries.
+            {% else %}
+                Process and finalize payroll first to generate {{ current.title }}.
+            {% endif %}
+        </p>
+        {% if active_tab == 'payroll' %}
+        <a href="{{ url_for('payroll.payroll_create') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-2"></i>Create Payroll
+        </a>
+        {% else %}
+        <a href="{{ url_for('payroll.payroll_list') }}" class="btn btn-outline-primary">
+            <i class="bi bi-arrow-left me-2"></i>Go to Salary Processing
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Multi-month reimbursement helpers
+function toggleAllMonths(el) {
+    document.querySelectorAll('.month-check').forEach(cb => { cb.checked = el.checked; });
+    updateMultiTotal();
+}
+
+function updateMultiTotal() {
+    const checks = document.querySelectorAll('.month-check:checked');
+    let total = 0;
+    checks.forEach(cb => {
+        const row = cb.closest('tr');
+        const cells = row.querySelectorAll('td');
+        // Total Refund is last numeric column (index 5)
+        const val = cells[5].textContent.replace(/[₹,\s]/g, '');
+        total += parseFloat(val) || 0;
+    });
+    document.getElementById('selectedCount').textContent = checks.length;
+    document.getElementById('selectedTotal').textContent = '₹' + total.toLocaleString('en-IN');
+    document.getElementById('multiReimBtn').disabled = checks.length === 0;
+}
+
+function generateMultiReim() {
+    const checks = document.querySelectorAll('.month-check:checked');
+    if (checks.length === 0) { alert('Please select at least one month.'); return; }
+
+    if (checks.length === 1) {
+        // Single month — use existing route
+        const pid = checks[0].value;
+        window.open('/payroll/' + pid + '/report/reimbursement', '_blank');
+    } else {
+        // Multi-month — build URL with multiple IDs
+        const ids = Array.from(checks).map(cb => cb.value).join(',');
+        window.open('/reports/reimbursement-multi?ids=' + ids, '_blank');
+    }
+}
+</script>
+{% endblock %}

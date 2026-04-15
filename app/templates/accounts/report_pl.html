@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Profit & Loss — {{ fy_label }}{% endblock %}
+{% block page_header %}Profit & Loss Account{% endblock %}
+
+{% block content %}
+<div style="max-width:800px; margin:0 auto;">
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb" style="font-size:0.78rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('accounts.accounts_home') }}" class="text-decoration-none">Accounts</a></li>
+        <li class="breadcrumb-item active">Profit & Loss — {{ fy_label }}</li>
+    </ol>
+</nav>
+
+<div class="table-container" id="printArea">
+    <div class="table-header" style="background:#1e293b;">
+        <div class="table-title" style="color:#fff;">
+            <i class="bi bi-graph-up"></i> Profit & Loss Account
+            <span style="font-size:0.65rem; font-weight:400; opacity:0.8; margin-left:8px;">FY {{ fy_label }}</span>
+        </div>
+        <button onclick="window.print()" class="btn btn-sm btn-light no-print" style="font-size:0.68rem;"><i class="bi bi-printer me-1"></i>Print</button>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; min-height:300px;">
+        <!-- Income Side -->
+        <div style="border-right:2px solid #1e293b;">
+            <div style="background:#f0fdf4; padding:8px 14px; font-size:0.72rem; font-weight:700; color:#166534; border-bottom:1px solid #e2e8f0;">
+                INCOME (Credit Side)
+            </div>
+            {% for item in income_data %}
+            <div style="padding:6px 14px; font-size:0.75rem; display:flex; justify-content:space-between; border-bottom:1px solid #f1f5f9;">
+                <span>{{ item.name }}</span>
+                <span style="font-weight:600;">{{ "{:,.0f}".format(item.amount) }}</span>
+            </div>
+            {% endfor %}
+            {% if not income_data %}
+            <div style="padding:20px 14px; text-align:center; color:#94a3b8; font-size:0.72rem;">No income entries</div>
+            {% endif %}
+            <div style="padding:8px 14px; background:#dcfce7; font-size:0.78rem; font-weight:800; display:flex; justify-content:space-between; border-top:2px solid #166534; margin-top:auto;">
+                <span>Total Income</span>
+                <span>{{ "{:,.0f}".format(total_income) }}</span>
+            </div>
+        </div>
+
+        <!-- Expense Side -->
+        <div>
+            <div style="background:#fef2f2; padding:8px 14px; font-size:0.72rem; font-weight:700; color:#991b1b; border-bottom:1px solid #e2e8f0;">
+                EXPENSES (Debit Side)
+            </div>
+            {% for item in expense_data %}
+            <div style="padding:6px 14px; font-size:0.75rem; display:flex; justify-content:space-between; border-bottom:1px solid #f1f5f9;">
+                <span>{{ item.name }}</span>
+                <span style="font-weight:600;">{{ "{:,.0f}".format(item.amount) }}</span>
+            </div>
+            {% endfor %}
+            {% if not expense_data %}
+            <div style="padding:20px 14px; text-align:center; color:#94a3b8; font-size:0.72rem;">No expense entries</div>
+            {% endif %}
+            <div style="padding:8px 14px; background:#fee2e2; font-size:0.78rem; font-weight:800; display:flex; justify-content:space-between; border-top:2px solid #991b1b;">
+                <span>Total Expenses</span>
+                <span>{{ "{:,.0f}".format(total_expenses) }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Net Profit -->
+    <div style="background:{% if net_profit >= 0 %}#f0fdf4; border-top:3px solid #16a34a;{% else %}#fef2f2; border-top:3px solid #dc2626;{% endif %} padding:14px; text-align:center;">
+        <div style="font-size:0.65rem; text-transform:uppercase; color:#64748b; font-weight:600;">
+            {% if net_profit >= 0 %}Net Profit{% else %}Net Loss{% endif %}
+        </div>
+        <div style="font-size:1.6rem; font-weight:800; color:{% if net_profit >= 0 %}#16a34a{% else %}#dc2626{% endif %};">
+            {{ "{:,.0f}".format(net_profit|abs) }}
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}

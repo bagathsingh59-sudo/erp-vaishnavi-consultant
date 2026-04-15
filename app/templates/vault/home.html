@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Compliance Vault{% endblock %}
+{% block page_header %}Compliance Document Vault{% endblock %}
+
+{% block content %}
+<div class="alert alert-info py-2 px-3" style="font-size:0.85rem;">
+    <i class="bi bi-info-circle-fill me-1"></i>
+    Showing status for <strong>{{ period_label }}</strong> — the month whose statutory documents are being filed now.
+    Green = uploaded, Red = pending.
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-light py-2">
+        <strong><i class="bi bi-calendar-check"></i> Pending Period — {{ period_label }}</strong>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" style="font-size:0.85rem;">
+            <thead class="table-light">
+                <tr>
+                    <th>Establishment</th>
+                    <th class="text-center">{{ period_label }} Status</th>
+                    <th class="text-center">Total Files</th>
+                    <th class="text-end">Storage</th>
+                    <th class="text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in establishments %}
+                {% set cnt = stats[e.id].period_cnt %}
+                <tr>
+                    <td><strong>{{ e.company_name }}</strong></td>
+                    <td class="text-center">
+                        {% if cnt > 0 %}
+                            <span class="badge bg-success">✓ Uploaded ({{ cnt }})</span>
+                        {% else %}
+                            <span class="badge bg-danger">Pending</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center"><span class="badge bg-secondary">{{ stats[e.id].total }}</span></td>
+                    <td class="text-end"><small>{{ (stats[e.id].size / 1024 / 1024)|round(2) }} MB</small></td>
+                    <td class="text-center">
+                        <a href="{{ url_for('vault.vault_browse', est_id=e.id) }}" class="btn btn-sm btn-outline-primary" title="Browse"><i class="bi bi-folder2-open"></i></a>
+                        <a href="{{ url_for('vault.vault_upload', est_id=e.id, fy=period_fy, month=period_month) }}" class="btn btn-sm btn-outline-success" title="Upload"><i class="bi bi-upload"></i></a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+
+<!-- Coverage Matrix: months covered per FY per establishment -->
+{% if fy_list %}
+<div class="card shadow-sm mt-3">
+    <div class="card-header bg-light py-2">
+        <strong><i class="bi bi-grid-3x3-gap-fill"></i> Coverage Matrix — months covered per FY</strong>
+        <small class="text-muted ms-2">X / 12 = months having at least one file. Click a cell to drill down.</small>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" style="font-size:0.85rem;">
+            <thead class="table-light">
+                <tr>
+                    <th>Establishment</th>
+                    {% for y in fy_list %}
+                    <th class="text-center">FY {{ y }}-{{ (y+1)|string|slice(2) }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in establishments %}
+                <tr>
+                    <td><strong>{{ e.company_name }}</strong></td>
+                    {% for y in fy_list %}
+                        {% set months = coverage[e.id].get(y) %}
+                        {% set n = months|length if months else 0 %}
+                        <td class="text-center">
+                            {% if n == 0 %}
+                                <span class="text-muted">—</span>
+                            {% else %}
+                                <a href="{{ url_for('vault.vault_browse', est_id=e.id, fy=y) }}"
+                                   class="badge {% if n == 12 %}bg-success{% elif n >= 6 %}bg-warning text-dark{% else %}bg-danger{% endif %} text-decoration-none">
+                                    {{ n }} / 12
+                                </a>
+                            {% endif %}
+                        </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

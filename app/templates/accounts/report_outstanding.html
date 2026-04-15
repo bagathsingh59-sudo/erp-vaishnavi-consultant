@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Outstanding Report — {{ fy_label }}{% endblock %}
+{% block page_header %}Outstanding Report{% endblock %}
+
+{% block content %}
+<div style="max-width:800px; margin:0 auto;">
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb" style="font-size:0.78rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('accounts.accounts_home') }}" class="text-decoration-none">Accounts</a></li>
+        <li class="breadcrumb-item active">Outstanding — {{ fy_label }}</li>
+    </ol>
+</nav>
+<div class="table-container">
+    <div class="table-header" style="background:#d97706;">
+        <div class="table-title" style="color:#fff;"><i class="bi bi-exclamation-diamond"></i> Client Outstanding (Sundry Debtors)</div>
+        <button onclick="window.print()" class="btn btn-sm btn-light no-print" style="font-size:0.68rem;"><i class="bi bi-printer me-1"></i>Print</button>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" style="font-size:0.75rem;">
+            <thead><tr style="background:#f8fafc;"><th style="width:40px;">#</th><th>Client Name</th><th style="width:130px; text-align:right;">Outstanding (₹)</th><th style="width:70px;"></th></tr></thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td style="font-weight:600;">{{ row.name }}</td>
+                    <td style="text-align:right; font-weight:700; color:{% if row.balance > 0 %}#dc2626{% else %}#16a34a{% endif %};">{{ "{:,.0f}".format(row.balance) }}{% if row.balance < 0 %} (Cr){% endif %}</td>
+                    <td>{% if row.est %}<a href="{{ url_for('accounts.account_ledger', account_id=row.est.account_head.id) }}" class="btn btn-outline-primary btn-sm" style="font-size:0.6rem; padding:1px 6px;">Ledger</a>{% endif %}</td>
+                </tr>
+                {% endfor %}
+                {% if not rows %}<tr><td colspan="4" class="text-center text-muted py-4">No outstanding balances.</td></tr>{% endif %}
+            </tbody>
+            <tfoot>
+                <tr style="background:#fef3c7; font-weight:700; font-size:0.82rem; border-top:2px solid #d97706;">
+                    <td colspan="2" style="text-align:right;">Total Outstanding</td>
+                    <td style="text-align:right;">{{ "{:,.0f}".format(total) }}</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+</div>
+{% endblock %}

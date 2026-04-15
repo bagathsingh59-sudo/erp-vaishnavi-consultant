@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Compliance Tracker{% endblock %}
+{% block page_header %}Compliance Tracker{% endblock %}
+
+{% block content %}
+<style>
+    .mis-card { border-radius: 10px; border: none; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .mis-stat { text-align: center; padding: 14px 8px; }
+    .mis-stat .num { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+    .mis-stat .lbl { font-size: 0.68rem; color: #64748b; margin-top: 4px; text-transform: uppercase; }
+    .tracker-table th { font-size: 0.7rem; text-transform: uppercase; color: #64748b; letter-spacing: 0.3px; white-space: nowrap; }
+    .tracker-table td { font-size: 0.76rem; vertical-align: middle; }
+    .check-yes { color: #059669; font-weight: 700; font-size: 0.82rem; }
+    .check-no { color: #dc2626; font-weight: 700; font-size: 0.82rem; }
+    .row-pending { background: #fef2f2 !important; }
+    .row-done { background: #f0fdf4 !important; }
+</style>
+
+<!-- Header -->
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+    <div>
+        <h5 class="mb-0" style="font-weight:700; font-size:1.1rem;">
+            <i class="bi bi-clipboard-check me-2" style="color:#7c3aed;"></i>Compliance Tracker
+        </h5>
+        <small class="text-muted" style="font-size:0.72rem;">
+            Replaces your physical book — Amount received vs Returns filed
+        </small>
+    </div>
+    <a href="{{ url_for('daily_mis.mis_home') }}" class="btn btn-outline-primary btn-sm" style="font-size:0.74rem;">
+        <i class="bi bi-arrow-left me-1"></i>Back to Daily MIS
+    </a>
+</div>
+
+<!-- Date Filter -->
+<div class="card mis-card mb-3">
+    <div class="card-body py-2 px-3">
+        <form method="GET" action="{{ url_for('daily_mis.mis_compliance') }}" class="d-flex align-items-end gap-2 flex-wrap">
+            <div>
+                <label style="font-size:0.7rem; font-weight:600;">From Date</label>
+                <input type="date" name="from_date" class="form-control form-control-sm" style="font-size:0.78rem; width:160px;"
+                       value="{{ from_date.strftime('%Y-%m-%d') }}">
+            </div>
+            <div>
+                <label style="font-size:0.7rem; font-weight:600;">To Date</label>
+                <input type="date" name="to_date" class="form-control form-control-sm" style="font-size:0.78rem; width:160px;"
+                       value="{{ to_date.strftime('%Y-%m-%d') }}">
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm" style="font-size:0.76rem;">
+                <i class="bi bi-funnel me-1"></i>Filter
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row g-2 mb-3">
+    <div class="col-4">
+        <div class="card mis-card">
+            <div class="mis-stat">
+                <div class="num" style="color:#7c3aed;">{{ total_received }}</div>
+                <div class="lbl">Amount Received</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="card mis-card">
+            <div class="mis-stat">
+                <div class="num text-success">{{ all_done }}</div>
+                <div class="lbl">All Done</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="card mis-card">
+            <div class="mis-stat">
+                <div class="num text-danger">{{ pending_action }}</div>
+                <div class="lbl">Pending Action</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tracker Table -->
+<div class="card mis-card">
+    <div class="card-body p-0">
+        {% if tracker_data %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 tracker-table">
+                <thead style="background:#f8fafc;">
+                    <tr>
+                        <th>#</th>
+                        <th>Date</th>
+                        <th>Establishment</th>
+                        <th class="text-end">Amount (Rs.)</th>
+                        <th>Reference</th>
+                        <th>Staff</th>
+                        <th class="text-center">EPF Filed</th>
+                        <th class="text-center">ESIC Filed</th>
+                        <th class="text-center">Challan Paid</th>
+                        <th class="text-center">All Done</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in tracker_data %}
+                <tr class="{% if row.all_done %}row-done{% else %}row-pending{% endif %}">
+                    <td class="text-muted">{{ loop.index }}</td>
+                    <td style="white-space:nowrap;">{{ row.entry.task_date.strftime('%d-%b-%Y') }}</td>
+                    <td style="font-weight:500;">{{ row.entry.establishment_name }}</td>
+                    <td class="text-end"><strong style="color:#7c3aed;">{{ "{:,.0f}".format(row.entry.amount) }}</strong></td>
+                    <td>
+                        {% if row.entry.reference %}
+                        <code style="font-size:0.7rem;">{{ row.entry.reference }}</code>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>{{ row.entry.staff_name or '—' }}</td>
+                    <td class="text-center">
+                        {% if row.epf_filed %}<span class="check-yes"><i class="bi bi-check-circle-fill"></i></span>
+                        {% else %}<span class="check-no"><i class="bi bi-x-circle-fill"></i></span>{% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if row.esic_filed %}<span class="check-yes"><i class="bi bi-check-circle-fill"></i></span>
+                        {% else %}<span class="check-no"><i class="bi bi-x-circle-fill"></i></span>{% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if row.challan_paid %}<span class="check-yes"><i class="bi bi-check-circle-fill"></i></span>
+                        {% else %}<span class="check-no"><i class="bi bi-x-circle-fill"></i></span>{% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if row.all_done %}
+                        <span class="badge bg-success" style="font-size:0.68rem;">ALL DONE</span>
+                        {% else %}
+                        <span class="badge bg-danger" style="font-size:0.68rem;">PENDING</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-3 py-2" style="background:#f8fafc; border-top:1px solid #e2e8f0; font-size:0.76rem;">
+            <strong>Summary:</strong>
+            {{ total_received }} payments received
+            <span class="mx-2">|</span>
+            <span class="text-success">{{ all_done }} fully processed</span>
+            <span class="mx-2">|</span>
+            <span class="text-danger fw-bold">{{ pending_action }} needs action</span>
+        </div>
+
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-clipboard-x text-muted" style="font-size:2.5rem;"></i>
+            <p class="text-muted mt-2" style="font-size:0.82rem;">No compliance payments found for this period</p>
+            <p class="text-muted" style="font-size:0.72rem;">When staff logs "Compliance Amount Received" entries, they appear here automatically.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

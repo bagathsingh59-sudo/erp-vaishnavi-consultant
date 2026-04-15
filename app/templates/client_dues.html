@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Client Dues - Vaishnavi Consultant{% endblock %}
+{% block page_header %}Client Due Reminder{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb" style="font-size:0.85rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('establishment.dashboard') }}" class="text-decoration-none">Dashboard</a></li>
+        <li class="breadcrumb-item active">Client Dues</li>
+    </ol>
+</nav>
+
+<!-- Summary Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 h-100" style="background:linear-gradient(135deg,#dc2626,#ef4444); color:#fff; border-radius:12px;">
+            <div class="card-body py-3 px-3 text-center">
+                <div style="font-size:0.65rem; text-transform:uppercase; opacity:0.85; letter-spacing:0.5px;">Total Outstanding</div>
+                <div style="font-size:1.8rem; font-weight:800; line-height:1.1;">{{ "₹{:,.0f}".format(total_due) }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 h-100" style="background:linear-gradient(135deg,#f59e0b,#d97706); color:#fff; border-radius:12px;">
+            <div class="card-body py-3 px-3 text-center">
+                <div style="font-size:0.65rem; text-transform:uppercase; opacity:0.85; letter-spacing:0.5px;">Clients with Dues</div>
+                <div style="font-size:1.8rem; font-weight:800; line-height:1.1;">{{ total_clients_due }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 h-100" style="background:linear-gradient(135deg,#7c3aed,#6d28d9); color:#fff; border-radius:12px;">
+            <div class="card-body py-3 px-3 text-center">
+                <div style="font-size:0.65rem; text-transform:uppercase; opacity:0.85; letter-spacing:0.5px;">60+ Days Overdue</div>
+                <div style="font-size:1.8rem; font-weight:800; line-height:1.1;">
+                    {{ dues_list|selectattr('aging', 'in', ['60d', '90d+'])|list|length }}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 h-100" style="background:linear-gradient(135deg,#059669,#10b981); color:#fff; border-radius:12px;">
+            <div class="card-body py-3 px-3 text-center">
+                <div style="font-size:0.65rem; text-transform:uppercase; opacity:0.85; letter-spacing:0.5px;">90+ Days Critical</div>
+                <div style="font-size:1.8rem; font-weight:800; line-height:1.1;">
+                    {{ dues_list|selectattr('aging', 'equalto', '90d+')|list|length }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Dues Table -->
+<div class="card border-0" style="border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,0.06);">
+    <div class="card-header bg-white py-2 px-4" style="border-bottom:2px solid #e2e8f0;">
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 style="font-weight:700; color:#334155; margin:0; font-size:0.85rem;">
+                <i class="bi bi-exclamation-diamond-fill text-danger me-2"></i>Outstanding Fee Report (Current FY)
+            </h6>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        {% if dues_list %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" style="font-size:0.82rem;">
+                <thead style="background:#f8fafc;">
+                    <tr>
+                        <th style="min-width:180px;">Client Name</th>
+                        <th style="text-align:center;">Fee Cycle</th>
+                        <th style="text-align:right;">Fee Amount</th>
+                        <th style="text-align:right;">Expected</th>
+                        <th style="text-align:right;">Received</th>
+                        <th style="text-align:right; font-weight:700;">Due</th>
+                        <th style="text-align:center;">Last Paid</th>
+                        <th style="text-align:center;">Aging</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in dues_list %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('establishment.select_establishment', est_id=item.est.id) }}"
+                               class="text-decoration-none fw-semibold" style="color:#4f46e5;">
+                                {{ item.est.display_name }}
+                            </a>
+                        </td>
+                        <td style="text-align:center;">
+                            <span class="badge bg-light text-dark" style="font-size:0.7rem;">{{ item.fee_type }}</span>
+                        </td>
+                        <td style="text-align:right;">
+                            {{ "₹{:,.0f}".format(item.fee_amount) }}
+                        </td>
+                        <td style="text-align:right; color:var(--text-secondary);">
+                            {{ "₹{:,.0f}".format(item.expected) }}
+                        </td>
+                        <td style="text-align:right; color:#059669; font-weight:600;">
+                            {{ "₹{:,.0f}".format(item.received) }}
+                        </td>
+                        <td style="text-align:right; font-weight:700; color:#dc2626; font-size:0.9rem;">
+                            {{ "₹{:,.0f}".format(item.due) }}
+                        </td>
+                        <td style="text-align:center; font-size:0.78rem;">
+                            {% if item.last_paid %}
+                                {{ item.last_paid.strftime('%d %b %Y') }}
+                            {% else %}
+                                <span class="text-danger" style="font-size:0.7rem;">Never Paid</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align:center;">
+                            {% if item.aging == 'current' %}
+                                <span class="badge bg-success" style="font-size:0.65rem;">Current</span>
+                            {% elif item.aging == '30d' %}
+                                <span class="badge bg-warning text-dark" style="font-size:0.65rem;">30+ Days</span>
+                            {% elif item.aging == '60d' %}
+                                <span class="badge bg-warning" style="font-size:0.65rem;">60+ Days</span>
+                            {% elif item.aging == '90d+' %}
+                                <span class="badge bg-danger" style="font-size:0.65rem;">90+ Days</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot style="background:#fef2f2;">
+                    <tr>
+                        <td colspan="5" style="text-align:right; font-weight:700; font-size:0.9rem;">Total Outstanding:</td>
+                        <td style="text-align:right; font-weight:800; color:#dc2626; font-size:1rem;">
+                            {{ "₹{:,.0f}".format(total_due) }}
+                        </td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <div style="font-size:3rem; color:#10b981;"><i class="bi bi-check-circle"></i></div>
+            <h5 class="mt-3" style="color:#059669;">All Clients Paid!</h5>
+            <p class="text-muted">No outstanding dues for the current financial year. Great work!</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

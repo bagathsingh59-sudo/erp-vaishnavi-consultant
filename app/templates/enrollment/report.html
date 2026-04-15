@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Enrollment Report{% endblock %}
+{% block page_header %}Enrollment Report{% endblock %}
+
+{% block content %}
+<style>
+    @media print {
+        .sidebar, .top-navbar, .no-print { display: none !important; }
+        .main-content { margin-left: 0 !important; padding: 0 !important; }
+        .page-content { padding: 0 !important; }
+        body { background: #fff !important; }
+        .rpt-container { box-shadow: none !important; border: none !important; }
+    }
+    .rpt-container { max-width: 1000px; margin: 0 auto; }
+    .rpt-table { width: 100%; border-collapse: collapse; font-size: 0.72rem; }
+    .rpt-table th { background: #1e293b; color: #fff; padding: 6px 8px; font-weight: 600; font-size: 0.68rem; text-transform: uppercase; }
+    .rpt-table td { padding: 5px 8px; border-bottom: 1px solid #f1f5f9; }
+    .rpt-table .est-header { background: #eef2ff; font-weight: 700; font-size: 0.76rem; color: #1e40af; }
+    .rpt-table .est-header td { padding: 8px; border-bottom: 2px solid #c7d2fe; }
+    .status-c { color: #16a34a; font-weight: 600; }
+    .status-pa { color: #f59e0b; font-weight: 600; }
+    .status-pe { color: #dc2626; font-weight: 600; }
+</style>
+
+<div class="rpt-container">
+
+<!-- Breadcrumb + Actions -->
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 no-print">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0" style="font-size:0.78rem;">
+            <li class="breadcrumb-item"><a href="{{ url_for('enrollment.enrollment_home') }}" class="text-decoration-none">UAN & ESIC Tracker</a></li>
+            <li class="breadcrumb-item active">Report</li>
+        </ol>
+    </nav>
+    <div class="d-flex gap-2">
+        <button onclick="window.print()" class="btn btn-sm btn-outline-secondary" style="font-size:0.72rem;">
+            <i class="bi bi-printer me-1"></i>Print
+        </button>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-3 no-print" style="border:none; box-shadow:0 1px 4px rgba(0,0,0,0.06); border-radius:10px;">
+    <div class="card-body py-2 px-3">
+        <form method="GET" action="{{ url_for('enrollment.enrollment_report') }}" class="d-flex align-items-center gap-2 flex-wrap">
+            <select name="est_id" class="form-select form-select-sm" style="font-size:0.76rem; width:220px;">
+                <option value="">All Establishments</option>
+                {% for est in establishments %}
+                <option value="{{ est.id }}" {% if est_id == est.id %}selected{% endif %}>{{ est.display_name }}</option>
+                {% endfor %}
+            </select>
+            <select name="month" class="form-select form-select-sm" style="font-size:0.76rem; width:130px;">
+                <option value="">All Months</option>
+                {% for m in range(1, 13) %}
+                <option value="{{ m }}" {% if month == m %}selected{% endif %}>{{ ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m-1] }}</option>
+                {% endfor %}
+            </select>
+            <select name="year" class="form-select form-select-sm" style="font-size:0.76rem; width:100px;">
+                {% for y in range(2024, 2028) %}
+                <option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm btn-primary" style="font-size:0.72rem;"><i class="bi bi-funnel me-1"></i>Filter</button>
+        </form>
+    </div>
+</div>
+
+<!-- Report Table -->
+<div class="table-container" id="printArea">
+    <div class="table-header" style="background:#1e293b;">
+        <div class="table-title" style="color:#fff;">
+            <i class="bi bi-person-vcard"></i> UAN & ESIC IP Enrollment Report
+            <span style="font-size:0.62rem; opacity:0.8; margin-left:8px;">{{ year }} | Total: {{ total }}</span>
+        </div>
+        <div style="font-size:0.6rem; color:#94a3b8;">Generated: {{ generated_on }}</div>
+    </div>
+    <div class="table-responsive">
+        <table class="rpt-table">
+            <thead>
+                <tr>
+                    <th style="width:30px;">#</th>
+                    <th>Employee Name</th>
+                    <th>Father / Husband</th>
+                    <th style="width:55px;">Gender</th>
+                    <th style="width:80px;">DOB</th>
+                    <th style="width:80px;">DOJ</th>
+                    <th style="width:100px;">UAN</th>
+                    <th style="width:100px;">ESIC IP</th>
+                    <th style="width:65px; text-align:center;">Status</th>
+                    <th style="width:55px; text-align:center;">Linked</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if grouped %}
+                    {% set counter = namespace(val=0) %}
+                    {% for est_name, enrs in grouped.items() %}
+                    <tr class="est-header">
+                        <td colspan="10">
+                            <i class="bi bi-building me-1"></i>{{ est_name }}
+                            <span style="font-size:0.62rem; color:#64748b; margin-left:6px;">({{ enrs|length }} employee{{ 's' if enrs|length != 1 }})</span>
+                        </td>
+                    </tr>
+                    {% for enr in enrs %}
+                        {% set counter.val = counter.val + 1 %}
+                        <tr>
+                            <td style="color:#94a3b8;">{{ counter.val }}</td>
+                            <td style="font-weight:600;">{{ enr.employee_name }}</td>
+                            <td>{{ enr.father_husband_name }}</td>
+                            <td>{{ enr.gender }}</td>
+                            <td>{{ enr.date_of_birth.strftime('%d-%m-%Y') if enr.date_of_birth else '—' }}</td>
+                            <td>{{ enr.date_of_joining.strftime('%d-%m-%Y') if enr.date_of_joining else '—' }}</td>
+                            <td style="font-family:monospace;">{{ enr.uan_number or '—' }}</td>
+                            <td style="font-family:monospace;">{{ enr.esic_ip_number or '—' }}</td>
+                            <td style="text-align:center;">
+                                {% set s = enr.enrollment_status %}
+                                {% if s == 'completed' %}<span class="status-c">Done</span>
+                                {% elif s == 'partial' %}<span class="status-pa">Partial</span>
+                                {% else %}<span class="status-pe">Pending</span>{% endif %}
+                            </td>
+                            <td style="text-align:center;">
+                                {% if enr.is_linked %}<i class="bi bi-check-circle-fill" style="color:#16a34a;"></i>
+                                {% else %}<i class="bi bi-dash" style="color:#cbd5e1;"></i>{% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="10" style="text-align:center; padding:30px; color:#94a3b8;">
+                        No enrollments found for the selected filters.
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Summary -->
+{% if grouped %}
+<div class="mt-3" style="font-size:0.72rem; color:#64748b; text-align:right;">
+    <strong>{{ total }}</strong> enrollment{{ 's' if total != 1 }} across <strong>{{ grouped|length }}</strong> establishment{{ 's' if grouped|length != 1 }}
+</div>
+{% endif %}
+
+</div>
+{% endblock %}

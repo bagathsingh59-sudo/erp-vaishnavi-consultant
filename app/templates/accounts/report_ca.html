@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}CA Report Package — {{ fy_label }}{% endblock %}
+{% block page_header %}CA Report Package{% endblock %}
+
+{% block content %}
+<div style="max-width:800px; margin:0 auto;">
+
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb" style="font-size:0.78rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('accounts.accounts_home') }}" class="text-decoration-none">Accounts</a></li>
+        <li class="breadcrumb-item active">CA Report Package</li>
+    </ol>
+</nav>
+
+<div class="table-container">
+    <div class="table-header" style="background:linear-gradient(135deg,#7c3aed,#a855f7);">
+        <div class="table-title" style="color:#fff;"><i class="bi bi-briefcase"></i> CA Report Package
+            <span style="font-size:0.65rem; opacity:0.8; margin-left:8px;">FY {{ fy_label }}</span>
+        </div>
+    </div>
+    <div style="padding:20px;">
+        <div style="font-size:0.78rem; color:#64748b; margin-bottom:16px;">
+            <i class="bi bi-info-circle me-1"></i> All reports below are print-ready. Share with your CA for IT Return filing and audit.
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:12px;">
+
+            <a href="{{ url_for('accounts.report_trial_balance') }}" target="_blank" class="text-decoration-none"
+               style="background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid #6366f1; border-radius:6px; padding:14px 16px; display:block;">
+                <div style="font-size:0.82rem; font-weight:700; color:#1e293b;"><i class="bi bi-clipboard-data me-2 text-primary"></i>Trial Balance</div>
+                <div style="font-size:0.62rem; color:#64748b; margin-top:4px;">All accounts — Debit & Credit totals</div>
+            </a>
+
+            <a href="{{ url_for('accounts.report_profit_loss') }}" target="_blank" class="text-decoration-none"
+               style="background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid #16a34a; border-radius:6px; padding:14px 16px; display:block;">
+                <div style="font-size:0.82rem; font-weight:700; color:#1e293b;"><i class="bi bi-graph-up me-2 text-success"></i>Profit & Loss Account</div>
+                <div style="font-size:0.62rem; color:#64748b; margin-top:4px;">Income vs Expenses = Net Profit</div>
+            </a>
+
+            <a href="{{ url_for('accounts.report_cash_flow') }}" target="_blank" class="text-decoration-none"
+               style="background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid #059669; border-radius:6px; padding:14px 16px; display:block;">
+                <div style="font-size:0.82rem; font-weight:700; color:#1e293b;"><i class="bi bi-arrow-left-right me-2" style="color:#059669;"></i>Cash Flow Statement</div>
+                <div style="font-size:0.62rem; color:#64748b; margin-top:4px;">Inflows vs Outflows — Bank & Cash</div>
+            </a>
+
+            <a href="{{ url_for('accounts.report_income_register') }}" target="_blank" class="text-decoration-none"
+               style="background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid #f59e0b; border-radius:6px; padding:14px 16px; display:block;">
+                <div style="font-size:0.82rem; font-weight:700; color:#1e293b;"><i class="bi bi-journal-text me-2 text-warning"></i>Income Register</div>
+                <div style="font-size:0.62rem; color:#64748b; margin-top:4px;">Month-wise income breakup (for IT Return)</div>
+            </a>
+
+            <a href="{{ url_for('accounts.report_tds') }}" target="_blank" class="text-decoration-none"
+               style="background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid #dc2626; border-radius:6px; padding:14px 16px; display:block;">
+                <div style="font-size:0.82rem; font-weight:700; color:#1e293b;"><i class="bi bi-percent me-2 text-danger"></i>TDS Report</div>
+                <div style="font-size:0.62rem; color:#64748b; margin-top:4px;">Client-wise TDS deducted (for IT Return)</div>
+            </a>
+
+            <a href="{{ url_for('accounts.report_outstanding') }}" target="_blank" class="text-decoration-none"
+               style="background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid #ec4899; border-radius:6px; padding:14px 16px; display:block;">
+                <div style="font-size:0.82rem; font-weight:700; color:#1e293b;"><i class="bi bi-people me-2" style="color:#ec4899;"></i>Outstanding Report</div>
+                <div style="font-size:0.62rem; color:#64748b; margin-top:4px;">Client-wise receivables & balances</div>
+            </a>
+
+            <a href="{{ url_for('accounts.report_bank_book') }}" target="_blank" class="text-decoration-none"
+               style="background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid #2563eb; border-radius:6px; padding:14px 16px; display:block;">
+                <div style="font-size:0.82rem; font-weight:700; color:#1e293b;"><i class="bi bi-bank me-2 text-primary"></i>Bank Book</div>
+                <div style="font-size:0.62rem; color:#64748b; margin-top:4px;">SBI Current Account — all transactions</div>
+            </a>
+
+            <a href="{{ url_for('accounts.report_daybook') }}" target="_blank" class="text-decoration-none"
+               style="background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid #64748b; border-radius:6px; padding:14px 16px; display:block;">
+                <div style="font-size:0.82rem; font-weight:700; color:#1e293b;"><i class="bi bi-calendar-day me-2 text-secondary"></i>Day Book</div>
+                <div style="font-size:0.62rem; color:#64748b; margin-top:4px;">All vouchers date-wise</div>
+            </a>
+
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}

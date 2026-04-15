@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if mode == 'edit' else 'Add' }} Nominee - Vaishnavi Consultant{% endblock %}
+{% block page_header %}{{ 'Edit' if mode == 'edit' else 'Add' }} Nominee{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb" style="font-size:0.85rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('employee.employee_list') }}" class="text-decoration-none">Employees</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('employee.employee_view', id=emp.id) }}" class="text-decoration-none">{{ emp.name }}</a></li>
+        <li class="breadcrumb-item active">{{ 'Edit' if mode == 'edit' else 'Add' }} Nominee</li>
+    </ol>
+</nav>
+
+<!-- Employee Info Banner -->
+<div style="background:linear-gradient(135deg, var(--primary), #7c3aed); color:#fff; padding:14px 24px; border-radius:var(--radius); margin-bottom:24px; display:flex; align-items:center; gap:16px;">
+    <div style="width:42px; height:42px; background:rgba(255,255,255,0.15); border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.2rem;">
+        <i class="bi bi-person-fill"></i>
+    </div>
+    <div>
+        <div style="font-weight:700;">{{ emp.name }} <code style="background:rgba(255,255,255,0.2); padding:1px 8px; border-radius:10px; font-size:0.75rem;">{{ emp.emp_code }}</code></div>
+        <div style="opacity:0.75; font-size:0.8rem;">{{ emp.establishment.company_name }}</div>
+    </div>
+</div>
+
+<form method="POST" autocomplete="off">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="form-card">
+        <div class="form-section">
+            <div class="form-section-title"><i class="bi bi-people-fill"></i> Nominee Details</div>
+            <div class="form-section-desc">EPF / ESIC nominee information with share percentage</div>
+
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <label class="form-label">Nominee Name <span class="text-danger">*</span></label>
+                    <input type="text" name="name" class="form-control"
+                           value="{{ nominee.name if nominee else '' }}"
+                           placeholder="Full name of nominee"
+                           style="text-transform:uppercase;" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Relation <span class="text-danger">*</span></label>
+                    <select name="relation" class="form-select" required>
+                        <option value="">Select relation</option>
+                        {% for rel in ['Wife', 'Husband', 'Son', 'Daughter', 'Father', 'Mother', 'Brother', 'Sister', 'Other'] %}
+                            <option value="{{ rel }}" {% if nominee and nominee.relation == rel %}selected{% endif %}>{{ rel }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Share Percentage</label>
+                    <div class="input-group">
+                        <input type="number" name="share_percentage" class="form-control"
+                               value="{{ nominee.share_percentage if nominee and nominee.share_percentage else '' }}"
+                               placeholder="e.g., 50" min="0" max="100" step="0.01">
+                        <span class="input-group-text">%</span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Date of Birth</label>
+                    <input type="date" name="date_of_birth" class="form-control"
+                           value="{{ nominee.date_of_birth.strftime('%Y-%m-%d') if nominee and nominee.date_of_birth else '' }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Aadhaar Number</label>
+                    <input type="text" name="aadhaar_number" class="form-control"
+                           value="{{ nominee.aadhaar_number if nominee and nominee.aadhaar_number else '' }}"
+                           maxlength="12" placeholder="12-digit Aadhaar">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section" style="border-bottom:none; background:#f8fafc;">
+            <div class="d-flex gap-3 justify-content-end">
+                <a href="{{ url_for('employee.employee_view', id=emp.id) }}" class="btn btn-light px-4">
+                    <i class="bi bi-x-lg me-1"></i> Cancel
+                </a>
+                <button type="submit" class="btn btn-primary px-4">
+                    <i class="bi bi-check-lg me-1"></i>
+                    {{ 'Update Nominee' if mode == 'edit' else 'Save Nominee' }}
+                </button>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}

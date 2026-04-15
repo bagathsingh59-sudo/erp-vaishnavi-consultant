@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}Attendance Register - {{ payroll.period_display }}{% endblock %}
+{% block page_header %}Attendance Register{% endblock %}
+
+{% block content %}
+<style>
+    @page { size: legal landscape; margin: 8mm; }
+    @media print {
+        .sidebar, .top-navbar, .no-print { display: none !important; }
+        .main-content { margin-left: 0 !important; padding: 0 !important; }
+        .page-content { padding: 0 !important; }
+        body { background: #fff !important; }
+        .att-page { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 8px !important; }
+        .att-table th, .att-table td { font-size: 7.5px !important; padding: 2px 3px !important; }
+    }
+    .att-page { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:20px; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.1); overflow-x:auto; }
+    .att-title { text-align:center; margin-bottom:12px; }
+    .att-title h3 { font-size:1.1rem; font-weight:700; margin:0; letter-spacing:1px; }
+    .att-title h4 { font-size:0.9rem; font-weight:700; margin:2px 0; color:#1e293b; }
+    .att-title p { font-size:0.78rem; margin:2px 0; color:#475569; }
+    .att-table { width:100%; border-collapse:collapse; font-size:0.7rem; }
+    .att-table th { background:#d9e2f3; font-weight:700; padding:4px 5px; border:1px solid #94a3b8; text-align:center; font-size:0.65rem; vertical-align:middle; }
+    .att-table td { padding:3px 4px; border:1px solid #cbd5e1; text-align:center; vertical-align:middle; }
+    .att-table .rest { background:#fce4ec; color:#c62828; font-weight:700; }
+    .att-table .holiday { background:#c8e6c9; color:#1b5e20; font-weight:700; }
+    .att-table .absent { color:#c62828; }
+    .att-table .total-row { background:#d9ead3; font-weight:700; }
+    .att-table .total-row td { border-top:2px solid #1e293b; border-bottom:2px solid #1e293b; }
+    .att-table .day-cell { min-width:22px; }
+    .att-table .summary-col { background:#e8f5e9; font-weight:600; }
+    .att-table .rest-header { background:#fce4ec; }
+    .att-table .holiday-header { background:#c8e6c9; }
+</style>
+
+<div class="no-print mb-3 d-flex justify-content-between align-items-center">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb" style="font-size:0.85rem; margin:0;">
+            <li class="breadcrumb-item"><a href="{{ url_for('payroll.payroll_list') }}" class="text-decoration-none">Salary Processing</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('payroll.payroll_process', payroll_id=payroll.id) }}" class="text-decoration-none">{{ payroll.period_display }}</a></li>
+            <li class="breadcrumb-item active">Attendance Register</li>
+        </ol>
+    </nav>
+    <div class="d-flex gap-2">
+        <button onclick="window.history.back()" style="background:#e5e7eb; color:#333; border:none; padding:6px 16px; border-radius:6px; cursor:pointer; font-size:0.82rem;"><i class="bi bi-arrow-left me-1"></i> Back to Payroll</button>
+        <a href="{{ url_for('reports.attendance_excel', payroll_id=payroll.id) }}" class="btn btn-success btn-sm">
+            <i class="bi bi-file-earmark-excel me-1"></i> Download Excel
+        </a>
+        <button onclick="window.print()" class="btn btn-primary btn-sm">
+            <i class="bi bi-printer me-1"></i> Print / PDF
+        </button>
+    </div>
+</div>
+
+<div class="att-page">
+    <div class="att-title">
+        <h3>ATTENDANCE REGISTER</h3>
+        <h4>{{ est.company_name.upper() }}</h4>
+        {% if est.address %}<p>{{ est.address }}</p>{% endif %}
+        <p style="font-weight:700; color:#1e3a8a; margin-top:6px;">
+            Month: {{ payroll.month_name }} {{ payroll.year }} &nbsp;|&nbsp; Working Days: {{ payroll.working_days }}
+            {% if holiday_days %}&nbsp;|&nbsp; Holidays: {{ holiday_days|join(', ') }}{% endif %}
+        </p>
+    </div>
+
+    <table class="att-table">
+        <thead>
+            <tr>
+                <th style="min-width:30px;">Sr</th>
+                <th style="min-width:130px; text-align:left;">Employee Name</th>
+                <th style="min-width:100px;">UAN</th>
+                <th style="min-width:90px;">ESIC IP</th>
+                {% for d in range(1, num_days + 1) %}
+                <th class="day-cell {% if d in rest_days %}rest-header{% elif d in holiday_days %}holiday-header{% endif %}">{{ d }}</th>
+                {% endfor %}
+                <th class="summary-col">Pres</th>
+                <th class="summary-col">Abs</th>
+                <th class="summary-col">PH</th>
+                <th class="summary-col">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% set ns = namespace(t_pres=0, t_abs=0, t_ph=0, t_total=0) %}
+
+            {% for att in attendance %}
+            <tr>
+                <td style="color:#94a3b8;">{{ loop.index }}</td>
+                <td style="text-align:left; font-weight:600; white-space:nowrap;">{{ att.emp.name }}</td>
+                <td style="font-size:0.62rem; color:#64748b;">{{ att.emp.uan_number or '' }}</td>
+                <td style="font-size:0.62rem; color:#64748b;">{{ att.emp.esic_ip_number or 'NA' }}</td>
+
+                {% for d in range(1, num_days + 1) %}
+                    {% set mark = att.marks.get(d, '') %}
+                    <td class="day-cell {% if mark == 'R' %}rest{% elif mark == 'H' %}holiday{% elif mark == 'A' %}absent{% endif %}">
+                        {{ mark }}
+                    </td>
+                {% endfor %}
+
+                <td class="summary-col">{{ att.days_present|int }}</td>
+                <td class="summary-col">{{ att.days_absent|int }}</td>
+                <td class="summary-col">{{ att.paid_holidays|int }}</td>
+                <td class="summary-col" style="font-weight:700;">{{ att.total_days|int }}</td>
+            </tr>
+            {% set ns.t_pres = ns.t_pres + att.days_present|int %}
+            {% set ns.t_abs = ns.t_abs + att.days_absent|int %}
+            {% set ns.t_ph = ns.t_ph + att.paid_holidays|int %}
+            {% set ns.t_total = ns.t_total + att.total_days|int %}
+            {% endfor %}
+
+            <tr class="total-row">
+                <td colspan="4" style="text-align:center;"><strong>TOTAL ({{ attendance|length }} Employees)</strong></td>
+                {% for d in range(1, num_days + 1) %}
+                <td></td>
+                {% endfor %}
+                <td class="summary-col">{{ ns.t_pres }}</td>
+                <td class="summary-col">{{ ns.t_abs }}</td>
+                <td class="summary-col">{{ ns.t_ph }}</td>
+                <td class="summary-col" style="font-weight:700;">{{ ns.t_total }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Legend -->
+    <div style="margin-top:14px; font-size:0.72rem; color:#475569;">
+        <strong>Legend:</strong>
+        <span style="display:inline-block; padding:1px 6px; background:#fff; border:1px solid #cbd5e1; margin:0 4px;">P</span> Present
+        <span style="display:inline-block; padding:1px 6px; background:#fff; color:#c62828; border:1px solid #cbd5e1; margin:0 4px;">A</span> Absent
+        <span style="display:inline-block; padding:1px 6px; background:#fce4ec; color:#c62828; font-weight:700; border:1px solid #f48fb1; margin:0 4px;">R</span> Rest/Weekly Off
+        <span style="display:inline-block; padding:1px 6px; background:#c8e6c9; color:#1b5e20; font-weight:700; border:1px solid #81c784; margin:0 4px;">H</span> Holiday
+    </div>
+
+    <!-- Signature -->
+    <div style="margin-top:36px; display:flex; justify-content:space-between;">
+        <div style="text-align:center; font-size:0.72rem; color:#475569;">
+            <div style="border-top:1px solid #94a3b8; width:150px; margin:0 auto 3px;"></div>
+            <div>Prepared By</div>
+            <div style="font-size:0.62rem; color:#94a3b8;">Vaishnavi Consultant</div>
+        </div>
+        <div style="text-align:center; font-size:0.72rem; color:#475569;">
+            <div style="border-top:1px solid #94a3b8; width:150px; margin:0 auto 3px;"></div>
+            <div>Verified By</div>
+            <div style="font-size:0.62rem; color:#94a3b8;">{{ est.company_name }}</div>
+        </div>
+    </div>
+
+    <div style="margin-top:14px; display:flex; justify-content:space-between; font-size:0.68rem; color:#94a3b8;">
+        <div>Generated: {{ generated_on }}</div>
+        <div>Vaishnavi Consultant</div>
+    </div>
+</div>
+{% endblock %}

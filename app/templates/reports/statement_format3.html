@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block title %}Salary Register (Format 3) - {{ payroll.period_display }}{% endblock %}
+{% block page_header %}Salary Register — Compact Executive{% endblock %}
+
+{% block content %}
+<style>
+    @page { size: legal landscape; margin: 8mm; }
+    @media print {
+        .sidebar, .top-navbar, .no-print { display: none !important; }
+        .main-content { margin-left: 0 !important; padding: 0 !important; }
+        .page-content { padding: 0 !important; }
+        body { background: #fff !important; }
+        .sf3-page { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 10px !important; }
+        .sf3-table th, .sf3-table td { font-size: 8px !important; padding: 2px 4px !important; }
+        .page-break { page-break-before: always; }
+    }
+
+    .sf3-page { background:#fff; border:1px solid #e2e8f0; border-radius:6px; padding:24px; margin-bottom:20px; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+
+    .sf3-hdr { border-bottom:2px solid #1e293b; padding-bottom:10px; margin-bottom:12px; }
+    .sf3-hdr-top { display:flex; justify-content:space-between; align-items:flex-end; }
+    .sf3-hdr h2 { font-size:1rem; font-weight:800; color:#1e293b; margin:0; letter-spacing:0.5px; text-transform:uppercase; }
+    .sf3-hdr .sub { font-size:0.65rem; color:#94a3b8; }
+    .sf3-hdr .client { font-size:0.82rem; font-weight:700; color:#1e293b; }
+    .sf3-hdr .meta { font-size:0.7rem; color:#475569; margin-top:2px; }
+    .sf3-hdr .period-badge { display:inline-block; background:#1e293b; color:#fff; font-size:0.65rem; padding:2px 10px; border-radius:3px; font-weight:600; }
+
+    .sf3-table { width:100%; border-collapse:collapse; font-size:0.72rem; }
+    .sf3-table thead th {
+        background:#1e293b; color:#fff; padding:5px 6px; text-align:center;
+        font-weight:600; font-size:0.64rem; text-transform:uppercase; letter-spacing:0.3px;
+        border:1px solid #334155; vertical-align:middle;
+    }
+    .sf3-table thead .sub-hdr { background:#334155; font-size:0.58rem; color:#cbd5e1; }
+    .sf3-table tbody td { padding:4px 5px; border:1px solid #e2e8f0; vertical-align:middle; }
+    .sf3-table tbody tr:nth-child(odd) { background:#fafbfc; }
+    .sf3-table tbody tr:hover { background:#f1f5f9; }
+    .sf3-table .r { text-align:right; }
+    .sf3-table .c { text-align:center; }
+    .sf3-table .l { text-align:left; }
+    .sf3-table .ded { color:#dc2626; }
+    .sf3-table .earn { color:#16a34a; font-weight:700; }
+    .sf3-table .net-col { background:#f0fdf4; font-weight:800; color:#166534; }
+
+    .sf3-table .total-row { background:#1e293b !important; color:#fff; font-weight:700; }
+    .sf3-table .total-row td { border-color:#475569; }
+
+    .sf3-quick { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+    .sf3-quick .chip { background:#f1f5f9; border:1px solid #e2e8f0; border-radius:4px; padding:4px 12px; font-size:0.7rem; }
+    .sf3-quick .chip strong { color:#1e293b; }
+    .sf3-quick .chip .lbl { color:#64748b; font-size:0.62rem; display:block; }
+
+    .sf3-box { border:1px solid #e2e8f0; border-radius:6px; overflow:hidden; }
+    .sf3-box .bh { background:#1e293b; color:#fff; padding:5px 12px; font-size:0.7rem; font-weight:700; }
+    .sf3-box table { width:100%; border-collapse:collapse; font-size:0.7rem; }
+    .sf3-box table td { padding:3px 12px; border-bottom:1px solid #f1f5f9; }
+    .sf3-box table .k { color:#475569; }
+    .sf3-box table .v { text-align:right; font-weight:600; color:#1e293b; }
+    .sf3-box table .tot td { border-top:2px solid #1e293b; font-weight:700; padding:5px 12px; background:#f8fafc; }
+</style>
+
+<div class="no-print mb-3 d-flex justify-content-between align-items-center">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb" style="font-size:0.85rem; margin:0;">
+            <li class="breadcrumb-item"><a href="{{ url_for('payroll.payroll_list') }}" class="text-decoration-none">Salary Processing</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('payroll.payroll_process', payroll_id=payroll.id) }}" class="text-decoration-none">{{ payroll.period_display }}</a></li>
+            <li class="breadcrumb-item active">Salary Register (Format 3)</li>
+        </ol>
+    </nav>
+    <div class="d-flex gap-2">
+        <button onclick="window.history.back()" style="background:#e5e7eb; color:#333; border:none; padding:6px 16px; border-radius:6px; cursor:pointer; font-size:0.82rem;"><i class="bi bi-arrow-left me-1"></i> Back to Payroll</button>
+        <button onclick="window.print()" class="btn btn-dark btn-sm">
+            <i class="bi bi-printer me-1"></i> Print / PDF
+        </button>
+    </div>
+</div>
+
+<!-- =============== PAGE 1: COMPACT SALARY REGISTER =============== -->
+<div class="sf3-page">
+    <div class="sf3-hdr">
+        <div class="sf3-hdr-top">
+            <div>
+                <h2>Vaishnavi Consultant</h2>
+                <div class="sub">Compliance & Payroll Consultants</div>
+            </div>
+            <div style="text-align:right;">
+                <div class="client">{{ est.company_name }}</div>
+                <div class="meta">
+                    {% if est.address %}{{ est.address }} | {% endif %}
+                    {% if est.pf_code %}PF: {{ est.pf_code }} | {% endif %}
+                    {% if est.esic_code %}ESIC: {{ est.esic_code }}{% endif %}
+                </div>
+            </div>
+        </div>
+        <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
+            <span class="period-badge">{{ payroll.month_name }} {{ payroll.year }}</span>
+            <span style="font-size:0.7rem; color:#475569;">Working Days: <strong>{{ payroll.working_days }}</strong> | Employees: <strong>{{ entries|length }}</strong></span>
+        </div>
+    </div>
+
+    <div style="overflow-x:auto;">
+        <table class="sf3-table">
+            <thead>
+                <tr>
+                    <th rowspan="2" style="width:28px;">#</th>
+                    <th rowspan="2" style="min-width:120px; text-align:left;">Employee</th>
+                    <th rowspan="2" style="min-width:60px;">UAN / ESIC</th>
+                    <th colspan="3">Days</th>
+                    <th rowspan="2">Gross<br>Rate</th>
+                    {% for head in heads %}
+                    <th rowspan="2">{{ head.short_code }}</th>
+                    {% endfor %}
+                    <th rowspan="2">NPH<br>Amt</th>
+                    <th rowspan="2" style="background:#166534;">Earned<br>Gross</th>
+                    {% if config.ot_applicable %}
+                    <th rowspan="2">OT<br>Hrs</th>
+                    <th rowspan="2">OT<br>Amt</th>
+                    {% endif %}
+                    {% if config.epf_applicable %}
+                    <th colspan="2" style="background:#7c2d12;">EPF</th>
+                    {% endif %}
+                    {% if config.esic_applicable %}
+                    <th colspan="2" style="background:#7c2d12;">ESIC</th>
+                    {% endif %}
+                    {% if config.pt_applicable %}
+                    <th rowspan="2" style="background:#7c2d12;">PT</th>
+                    {% endif %}
+                    <th rowspan="2" style="background:#7c2d12;">Oth<br>Ded</th>
+                    <th rowspan="2" style="background:#7c2d12;">Tot<br>Ded</th>
+                    <th rowspan="2" style="background:#166534;">Net Pay</th>
+                    <th rowspan="2">Sign</th>
+                </tr>
+                <tr>
+                    <th class="sub-hdr">Wrk</th>
+                    <th class="sub-hdr">PH</th>
+                    <th class="sub-hdr">Pay</th>
+                    {% if config.epf_applicable %}
+                    <th class="sub-hdr">EE</th>
+                    <th class="sub-hdr">ER</th>
+                    {% endif %}
+                    {% if config.esic_applicable %}
+                    <th class="sub-hdr">EE</th>
+                    <th class="sub-hdr">ER</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% set ns = namespace(
+                    t_present=0, t_ph=0, t_payable=0,
+                    t_nph_amt=0, t_earned=0, t_ot_hrs=0, t_ot=0,
+                    t_epf_ee=0, t_epf_er=0, t_esic_ee=0, t_esic_er=0,
+                    t_pt=0, t_other_ded=0, t_total_ded=0, t_net=0
+                ) %}
+                {% set head_totals = {} %}
+
+                {% for entry in entries %}
+                <tr>
+                    <td class="c" style="color:#94a3b8;">{{ loop.index }}</td>
+                    <td class="l">
+                        <div style="font-weight:700; font-size:0.72rem;">{{ entry.employee.name }}</div>
+                        <div style="font-size:0.58rem; color:#94a3b8;">{{ entry.employee.designation or '' }}</div>
+                    </td>
+                    {% set uan = entry.employee.uan_number or '' %}
+                    {% set uan_bad = uan and (uan|length != 12 or not uan.isdigit()) %}
+                    {% set ip = entry.employee.esic_ip_number or '' %}
+                    {% set ip_bad = ip and (ip|length != 10 or not ip.isdigit()) %}
+                    <td class="c" style="font-size:0.58rem; line-height:1.3;">
+                        <span style="{% if uan_bad %}color:#dc2626; font-weight:700;{% else %}color:#64748b;{% endif %}"{% if uan_bad %} title="UAN must be 12 digits"{% endif %}>{{ uan or '-' }}{% if uan_bad %} <i class="bi bi-exclamation-triangle-fill" style="font-size:0.5rem;"></i>{% endif %}</span><br>
+                        <span style="{% if ip_bad %}color:#dc2626; font-weight:700;{% else %}color:#64748b;{% endif %}"{% if ip_bad %} title="ESIC IP must be 10 digits"{% endif %}>{{ ip or 'NA' }}{% if ip_bad %} <i class="bi bi-exclamation-triangle-fill" style="font-size:0.5rem;"></i>{% endif %}</span>
+                    </td>
+                    <td class="c">{{ entry.days_present|int if entry.days_present == entry.days_present|int else entry.days_present }}</td>
+                    <td class="c">{{ entry.paid_holidays|int if entry.paid_holidays else 0 }}</td>
+                    <td class="c" style="font-weight:700;">{{ entry.total_payable_days|int if entry.total_payable_days == entry.total_payable_days|int else entry.total_payable_days }}</td>
+                    <td class="r" style="color:#64748b;">{{ "{:,.0f}".format(entry.gross_salary) }}</td>
+
+                    {% for head in heads %}
+                    <td class="r">
+                        {% if head.id in entry.head_amounts %}
+                            {{ "{:,.0f}".format(entry.head_amounts[head.id].earned_amount) }}
+                            {% if head_totals.update({head.id: (head_totals.get(head.id, 0) + entry.head_amounts[head.id].earned_amount)}) %}{% endif %}
+                        {% else %}-{% endif %}
+                    </td>
+                    {% endfor %}
+
+                    <td class="r">{{ "{:,.0f}".format(entry._nph_amount) if entry._nph_amount else "-" }}</td>
+                    <td class="r earn">{{ "{:,.0f}".format(entry.earned_gross) }}</td>
+                    {% if config.ot_applicable %}
+                    <td class="c">{{ entry.ot_hours|int if entry.ot_hours else "-" }}</td>
+                    <td class="r">{{ "{:,.0f}".format(entry.ot_amount) }}</td>
+                    {% endif %}
+                    {% if config.epf_applicable %}
+                    <td class="r ded">{{ "{:,.0f}".format(entry.epf_employee) }}</td>
+                    <td class="r" style="color:#92400e;">{{ "{:,.0f}".format(entry.epf_employer) }}</td>
+                    {% endif %}
+                    {% if config.esic_applicable %}
+                    <td class="r ded">{{ "{:,.0f}".format(entry.esic_employee) }}</td>
+                    <td class="r" style="color:#92400e;">{{ "{:,.0f}".format(entry.esic_employer) }}</td>
+                    {% endif %}
+                    {% if config.pt_applicable %}
+                    <td class="r ded">{{ "{:,.0f}".format(entry.professional_tax) }}</td>
+                    {% endif %}
+                    <td class="r">{{ "{:,.0f}".format(entry.other_deduction) if entry.other_deduction else "-" }}</td>
+                    <td class="r" style="font-weight:700; color:#dc2626;">{{ "{:,.0f}".format(entry.total_deductions) }}</td>
+                    <td class="r net-col">{{ "{:,.0f}".format(entry.net_pay) }}</td>
+                    <td></td>
+                </tr>
+                {% set ns.t_present = ns.t_present + entry.days_present %}
+                {% set ns.t_ph = ns.t_ph + (entry.paid_holidays or 0) %}
+                {% set ns.t_payable = ns.t_payable + entry.total_payable_days %}
+                {% set ns.t_nph_amt = ns.t_nph_amt + (entry._nph_amount or 0) %}
+                {% set ns.t_earned = ns.t_earned + entry.earned_gross %}
+                {% set ns.t_ot_hrs = ns.t_ot_hrs + (entry.ot_hours or 0) %}
+                {% set ns.t_ot = ns.t_ot + entry.ot_amount %}
+                {% set ns.t_epf_ee = ns.t_epf_ee + entry.epf_employee %}
+                {% set ns.t_epf_er = ns.t_epf_er + entry.epf_employer %}
+                {% set ns.t_esic_ee = ns.t_esic_ee + entry.esic_employee %}
+                {% set ns.t_esic_er = ns.t_esic_er + entry.esic_employer %}
+                {% set ns.t_pt = ns.t_pt + entry.professional_tax %}
+                {% set ns.t_other_ded = ns.t_other_ded + entry.other_deduction %}
+                {% set ns.t_total_ded = ns.t_total_ded + entry.total_deductions %}
+                {% set ns.t_net = ns.t_net + entry.net_pay %}
+                {% endfor %}
+
+                <tr class="total-row">
+                    <td></td>
+                    <td class="l">TOTAL ({{ entries|length }})</td>
+                    <td></td>
+                    <td class="c">{{ ns.t_present|int }}</td>
+                    <td class="c">{{ ns.t_ph|int }}</td>
+                    <td class="c">{{ ns.t_payable|int }}</td>
+                    <td></td>
+                    {% for head in heads %}
+                    <td class="r">{{ "{:,.0f}".format(head_totals.get(head.id, 0)) }}</td>
+                    {% endfor %}
+                    <td class="r">{{ "{:,.0f}".format(ns.t_nph_amt) }}</td>
+                    <td class="r" style="color:#86efac;">{{ "{:,.0f}".format(ns.t_earned) }}</td>
+                    {% if config.ot_applicable %}
+                    <td class="c">{{ ns.t_ot_hrs|int }}</td>
+                    <td class="r">{{ "{:,.0f}".format(ns.t_ot) }}</td>
+                    {% endif %}
+                    {% if config.epf_applicable %}
+                    <td class="r">{{ "{:,.0f}".format(ns.t_epf_ee) }}</td>
+                    <td class="r">{{ "{:,.0f}".format(ns.t_epf_er) }}</td>
+                    {% endif %}
+                    {% if config.esic_applicable %}
+                    <td class="r">{{ "{:,.0f}".format(ns.t_esic_ee) }}</td>
+                    <td class="r">{{ "{:,.0f}".format(ns.t_esic_er) }}</td>
+                    {% endif %}
+                    {% if config.pt_applicable %}
+                    <td class="r">{{ "{:,.0f}".format(ns.t_pt) }}</td>
+                    {% endif %}
+                    <td class="r">{{ "{:,.0f}".format(ns.t_other_ded) }}</td>
+                    <td class="r">{{ "{:,.0f}".format(ns.t_total_ded) }}</td>
+                    <td class="r" style="color:#86efac; font-size:0.82rem;">{{ "{:,.0f}".format(ns.t_net) }}</td>
+                    <td></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div style="margin-top:16px; display:flex; justify-content:space-between; font-size:0.68rem; color:#94a3b8;">
+        <div>{{ generated_on }}</div>
+        <div>Vaishnavi Consultant</div>
+    </div>
+</div>
+
+{% endblock %}

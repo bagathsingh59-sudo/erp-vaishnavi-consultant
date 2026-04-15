@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Form XIX — Pay Slips | {{ est.company_name }} | {{ payroll.period_display }}</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 10mm 12mm;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            color: #000;
+            background: #fff;
+        }
+
+        .slip-container {
+            width: 100%;
+            page-break-inside: avoid;
+            border: 2px solid #000;
+            padding: 0;
+            margin-bottom: 12px;
+        }
+
+        /* 2 slips per page */
+        .slip-container:nth-child(2n) {
+            page-break-after: always;
+        }
+        .slip-container:last-child {
+            page-break-after: avoid;
+        }
+
+        .slip-header {
+            text-align: center;
+            font-weight: bold;
+            font-size: 13px;
+            padding: 6px 0 2px;
+            border-bottom: 1px solid #000;
+            background: #f0f0f0;
+        }
+        .slip-header small {
+            font-size: 9px;
+            font-weight: normal;
+            display: block;
+        }
+
+        .info-section {
+            padding: 5px 10px;
+            border-bottom: 1px solid #000;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 2px;
+        }
+        .info-label {
+            font-weight: bold;
+            font-size: 10px;
+            color: #333;
+            min-width: 200px;
+        }
+        .info-value {
+            font-size: 10.5px;
+        }
+
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .details-table td {
+            padding: 4px 8px;
+            border: 1px solid #000;
+            font-size: 10.5px;
+            vertical-align: top;
+        }
+        .details-table .label-cell {
+            font-weight: bold;
+            background: #f5f5f5;
+            width: 48%;
+            font-size: 10px;
+        }
+        .details-table .value-cell {
+            width: 52%;
+            text-align: right;
+            font-weight: bold;
+        }
+        .details-table .highlight-row td {
+            background: #e8e8e8;
+            font-weight: bold;
+            font-size: 11px;
+        }
+
+        .signature-section {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 15px;
+            font-size: 10px;
+            border-top: 1px solid #000;
+        }
+
+        .cut-line {
+            text-align: center;
+            font-size: 8px;
+            color: #999;
+            margin: 4px 0;
+            border-top: 1px dashed #ccc;
+            padding-top: 2px;
+        }
+
+        /* Print styles */
+        @media print {
+            body { background: #fff; }
+            .no-print { display: none !important; }
+            .cut-line { color: #999; }
+        }
+
+        /* Print button */
+        .print-bar {
+            background: #1e40af;
+            color: #fff;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-radius: 6px;
+        }
+        .print-bar button {
+            background: #fff;
+            color: #1e40af;
+            border: none;
+            padding: 6px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <!-- Print Bar -->
+    <div class="print-bar no-print">
+        <div>
+            <strong>FORM XIX — Pay Slips</strong> |
+            {{ est.company_name }} | {{ payroll.period_display }} |
+            {{ slips|length }} Employee(s)
+        </div>
+        <div>
+            <button onclick="window.print()">🖨 Print / Save PDF</button>
+            <button onclick="window.close()" style="margin-left:8px; background:#e5e7eb; color:#333;">✕ Close</button>
+        </div>
+    </div>
+
+    {% for slip in slips %}
+    <div class="slip-container">
+        <!-- Header -->
+        <div class="slip-header">
+            FORM XIX
+            <small>[ SEE RULE 78 (2) ]</small>
+            WAGES SLIP
+        </div>
+
+        <!-- Establishment Info Section -->
+        <div class="info-section" style="font-size:10px;">
+            <div class="info-row">
+                <div><span class="info-label">Name & Address of Contractor:</span> {{ est.contact_person or est.company_name }}</div>
+            </div>
+            <div class="info-row">
+                <div><span class="info-label">Name & Address of Establishment:</span> {{ est.company_name }}{% if est.address %}, {{ est.address }}{% endif %}</div>
+            </div>
+            <div class="info-row">
+                <div style="flex:1;"><span class="info-label">Name & Address of Principal Employer:</span> {{ est.company_name }}{% if est.address %}, {{ est.address }}{% endif %}</div>
+            </div>
+        </div>
+
+        <!-- Employee Info Section -->
+        <div class="info-section">
+            {% set uan = slip.emp.uan_number or '' %}
+            {% set uan_bad = uan and (uan|length != 12 or not uan.isdigit()) %}
+            {% set ip = slip.emp.esic_ip_number or '' %}
+            {% set ip_bad = ip and (ip|length != 10 or not ip.isdigit()) %}
+            <div class="info-row">
+                <div><span class="info-label">UAN Number:</span> <span style="{% if uan_bad %}color:#dc2626; font-weight:700;{% endif %}"{% if uan_bad %} title="UAN must be 12 digits"{% endif %}>{{ uan or '—' }}{% if uan_bad %} <i class="bi bi-exclamation-triangle-fill" style="font-size:0.6rem; color:#dc2626;"></i>{% endif %}</span></div>
+                <div><span class="info-label">Month:</span> {{ payroll.period_display }}</div>
+            </div>
+            <div class="info-row">
+                <div><span class="info-label">ESIC Number:</span> <span style="{% if ip_bad %}color:#dc2626; font-weight:700;{% endif %}"{% if ip_bad %} title="ESIC IP must be 10 digits"{% endif %}>{{ ip or '—' }}{% if ip_bad %} <i class="bi bi-exclamation-triangle-fill" style="font-size:0.6rem; color:#dc2626;"></i>{% endif %}</span></div>
+            </div>
+            <div class="info-row">
+                <div><span class="info-label">Name of the Workmen:</span> {{ slip.emp.name }}</div>
+                <div><span class="info-label">Father's/Husband Name:</span> {{ slip.emp.father_husband_name }}</div>
+            </div>
+        </div>
+
+        <!-- Salary Details Table -->
+        <table class="details-table">
+            <tr>
+                <td class="label-cell">No. of Days Worked</td>
+                <td class="value-cell">{{ slip.entry.days_present|int }}</td>
+            </tr>
+            <tr>
+                <td class="label-cell">Paid Holidays (NPH/PH)</td>
+                <td class="value-cell">{{ slip.entry.paid_holidays|int if slip.entry.paid_holidays else '—' }}</td>
+            </tr>
+            <tr>
+                <td class="label-cell">Total Payable Days</td>
+                <td class="value-cell">{{ slip.entry.total_payable_days|int if slip.entry.total_payable_days == slip.entry.total_payable_days|int else slip.entry.total_payable_days }}</td>
+            </tr>
+            <tr>
+                <td class="label-cell">Rate of Daily Wages / Piece Rate</td>
+                <td class="value-cell">{{ "₹{:,.0f}".format(slip.daily_rate) }}</td>
+            </tr>
+            <tr>
+                <td class="label-cell">Sub Total Wages</td>
+                <td class="value-cell">{{ "₹{:,.0f}".format(slip.entry.earned_gross) }}</td>
+            </tr>
+            <tr>
+                <td class="label-cell">Overtime Worked (in Hours)</td>
+                <td class="value-cell">{{ slip.entry.ot_hours|int if slip.entry.ot_hours else '—' }}</td>
+            </tr>
+            <tr>
+                <td class="label-cell">Wages of Overtime</td>
+                <td class="value-cell">{{ "₹{:,.0f}".format(slip.entry.ot_amount) if slip.entry.ot_amount else '—' }}</td>
+            </tr>
+            <tr class="highlight-row">
+                <td class="label-cell">Gross Wages / Earning Payable Rs.</td>
+                <td class="value-cell">{{ "₹{:,.0f}".format(slip.entry.total_earnings) }}</td>
+            </tr>
+            <tr>
+                <td class="label-cell">EPF Employee Share Deduction</td>
+                <td class="value-cell">{{ "₹{:,.0f}".format(slip.entry.epf_employee) if slip.entry.epf_employee else '—' }}</td>
+            </tr>
+            <tr>
+                <td class="label-cell">ESIC Employee Share Deduction</td>
+                <td class="value-cell">{{ "₹{:,.0f}".format(slip.entry.esic_employee) if slip.entry.esic_employee else '—' }}</td>
+            </tr>
+            {% if slip.entry.professional_tax > 0 %}
+            <tr>
+                <td class="label-cell">Professional Tax</td>
+                <td class="value-cell">{{ "₹{:,.0f}".format(slip.entry.professional_tax) }}</td>
+            </tr>
+            {% endif %}
+            {% if slip.entry.other_deduction > 0 %}
+            <tr>
+                <td class="label-cell">{{ slip.entry.other_deduction_remark or 'Other Deduction' }}</td>
+                <td class="value-cell">{{ "₹{:,.0f}".format(slip.entry.other_deduction) }}</td>
+            </tr>
+            {% endif %}
+            <tr>
+                <td class="label-cell">Total Deduction</td>
+                <td class="value-cell">{{ "₹{:,.0f}".format(slip.entry.total_deductions) }}</td>
+            </tr>
+            <tr class="highlight-row">
+                <td class="label-cell">Total Net Payable Rs.</td>
+                <td class="value-cell" style="font-size:12px;">{{ "₹{:,.0f}".format(slip.entry.net_pay) }}</td>
+            </tr>
+        </table>
+
+        <!-- Signature Section -->
+        <div class="signature-section">
+            <div>Employee Signature</div>
+            <div>Employer / Contractor Signature</div>
+        </div>
+    </div>
+
+    {% if loop.index is even and not loop.last %}
+    <div class="cut-line no-print">✂ — — — — — — — — — — — — — — — — — — — — — — — — — — —</div>
+    {% elif loop.index is odd and not loop.last %}
+    <div class="cut-line no-print" style="border:none; margin:6px 0;">— — — — — — — —</div>
+    {% endif %}
+    {% endfor %}
+</body>
+</html>

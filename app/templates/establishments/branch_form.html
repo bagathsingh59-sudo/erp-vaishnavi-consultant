@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Add Branch / Sub-Unit — {{ parent.company_name }}{% endblock %}
+{% block page_header %}Add Branch / Sub-Unit{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb" style="font-size:0.85rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('establishment.establishment_list') }}" class="text-decoration-none">Establishments</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('establishment.establishment_view', id=parent.id) }}" class="text-decoration-none">{{ parent.company_name }}</a></li>
+        <li class="breadcrumb-item active">Add Branch</li>
+    </ol>
+</nav>
+
+<!-- Parent Info Banner -->
+<div style="background:linear-gradient(135deg, #4f46e5, #7c3aed); color:#fff; padding:16px 24px; border-radius:var(--radius); margin-bottom:24px;">
+    <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.5px; opacity:0.8;">Creating Branch / Sub-Unit Of</div>
+    <div style="font-size:1.15rem; font-weight:700; margin-top:4px;">{{ parent.company_name }}</div>
+    <div style="font-size:0.82rem; opacity:0.85; margin-top:2px;">
+        {% if parent.pf_code %}<span class="me-3"><i class="bi bi-shield-check me-1"></i>{{ parent.pf_code }}</span>{% endif %}
+        {% if parent.esic_code %}<span><i class="bi bi-hospital me-1"></i>{{ parent.esic_code }}</span>{% endif %}
+    </div>
+    <div style="margin-top:8px; padding:8px 12px; background:rgba(255,255,255,0.15); border-radius:6px; font-size:0.78rem;">
+        <i class="bi bi-info-circle me-1"></i>
+        Payroll configuration and salary heads will be automatically copied from the parent establishment.
+        You can modify them later for this branch independently.
+    </div>
+</div>
+
+<form method="POST" autocomplete="off">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="form-card">
+        <!-- Section 1: Branch Identity -->
+        <div class="form-section">
+            <div class="form-section-title">
+                <i class="bi bi-diagram-3"></i> Branch / Sub-Unit Details
+            </div>
+            <div class="form-section-desc">Identify this branch within {{ parent.company_name }}</div>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Branch / Sub-Unit Name <span class="text-danger">*</span></label>
+                    <input type="text" name="branch_name" class="form-control"
+                           placeholder="e.g., Unit 2, Bangalore Branch, Factory Site"
+                           required>
+                    <small class="text-muted">This will appear as "{{ parent.company_name }} — [Branch Name]"</small>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Branch Address</label>
+                    <textarea name="address" class="form-control" rows="2"
+                              placeholder="Enter address (leave blank to use parent's address)">{{ parent.address or '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 2: Registration Numbers (may differ per branch) -->
+        <div class="form-section">
+            <div class="form-section-title">
+                <i class="bi bi-card-checklist"></i> Registration Numbers
+            </div>
+            <div class="form-section-desc">These may be different for each branch/sub-unit</div>
+
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">PF Code Number</label>
+                    <input type="text" name="pf_code" class="form-control"
+                           placeholder="e.g., KABLR0012345001"
+                           value="">
+                    <small class="text-muted">Parent: {{ parent.pf_code or 'Not set' }}</small>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">ESIC Code Number</label>
+                    <input type="text" name="esic_code" class="form-control"
+                           placeholder="e.g., 53001234567890123"
+                           value="">
+                    <small class="text-muted">Parent: {{ parent.esic_code or 'Not set' }}</small>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Registration Date</label>
+                    <input type="date" name="date_of_registration" class="form-control"
+                           value="{{ parent.date_of_registration.strftime('%Y-%m-%d') if parent.date_of_registration else '' }}">
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 3: Contact (optional override) -->
+        <div class="form-section">
+            <div class="form-section-title">
+                <i class="bi bi-person-lines-fill"></i> Contact (Optional)
+            </div>
+            <div class="form-section-desc">Leave blank to inherit from parent establishment</div>
+
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Contact Person</label>
+                    <input type="text" name="contact_person" class="form-control"
+                           value="{{ parent.contact_person or '' }}"
+                           placeholder="Contact person name">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Phone</label>
+                    <input type="text" name="contact_phone" class="form-control"
+                           value="{{ parent.contact_phone or '' }}"
+                           placeholder="Phone number">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="contact_email" class="form-control"
+                           value="{{ parent.contact_email or '' }}"
+                           placeholder="Email address">
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 4: Service & Fee -->
+        <div class="form-section">
+            <div class="form-section-title">
+                <i class="bi bi-currency-rupee"></i> Fee Configuration
+            </div>
+            <div class="form-section-desc">Consultant fee for this branch (can differ from parent)</div>
+
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Fee Type</label>
+                    <select name="fee_type" class="form-select">
+                        <option value="">Same as parent</option>
+                        <option value="Monthly" {% if parent.fee_type == 'Monthly' %}selected{% endif %}>Monthly</option>
+                        <option value="Quarterly" {% if parent.fee_type == 'Quarterly' %}selected{% endif %}>Quarterly</option>
+                        <option value="Half Yearly" {% if parent.fee_type == 'Half Yearly' %}selected{% endif %}>Half Yearly</option>
+                        <option value="Yearly" {% if parent.fee_type == 'Yearly' %}selected{% endif %}>Yearly</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Fee Amount (₹)</label>
+                    <input type="number" name="fee_amount" class="form-control"
+                           value="{{ parent.fee_amount or '' }}"
+                           placeholder="0.00" step="0.01" min="0">
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="form-actions" style="padding:16px 20px; border-top:1px solid var(--border-color); display:flex; justify-content:space-between;">
+            <a href="{{ url_for('establishment.establishment_view', id=parent.id) }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i> Cancel
+            </a>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-diagram-3 me-1"></i> Create Branch / Sub-Unit
+            </button>
+        </div>
+    </div>
+</form>
+{% endblock %}

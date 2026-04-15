@@ -1,0 +1,927 @@
+{% extends "base.html" %}
+
+{% block title %}{{ payroll.period_display }} - {{ est.company_name }}{% endblock %}
+{% block page_header %}Payroll Processing{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb" style="font-size:0.85rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('payroll.payroll_list') }}" class="text-decoration-none">Salary Processing</a></li>
+        <li class="breadcrumb-item active">{{ payroll.period_display }} — {{ est.company_name }}</li>
+    </ol>
+</nav>
+
+<!-- Payroll Header Banner -->
+<div style="background:linear-gradient(135deg, var(--primary), #7c3aed); color:#fff; padding:16px 24px; border-radius:var(--radius); margin-bottom:24px;">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+            <div style="font-weight:700; font-size:1.15rem;">{{ payroll.period_display }}</div>
+            <div style="opacity:0.8; font-size:0.85rem;">{{ est.company_name }} | Working Days: {{ payroll.working_days }}</div>
+        </div>
+        <div class="d-flex gap-3 align-items-center">
+            {% if payroll.status == 'draft' %}
+                <span class="badge bg-warning bg-opacity-25 text-white px-3 py-2" style="border-radius:20px; font-size:0.8rem;">
+                    <i class="bi bi-pencil-square me-1"></i> Draft
+                </span>
+            {% elif payroll.status == 'processing' %}
+                <span class="badge bg-info bg-opacity-25 text-white px-3 py-2" style="border-radius:20px; font-size:0.8rem;">
+                    <i class="bi bi-gear-wide-connected me-1"></i> Processing
+                </span>
+            {% elif payroll.status == 'finalized' %}
+                <span class="badge bg-success bg-opacity-25 text-white px-3 py-2" style="border-radius:20px; font-size:0.8rem;">
+                    <i class="bi bi-check-circle me-1"></i> Finalized
+                </span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if payroll.status != 'draft' %}
+    <!-- Summary Row 1: Overview -->
+    <div class="row g-2 mt-3">
+        <div class="col">
+            <div style="background:rgba(255,255,255,0.12); border-radius:8px; padding:8px 12px; text-align:center;">
+                <div style="font-size:0.6rem; opacity:0.7; text-transform:uppercase;">Employees</div>
+                <div style="font-size:1.1rem; font-weight:700;">{{ payroll.total_employees }}</div>
+            </div>
+        </div>
+        <div class="col">
+            <div style="background:rgba(255,255,255,0.12); border-radius:8px; padding:8px 12px; text-align:center;">
+                <div style="font-size:0.6rem; opacity:0.7; text-transform:uppercase;">Total Gross</div>
+                <div style="font-size:1rem; font-weight:700;">{{ "₹{:,.0f}".format(payroll.total_gross) }}</div>
+            </div>
+        </div>
+        <div class="col">
+            <div style="background:rgba(255,255,255,0.12); border-radius:8px; padding:8px 12px; text-align:center;">
+                <div style="font-size:0.6rem; opacity:0.7; text-transform:uppercase;">EPF EE (12%)</div>
+                <div style="font-size:1rem; font-weight:700;">{{ "₹{:,.0f}".format(payroll.total_epf_employee) }}</div>
+            </div>
+        </div>
+        <div class="col">
+            <div style="background:rgba(255,255,255,0.15); border-radius:8px; padding:8px 12px; text-align:center;">
+                <div style="font-size:0.6rem; opacity:0.7; text-transform:uppercase;">ESIC EE (0.75%)</div>
+                <div style="font-size:1rem; font-weight:700;">{{ "₹{:,.0f}".format(payroll.total_esic_employee) }}</div>
+            </div>
+        </div>
+        {% if payroll.total_pt > 0 %}
+        <div class="col">
+            <div style="background:rgba(255,255,255,0.12); border-radius:8px; padding:8px 12px; text-align:center;">
+                <div style="font-size:0.6rem; opacity:0.7; text-transform:uppercase;">Prof. Tax</div>
+                <div style="font-size:1rem; font-weight:700;">{{ "₹{:,.0f}".format(payroll.total_pt) }}</div>
+            </div>
+        </div>
+        {% endif %}
+        <div class="col">
+            <div style="background:rgba(16,185,129,0.3); border-radius:8px; padding:8px 12px; text-align:center;">
+                <div style="font-size:0.6rem; opacity:0.7; text-transform:uppercase;">Net Pay</div>
+                <div style="font-size:1.1rem; font-weight:700;">{{ "₹{:,.0f}".format(payroll.total_net_pay) }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EPF & ESIC Breakdowns — Side by Side -->
+    <div class="d-flex gap-2 flex-wrap" style="margin-top:10px;">
+        {% if config.epf_applicable %}
+        <div style="background:rgba(255,255,255,0.08); border-radius:8px; padding:10px 16px; flex:1; min-width:280px;">
+            <div style="font-size:0.68rem; opacity:0.7; margin-bottom:6px; font-weight:600;">EPF BREAKDOWN</div>
+            <div class="d-flex gap-3 flex-wrap" style="font-size:0.78rem;">
+                <div><span style="opacity:0.6;">EE (12%):</span> <strong>{{ "₹{:,.0f}".format(payroll.total_epf_employee) }}</strong></div>
+                <div><span style="opacity:0.6;">A/c 01:</span> <strong>{{ "₹{:,.0f}".format(payroll.total_epf_ac01) }}</strong></div>
+                <div><span style="opacity:0.6;">EPS:</span> <strong>{{ "₹{:,.0f}".format(payroll.total_epf_eps) }}</strong></div>
+                <div><span style="opacity:0.6;">Admin:</span> <strong>{{ "₹{:,.0f}".format(payroll.total_epf_admin) }}</strong>{% if payroll.total_epf_admin == config.epf_admin_min %}<small style="opacity:0.7; color:#fbbf24;"> (min)</small>{% endif %}</div>
+                <div><span style="opacity:0.6;">EDLI:</span> <strong>{{ "₹{:,.0f}".format(payroll.total_epf_edli) }}</strong></div>
+                <div style="border-left:1px solid rgba(255,255,255,0.3); padding-left:10px;">
+                    <span style="opacity:0.6;">ER (13%):</span> <strong>{{ "₹{:,.0f}".format(payroll.total_epf_employer) }}</strong>
+                </div>
+            </div>
+            <div style="margin-top:8px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.15); font-size:0.82rem;">
+                <span style="opacity:0.7;">Payable to EPF (EE+ER):</span>
+                <strong style="font-size:1rem; color:#fbbf24;">{{ "₹{:,.0f}".format(payroll.total_epf_employee + payroll.total_epf_employer) }}</strong>
+            </div>
+        </div>
+        {% endif %}
+        {% if config.esic_applicable %}
+        <div style="background:rgba(255,255,255,0.08); border-radius:8px; padding:10px 16px; min-width:200px;">
+            <div style="font-size:0.68rem; opacity:0.7; margin-bottom:6px; font-weight:600;">ESIC BREAKDOWN</div>
+            <div class="d-flex gap-3 flex-wrap" style="font-size:0.78rem;">
+                <div><span style="opacity:0.6;">EE ({{ config.esic_employee_rate }}%):</span> <strong>{{ "₹{:,.0f}".format(payroll.total_esic_employee) }}</strong></div>
+                <div><span style="opacity:0.6;">ER ({{ config.esic_employer_rate }}%):</span> <strong>{{ "₹{:,.0f}".format(payroll.total_esic_employer) }}</strong></div>
+            </div>
+            <div style="margin-top:8px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.15); font-size:0.82rem;">
+                <span style="opacity:0.7;">Total ESIC (EE+ER):</span>
+                <strong style="font-size:1rem; color:#fbbf24;">{{ "₹{:,.0f}".format(payroll.total_esic_employee + payroll.total_esic_employer) }}</strong>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- ============================================ -->
+<!-- ACTION BUTTONS (Finalize / Delete) — TOP     -->
+<!-- ============================================ -->
+{% if payroll.status in ['processing', 'finalized'] %}
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px; background:#fff; padding:14px 20px; border-radius:var(--radius); border:1px solid var(--border-color);">
+    <div class="d-flex gap-2 align-items-center">
+        {% if payroll.status in ['draft', 'processing'] %}
+        <form method="POST" action="{{ url_for('payroll.payroll_delete', payroll_id=payroll.id) }}" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-danger btn-sm"
+                    onclick="return confirm('Are you sure you want to DELETE this payroll for {{ payroll.period_display }}? This cannot be undone.')">
+                <i class="bi bi-trash3 me-1"></i> Delete Payroll
+            </button>
+        </form>
+        {% elif payroll.status == 'finalized' %}
+        <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deletePasswordModal">
+            <i class="bi bi-trash3 me-1"></i> Delete Payroll
+        </button>
+        {% endif %}
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        {% if payroll.status == 'processing' %}
+            <form method="POST" action="{{ url_for('payroll.payroll_finalize', payroll_id=payroll.id) }}" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-success"
+                        onclick="return confirm('Finalize this payroll? It will be locked from further editing.')">
+                    <i class="bi bi-check-circle me-1"></i> Finalize Payroll
+                </button>
+            </form>
+        {% elif payroll.status == 'finalized' %}
+            <form method="POST" action="{{ url_for('payroll.payroll_reopen', payroll_id=payroll.id) }}" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-outline-warning btn-sm"
+                        onclick="return confirm('Reopen this payroll for editing?')">
+                    <i class="bi bi-unlock me-1"></i> Reopen for Editing
+                </button>
+            </form>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- ============================================ -->
+<!-- RED FLAG ALERTS                              -->
+<!-- ============================================ -->
+{% if red_flags is defined and red_flags|length > 0 %}
+<div style="background:#fef2f2; border:1px solid #fecaca; border-radius:var(--radius); padding:14px 20px; margin-bottom:16px;">
+    <div style="font-weight:700; font-size:0.85rem; color:#991b1b; margin-bottom:8px;">
+        <i class="bi bi-exclamation-triangle-fill me-1"></i> Attention Required — {{ red_flags|length }} Issue{{ 's' if red_flags|length > 1 }}
+    </div>
+    <ul style="margin:0; padding-left:20px; font-size:0.78rem; color:#7f1d1d; line-height:1.8;">
+        {% for flag in red_flags %}
+        <li>{{ flag }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<!-- ============================================ -->
+<!-- REPORTS & DOWNLOADS — TOP                    -->
+<!-- ============================================ -->
+{% if payroll.status in ['processing', 'finalized'] %}
+<div class="table-container" style="margin-bottom:16px; overflow:visible;">
+    <div class="table-header" style="background:#f0f9ff;">
+        <div class="table-title" style="font-size:0.9rem; color:#1e40af;">
+            <i class="bi bi-file-earmark-bar-graph"></i> Reports & Downloads
+        </div>
+    </div>
+    <div style="padding:16px 20px;">
+        <div class="d-flex gap-3 flex-wrap">
+            <!-- Salary Statement (3 Formats) -->
+            <div class="btn-group">
+                <a href="{{ url_for('payroll.payroll_statement', payroll_id=payroll.id) }}" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-file-earmark-text me-1"></i> Monthly Statement
+                </a>
+                <button type="button" class="btn btn-outline-primary btn-sm dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">More formats</span>
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{{ url_for('payroll.payroll_statement', payroll_id=payroll.id) }}"><i class="bi bi-file-text me-2"></i>Monthly Statement to Client</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('reports.statement_format2', payroll_id=payroll.id) }}"><i class="bi bi-file-richtext me-2"></i>Salary Register (Format 2)</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('reports.statement_format3', payroll_id=payroll.id) }}"><i class="bi bi-file-bar-graph me-2"></i>Salary Register (Format 3)</a></li>
+                </ul>
+            </div>
+            <!-- Form B - Wage Register -->
+            <div class="btn-group">
+                <a href="{{ url_for('reports.form_b_view', payroll_id=payroll.id) }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-file-earmark-ruled me-1"></i> Form B (Wage Register)
+                </a>
+                <a href="{{ url_for('reports.form_b_excel', payroll_id=payroll.id) }}" class="btn btn-success btn-sm" title="Download Excel">
+                    <i class="bi bi-file-earmark-excel"></i>
+                </a>
+            </div>
+            <!-- Attendance Register -->
+            <div class="btn-group">
+                <a href="{{ url_for('reports.attendance_view', payroll_id=payroll.id) }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-calendar-check me-1"></i> Attendance Register
+                </a>
+                <a href="{{ url_for('reports.attendance_excel', payroll_id=payroll.id) }}" class="btn btn-success btn-sm" title="Download Excel">
+                    <i class="bi bi-file-earmark-excel"></i>
+                </a>
+            </div>
+            <!-- Form D -->
+            <div class="btn-group">
+                <a href="{{ url_for('reports.form_d_view', payroll_id=payroll.id) }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-file-earmark-ruled me-1"></i> Form D (Attendance)
+                </a>
+                <a href="{{ url_for('reports.form_d_excel', payroll_id=payroll.id) }}" class="btn btn-success btn-sm" title="Download Excel">
+                    <i class="bi bi-file-earmark-excel"></i>
+                </a>
+            </div>
+            <!-- Form D (26-25) -->
+            <div class="btn-group">
+                <a href="{{ url_for('reports.form_d_2625_view', payroll_id=payroll.id) }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-file-earmark-ruled me-1"></i> Form D (26-25)
+                </a>
+                <a href="{{ url_for('reports.form_d_2625_excel', payroll_id=payroll.id) }}" class="btn btn-success btn-sm" title="Download Excel">
+                    <i class="bi bi-file-earmark-excel"></i>
+                </a>
+            </div>
+            <!-- Pay Slips -->
+            <div class="btn-group">
+                <a href="{{ url_for('reports.payslip_form_xix', payroll_id=payroll.id) }}" class="btn btn-outline-dark btn-sm" target="_blank">
+                    <i class="bi bi-receipt me-1"></i> Pay Slips
+                </a>
+                <button type="button" class="btn btn-outline-dark btn-sm dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">More formats</span>
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{{ url_for('reports.payslip_form_xix', payroll_id=payroll.id) }}" target="_blank"><i class="bi bi-file-earmark-ruled me-2"></i>Form XIX — Government</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('reports.payslip_professional', payroll_id=payroll.id) }}" target="_blank"><i class="bi bi-file-richtext me-2"></i>Professional Format</a></li>
+                </ul>
+            </div>
+            {% if config.epf_applicable %}
+            <!-- EPF ECR -->
+            <div class="btn-group">
+                <a href="{{ url_for('reports.epf_ecr_view', payroll_id=payroll.id) }}" class="btn btn-outline-info btn-sm">
+                    <i class="bi bi-shield-check me-1"></i> EPF ECR
+                </a>
+                <a href="{{ url_for('reports.epf_ecr_text', payroll_id=payroll.id) }}" class="btn btn-dark btn-sm" title="Download ECR Text">
+                    <i class="bi bi-file-earmark-text"></i>
+                </a>
+                <a href="{{ url_for('reports.epf_ecr_csv', payroll_id=payroll.id) }}" class="btn btn-success btn-sm" title="Download CSV">
+                    <i class="bi bi-file-earmark-spreadsheet"></i>
+                </a>
+            </div>
+            {% endif %}
+            {% if config.esic_applicable %}
+            <!-- ESIC Template -->
+            <div class="btn-group">
+                <a href="{{ url_for('reports.esic_view', payroll_id=payroll.id) }}" class="btn btn-outline-warning btn-sm">
+                    <i class="bi bi-hospital me-1"></i> ESIC Template
+                </a>
+                <a href="{{ url_for('reports.esic_excel', payroll_id=payroll.id) }}" class="btn btn-success btn-sm" title="Download MC Template (.xls)">
+                    <i class="bi bi-file-earmark-excel"></i>
+                </a>
+            </div>
+            {% endif %}
+            <!-- Reimbursement Letter -->
+            <div class="btn-group">
+                <a href="{{ url_for('reports.reimbursement_view', payroll_id=payroll.id) }}" class="btn btn-outline-danger btn-sm" target="_blank">
+                    <i class="bi bi-envelope-paper me-1"></i> Reimbursement Letter
+                </a>
+            </div>
+            <!-- Compliance Statement -->
+            <div class="btn-group">
+                <a href="{{ url_for('reports.compliance_monthly', payroll_id=payroll.id) }}" class="btn btn-outline-primary btn-sm" target="_blank">
+                    <i class="bi bi-clipboard-data me-1"></i> Compliance Statement
+                </a>
+                <button type="button" class="btn btn-outline-primary btn-sm dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">More</span>
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{{ url_for('reports.compliance_monthly', payroll_id=payroll.id) }}" target="_blank"><i class="bi bi-calendar-month me-2"></i>Monthly Statement</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('reports.compliance_annual', est_id=est.id) }}" target="_blank"><i class="bi bi-calendar-range me-2"></i>Annual Statement (FY)</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if entries %}
+<!-- Holiday Dates Configuration -->
+<div class="table-container" style="margin-bottom:16px;">
+    <div class="table-header" style="background:#fefce8;">
+        <div class="table-title" style="font-size:0.85rem; color:#92400e;">
+            <i class="bi bi-calendar-heart"></i> National Paid Holidays (for Attendance Register)
+        </div>
+    </div>
+    <div style="padding:12px 20px;">
+        <form method="POST" action="{{ url_for('payroll.save_holidays', payroll_id=payroll.id) }}" class="d-flex gap-3 align-items-end">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div style="flex:1;">
+                <label class="form-label" style="font-size:0.78rem; font-weight:600;">Holiday Dates (comma-separated day numbers)</label>
+                <input type="text" name="holiday_dates" id="holidayDatesInput" class="form-control form-control-sm"
+                       value="{{ payroll.holiday_dates or '' }}"
+                       placeholder="e.g., 2,15,26 (for 2nd, 15th, 26th of the month)"
+                       {% if payroll.status == 'finalized' %}disabled{% endif %}>
+                <small class="text-muted">Enter day numbers when national paid holidays fall in {{ payroll.month_name }} {{ payroll.year }}</small>
+            </div>
+            {% if payroll.status != 'finalized' %}
+            <button type="submit" class="btn btn-outline-warning btn-sm">
+                <i class="bi bi-check-lg me-1"></i> Save Holidays
+            </button>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<form method="POST" action="{{ url_for('payroll.save_attendance', payroll_id=payroll.id) }}" onsubmit="return validateBeforeSave()">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="table-container">
+        <div class="table-header">
+            <div class="table-title" style="font-size:0.9rem;">
+                <i class="bi bi-people"></i> Attendance & Salary
+            </div>
+            <div class="d-flex gap-2 align-items-center flex-wrap">
+                {% if payroll.status != 'finalized' %}
+                <!-- Bulk Upload Section -->
+                <div class="btn-group">
+                    <a href="{{ url_for('payroll.download_attendance_template', payroll_id=payroll.id) }}"
+                       class="btn btn-outline-success btn-sm" title="Download Excel template with employee list">
+                        <i class="bi bi-download me-1"></i> Download Template
+                    </a>
+                    <button type="button" class="btn btn-outline-success btn-sm dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="visually-hidden">More</span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="{{ url_for('payroll.download_attendance_template', payroll_id=payroll.id) }}"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Monthly Template (pre-filled)</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('payroll.download_universal_template', payroll_id=payroll.id) }}"><i class="bi bi-globe me-2"></i>Universal Template (reusable)</a></li>
+                    </ul>
+                </div>
+                <button type="button" class="btn btn-outline-warning btn-sm" onclick="document.getElementById('bulkUploadModal').style.display='flex'"
+                        title="Upload filled Excel attendance">
+                    <i class="bi bi-upload me-1"></i> Upload Attendance
+                </button>
+                <span style="border-left:2px solid #e2e8f0; height:22px;"></span>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-calculator me-1"></i> Save & Calculate
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table" style="font-size:0.8rem;">
+                <thead>
+                    <tr>
+                        <th style="white-space:nowrap;">#</th>
+                        <th style="white-space:nowrap; min-width:140px;">Employee</th>
+                        <th style="white-space:nowrap; width:65px;">Gross</th>
+                        <th style="white-space:nowrap; width:55px;" title="Days Present">Pres.</th>
+                        <th style="white-space:nowrap; width:55px;" title="Days Absent">Abs.</th>
+                        {% if config.paid_holiday_type == 'separate' %}
+                        <th style="white-space:nowrap; width:50px;" title="Paid Holidays">PH</th>
+                        {% endif %}
+                        {% if config.ot_applicable %}
+                        <th style="white-space:nowrap; width:55px;" title="Overtime">OT</th>
+                        {% endif %}
+                        <th style="white-space:nowrap; width:65px;" title="Payable Days">Pay Days</th>
+                        <th style="white-space:nowrap; text-align:right;" title="Earned Gross">Earned</th>
+                        {% if config.ot_applicable %}
+                        <th style="white-space:nowrap; text-align:right;">OT Amt</th>
+                        {% endif %}
+                        {% if config.epf_applicable %}
+                        <th style="white-space:nowrap; text-align:right;" title="EPF Employee">EPF EE</th>
+                        <th style="white-space:nowrap; text-align:right;" title="EPF Employer">EPF ER</th>
+                        {% endif %}
+                        {% if config.esic_applicable %}
+                        <th style="white-space:nowrap; text-align:right;" title="ESIC Employee">ESIC EE</th>
+                        <th style="white-space:nowrap; text-align:right;" title="ESIC Employer">ESIC ER</th>
+                        {% endif %}
+                        {% if config.pt_applicable %}
+                        <th style="white-space:nowrap; text-align:right;">PT</th>
+                        {% endif %}
+                        <th style="white-space:nowrap; width:70px;" title="Arrear Salary">Arrear</th>
+                        <th style="white-space:nowrap; width:70px;" title="Other Deduction">Oth Ded</th>
+                        <th style="white-space:nowrap; text-align:right; font-weight:700;">Net Pay</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in entries %}
+                    <tr>
+                        <td style="color:var(--text-light);">{{ loop.index }}</td>
+                        <td>
+                            <div style="font-weight:600; white-space:nowrap;">
+                                {{ entry.employee.name }}
+                            </div>
+                            <div style="font-size:0.7rem; color:var(--text-light);">
+                                {{ entry.employee.uan_number or entry.employee.esic_ip_number or entry.employee.emp_code }}
+                            </div>
+                        </td>
+                        <td style="font-size:0.8rem; color:var(--text-secondary);">
+                            {{ "{:,.0f}".format(entry.gross_salary) }}
+                        </td>
+                        <td>
+                            <input type="number" name="present_{{ entry.employee_id }}" class="form-control form-control-sm"
+                                   value="{{ entry.days_present }}" step="0.5" min="0" max="{{ payroll.working_days }}"
+                                   style="width:55px; font-size:0.8rem; padding:2px 4px; text-align:center;"
+                                   {% if payroll.status == 'finalized' %}disabled{% endif %}
+                                   onchange="autoCalcAbsent(this, {{ entry.employee_id }})">
+                        </td>
+                        <td>
+                            <span id="absent_display_{{ entry.employee_id }}" style="font-size:0.8rem; font-weight:600; color:var(--danger);">
+                                {{ entry.days_absent|int }}
+                            </span>
+                        </td>
+                        {% if config.paid_holiday_type == 'separate' %}
+                        <td>
+                            <input type="number" name="ph_{{ entry.employee_id }}" class="form-control form-control-sm"
+                                   value="{{ entry.paid_holidays }}" step="0.5" min="0"
+                                   style="width:50px; font-size:0.8rem; padding:2px 4px; text-align:center;"
+                                   {% if payroll.status == 'finalized' %}disabled{% endif %}>
+                        </td>
+                        {% endif %}
+                        {% if config.ot_applicable %}
+                        <td>
+                            <input type="number" name="ot_{{ entry.employee_id }}" class="form-control form-control-sm"
+                                   value="{{ entry.ot_hours }}" step="0.5" min="0"
+                                   style="width:55px; font-size:0.8rem; padding:2px 4px; text-align:center;"
+                                   {% if payroll.status == 'finalized' %}disabled{% endif %}>
+                        </td>
+                        {% endif %}
+                        <td style="font-weight:600; text-align:center;">
+                            {{ entry.total_payable_days }}
+                        </td>
+                        <td style="text-align:right; font-weight:600;">
+                            {{ "{:,.0f}".format(entry.earned_gross) }}
+                        </td>
+                        {% if config.ot_applicable %}
+                        <td style="text-align:right;">{{ "{:,.0f}".format(entry.ot_amount) }}</td>
+                        {% endif %}
+                        {% if config.epf_applicable %}
+                        <td style="text-align:right; color:var(--danger);">{{ "{:,.0f}".format(entry.epf_employee) }}</td>
+                        <td style="text-align:right; color:var(--text-light);">{{ "{:,.0f}".format(entry.epf_employer) }}</td>
+                        {% endif %}
+                        {% if config.esic_applicable %}
+                        <td style="text-align:right; color:var(--danger);">{{ "{:,.0f}".format(entry.esic_employee) }}</td>
+                        <td style="text-align:right; color:var(--text-light);">{{ "{:,.0f}".format(entry.esic_employer) }}</td>
+                        {% endif %}
+                        {% if config.pt_applicable %}
+                        <td style="text-align:right; color:var(--danger);">{{ "{:,.0f}".format(entry.professional_tax) }}</td>
+                        {% endif %}
+                        <td>
+                            <input type="number" name="arrear_{{ entry.employee_id }}" class="form-control form-control-sm"
+                                   value="{{ entry.arrear_amount }}" step="1" min="0"
+                                   style="width:70px; font-size:0.8rem; padding:2px 4px; text-align:center; {% if entry.arrear_amount > 0 %}background:#ecfdf5; font-weight:600;{% endif %}"
+                                   {% if payroll.status == 'finalized' %}disabled{% endif %}
+                                   title="{{ entry.arrear_remark or 'Arrear amount (if any)' }}">
+                        </td>
+                        <td>
+                            <input type="number" name="other_ded_{{ entry.employee_id }}" class="form-control form-control-sm"
+                                   value="{{ entry.other_deduction }}" step="1" min="0"
+                                   style="width:70px; font-size:0.8rem; padding:2px 4px; text-align:center;"
+                                   {% if payroll.status == 'finalized' %}disabled{% endif %}>
+                        </td>
+                        <td style="text-align:right; font-weight:700; color:var(--success); font-size:0.9rem;">
+                            {{ "{:,.0f}".format(entry.net_pay) }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Other Charges (Additional Billing to Client — recorded as Other Income) -->
+        <div style="padding:12px 20px; background:#fffbeb; border-top:1px solid #fde68a;">
+            <div style="font-size:0.78rem; font-weight:700; color:#92400e; margin-bottom:6px;">
+                <i class="bi bi-receipt-cutoff me-1"></i> Other Charges to Client (Optional — recorded as Other Income)
+            </div>
+            <div class="d-flex gap-3 align-items-end flex-wrap">
+                <div style="flex:1; min-width:250px;">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:600; color:#78716c; margin-bottom:2px;">Description / Reason</label>
+                    <input type="text" name="other_charges_description" class="form-control form-control-sm"
+                           value="{{ payroll.other_charges_description or '' }}"
+                           placeholder="e.g., Annual Return Filing, Registration Charges, etc."
+                           style="font-size:0.82rem;"
+                           {% if payroll.status == 'finalized' %}disabled{% endif %}>
+                </div>
+                <div style="width:150px;">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:600; color:#78716c; margin-bottom:2px;">Amount (₹)</label>
+                    <input type="number" name="other_charges_amount" class="form-control form-control-sm"
+                           value="{{ payroll.other_charges_amount or 0 }}"
+                           step="1" min="0"
+                           style="font-size:0.82rem; font-weight:600; text-align:right;"
+                           {% if payroll.status == 'finalized' %}disabled{% endif %}>
+                </div>
+            </div>
+            <div style="font-size:0.65rem; color:#a8a29e; margin-top:4px;">
+                <i class="bi bi-info-circle me-1"></i> This will appear in the Monthly Statement to Client and is tracked as Other Income for your records.
+            </div>
+        </div>
+
+        <!-- Bottom Actions -->
+        <div style="padding:16px 20px; background:#f8fafc; border-top:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div style="font-size:0.8rem; color:var(--text-light);">
+                <i class="bi bi-info-circle me-1"></i>
+                Enter attendance manually <strong>OR</strong> use
+                <a href="{{ url_for('payroll.download_attendance_template', payroll_id=payroll.id) }}" class="text-decoration-none fw-bold">Download Template</a> /
+                <a href="{{ url_for('payroll.download_universal_template', payroll_id=payroll.id) }}" class="text-decoration-none fw-bold" style="color:#0d9488;">Universal Template</a> →
+                Fill in Excel →
+                <a href="javascript:void(0)" onclick="document.getElementById('bulkUploadModal').style.display='flex'" class="text-decoration-none fw-bold">Upload Attendance</a>
+                → Save & Calculate
+            </div>
+            <div class="d-flex gap-2">
+                {% if payroll.status != 'finalized' %}
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-calculator me-1"></i> Save & Calculate
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</form>
+
+<!-- ============================================ -->
+<!-- BULK UPLOAD MODAL                            -->
+<!-- ============================================ -->
+{% if payroll.status != 'finalized' %}
+<div id="bulkUploadModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
+    <div style="background:#fff; border-radius:16px; width:95%; max-width:520px; box-shadow:0 20px 60px rgba(0,0,0,0.3); overflow:hidden;">
+        <!-- Header -->
+        <div style="background:linear-gradient(135deg,#059669,#10b981); padding:20px 24px; color:#fff;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div style="font-weight:700; font-size:1.1rem;"><i class="bi bi-file-earmark-arrow-up me-2"></i>Upload Attendance</div>
+                    <div style="font-size:0.78rem; opacity:0.85;">{{ payroll.period_display }} — {{ est.company_name }}</div>
+                </div>
+                <button type="button" onclick="document.getElementById('bulkUploadModal').style.display='none'"
+                        style="background:rgba(255,255,255,0.2); border:none; color:#fff; width:32px; height:32px; border-radius:50%; font-size:1.2rem; cursor:pointer;">&times;</button>
+            </div>
+        </div>
+
+        <!-- Body -->
+        <form method="POST" action="{{ url_for('payroll.upload_attendance', payroll_id=payroll.id) }}" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div style="padding:24px;">
+                <!-- Step Guide -->
+                <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:14px 16px; margin-bottom:20px;">
+                    <div style="font-weight:700; font-size:0.82rem; color:#166534; margin-bottom:8px;">How it works:</div>
+                    <div style="font-size:0.75rem; color:#15803d; line-height:1.6;">
+                        <strong>Step 1:</strong> <a href="{{ url_for('payroll.download_attendance_template', payroll_id=payroll.id) }}" class="text-decoration-none" style="color:#059669;">Download Monthly Template</a> or <a href="{{ url_for('payroll.download_universal_template', payroll_id=payroll.id) }}" class="text-decoration-none" style="color:#0d9488;">Universal Template</a><br>
+                        <strong>Step 2:</strong> Fill in Days Present, OT, Other Deductions in the yellow columns<br>
+                        <strong>Step 3:</strong> Save the Excel file and upload it below<br>
+                        <strong>Step 4:</strong> Click "Save & Calculate" to compute everything
+                    </div>
+                </div>
+
+                <!-- File Input -->
+                <div style="border:2px dashed #d1d5db; border-radius:12px; padding:30px 20px; text-align:center; transition:all 0.2s;" id="dropZone"
+                     ondragover="event.preventDefault(); this.style.borderColor='#059669'; this.style.background='#f0fdf4';"
+                     ondragleave="this.style.borderColor='#d1d5db'; this.style.background='transparent';"
+                     ondrop="event.preventDefault(); this.style.borderColor='#059669'; document.getElementById('attendance_file').files=event.dataTransfer.files; showFileName();">
+                    <i class="bi bi-cloud-arrow-up" style="font-size:2.5rem; color:#9ca3af;"></i>
+                    <div style="font-size:0.88rem; font-weight:600; color:#374151; margin-top:8px;">
+                        Drag & Drop Excel file here
+                    </div>
+                    <div style="font-size:0.75rem; color:#9ca3af; margin:6px 0 12px;">or</div>
+                    <label for="attendance_file" class="btn btn-outline-success btn-sm" style="cursor:pointer;">
+                        <i class="bi bi-folder2-open me-1"></i> Browse Files
+                    </label>
+                    <input type="file" id="attendance_file" name="attendance_file" accept=".xlsx,.xls"
+                           style="display:none;" onchange="showFileName()">
+                    <div id="selectedFileName" style="display:none; margin-top:12px; background:#ecfdf5; border-radius:8px; padding:8px 12px;">
+                        <i class="bi bi-file-earmark-excel" style="color:#059669; font-size:1.2rem;"></i>
+                        <span id="fileNameText" style="font-size:0.82rem; font-weight:600; color:#166534; margin-left:6px;"></span>
+                        <span id="fileSizeText" style="font-size:0.7rem; color:#6b7280; margin-left:8px;"></span>
+                    </div>
+                </div>
+
+                <!-- Warning -->
+                <div style="font-size:0.7rem; color:#92400e; margin-top:12px; background:#fffbeb; border-radius:6px; padding:8px 10px;">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    This will <strong>overwrite</strong> current attendance data. For Universal Template: employees NOT in the file will get <strong>0 days</strong> (absent full month).
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="padding:14px 24px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:10px;">
+                <button type="button" class="btn btn-outline-secondary btn-sm"
+                        onclick="document.getElementById('bulkUploadModal').style.display='none'">Cancel</button>
+                <button type="submit" class="btn btn-success btn-sm" id="uploadBtn" disabled>
+                    <i class="bi bi-upload me-1"></i> Upload & Apply
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function showFileName() {
+    var input = document.getElementById('attendance_file');
+    var nameDiv = document.getElementById('selectedFileName');
+    var nameText = document.getElementById('fileNameText');
+    var sizeText = document.getElementById('fileSizeText');
+    var uploadBtn = document.getElementById('uploadBtn');
+
+    if (input.files && input.files.length > 0) {
+        var file = input.files[0];
+        nameText.textContent = file.name;
+        var sizeMB = (file.size / 1024).toFixed(1);
+        sizeText.textContent = '(' + sizeMB + ' KB)';
+        nameDiv.style.display = 'block';
+        uploadBtn.disabled = false;
+        // Update drop zone visual
+        document.getElementById('dropZone').style.borderColor = '#059669';
+        document.getElementById('dropZone').style.background = '#f0fdf4';
+    } else {
+        nameDiv.style.display = 'none';
+        uploadBtn.disabled = true;
+    }
+}
+</script>
+{% endif %}
+
+<!-- EPF Late Payment — Interest (7Q) & Damages (14B) -->
+{% if payroll.status in ['processing', 'finalized'] and config.epf_applicable %}
+{% set delay_months = ((payroll.epf_delay_days or 0) + 29) // 30 if (payroll.epf_delay_days or 0) > 0 else 0 %}
+<div class="table-container" style="margin-top:16px;">
+    <div class="table-header" style="background:{% if payroll.epf_delay_days and payroll.epf_delay_days > 0 %}#fef2f2{% else %}#f0fdf4{% endif %};">
+        <div class="table-title" style="font-size:0.88rem; color:{% if payroll.epf_delay_days and payroll.epf_delay_days > 0 %}#991b1b{% else %}#166534{% endif %};">
+            <i class="bi bi-clock-history me-1"></i> EPF Payment Status
+            {% if payroll.epf_delay_days and payroll.epf_delay_days > 0 %}
+                <span class="badge bg-danger ms-2" style="font-size:0.65rem;">DELAYED — {{ payroll.epf_delay_days }} Days ({{ delay_months }} Month{{ 's' if delay_months > 1 }})</span>
+            {% elif payroll.epf_payment_date %}
+                <span class="badge bg-success ms-2" style="font-size:0.65rem;">PAID ON TIME</span>
+            {% else %}
+                <span class="badge bg-warning text-dark ms-2" style="font-size:0.65rem;">PENDING</span>
+            {% endif %}
+            <button type="button" class="btn btn-sm ms-auto" data-bs-toggle="modal" data-bs-target="#epfCalcGlobal"
+                    style="background:linear-gradient(135deg,#4338ca,#7c3aed); color:#fff; font-size:0.68rem; padding:3px 10px; border-radius:15px;"
+                    title="EPF Delay Calculator">
+                <i class="bi bi-calculator me-1"></i> Calculator
+            </button>
+        </div>
+    </div>
+    <div style="padding:14px 20px;">
+        <form method="POST" action="{{ url_for('payroll.save_epf_payment', payroll_id=payroll.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <!-- Info Banner -->
+            <div style="display:flex; gap:16px; align-items:flex-start; margin-bottom:12px; flex-wrap:wrap;">
+                <!-- Due Date Display -->
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 16px; min-width:180px; text-align:center;">
+                    <div style="font-size:0.65rem; color:#64748b; text-transform:uppercase; font-weight:600;">EPF Due Date</div>
+                    <div style="font-size:1.1rem; font-weight:700; color:#1e293b;">{{ payroll.epf_due_date.strftime('%d-%m-%Y') }}</div>
+                    <div style="font-size:0.6rem; color:#94a3b8;">15th of next month after wages</div>
+                </div>
+
+                <!-- Payment Date Input -->
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 16px; min-width:200px;">
+                    <label style="font-size:0.65rem; color:#64748b; text-transform:uppercase; font-weight:600; display:block; margin-bottom:4px;">Actual Payment Date</label>
+                    <input type="date" name="epf_payment_date" id="epf_payment_date"
+                           class="form-control form-control-sm"
+                           value="{{ payroll.epf_payment_date.strftime('%Y-%m-%d') if payroll.epf_payment_date else '' }}"
+                           style="font-size:0.88rem; font-weight:600;"
+                           onchange="calcEpfPenalty()"
+                           {% if payroll.status == 'finalized' %}disabled{% endif %}>
+                    <div style="font-size:0.58rem; color:#94a3b8; margin-top:2px;">Enter the date you paid EPF to the portal</div>
+                </div>
+
+                <!-- Delay Display -->
+                <div id="delay_card" style="background:{% if payroll.epf_delay_days and payroll.epf_delay_days > 0 %}#fef2f2; border-color:#fecaca;{% else %}#f0fdf4; border-color:#bbf7d0;{% endif %} border:1px solid; border-radius:8px; padding:10px 16px; min-width:140px; text-align:center;">
+                    <div style="font-size:0.65rem; color:#64748b; text-transform:uppercase; font-weight:600;">Delay</div>
+                    <div id="delay_days_display" style="font-size:1.2rem; font-weight:800; color:{% if payroll.epf_delay_days and payroll.epf_delay_days > 0 %}#dc2626{% else %}#16a34a{% endif %};">
+                        {% if payroll.epf_payment_date %}
+                            {% if payroll.epf_delay_days > 0 %}{{ payroll.epf_delay_days }} Days{% else %}On Time{% endif %}
+                        {% else %}—{% endif %}
+                    </div>
+                    <div id="delay_months_display" style="font-size:0.6rem; color:#64748b;">
+                        {% if delay_months > 0 %}{{ delay_months }} Month(s){% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Penalty Calculation (only shown when delayed) -->
+            <div id="penalty_section" style="{% if not payroll.epf_delay_days or payroll.epf_delay_days <= 0 %}display:none;{% endif %} background:#fff5f5; border:1px solid #fecaca; border-radius:8px; padding:12px 16px; margin-bottom:12px;">
+                <div style="font-size:0.72rem; font-weight:700; color:#991b1b; margin-bottom:8px;">
+                    <i class="bi bi-exclamation-triangle me-1"></i> Late Payment Charges (as per EPF Department)
+                </div>
+                <div style="display:flex; gap:20px; flex-wrap:wrap;">
+                    <!-- Interest u/s 7Q -->
+                    <div style="flex:1; min-width:200px; background:#fff; border:1px solid #fde2e2; border-radius:6px; padding:8px 12px;">
+                        <div style="font-size:0.62rem; color:#991b1b; text-transform:uppercase; font-weight:600;">Interest u/s 7Q</div>
+                        <div style="font-size:0.58rem; color:#64748b; margin-bottom:4px;">@ 12% per annum on EPF contribution</div>
+                        <div id="interest_display" style="font-size:1.1rem; font-weight:700; color:#dc2626;">
+                            ₹{{ "{:,.0f}".format(payroll.epf_interest_14b) if payroll.epf_interest_14b else '0' }}
+                        </div>
+                        <input type="hidden" name="epf_interest_14b" id="epf_interest_14b" value="{{ payroll.epf_interest_14b or 0 }}">
+                    </div>
+
+                    <!-- Damages u/s 14B -->
+                    <div style="flex:1; min-width:200px; background:#fff; border:1px solid #fde2e2; border-radius:6px; padding:8px 12px;">
+                        <div style="font-size:0.62rem; color:#991b1b; text-transform:uppercase; font-weight:600;">Damages u/s 14B</div>
+                        <div id="damages_rate_info" style="font-size:0.58rem; color:#64748b; margin-bottom:4px;">
+                            @ 1% per month × {{ delay_months }} month(s)
+                        </div>
+                        <div id="damages_display" style="font-size:1.1rem; font-weight:700; color:#dc2626;">
+                            ₹{{ "{:,.0f}".format(payroll.epf_damages_7q) if payroll.epf_damages_7q else '0' }}
+                        </div>
+                        <input type="hidden" name="epf_damages_7q" id="epf_damages_7q" value="{{ payroll.epf_damages_7q or 0 }}">
+                    </div>
+
+                    <!-- Total Penalty -->
+                    <div style="flex:1; min-width:180px; background:#991b1b; border-radius:6px; padding:8px 12px; color:#fff;">
+                        <div style="font-size:0.62rem; text-transform:uppercase; font-weight:600; opacity:0.8;">Total Penalty</div>
+                        <div style="font-size:0.58rem; opacity:0.7; margin-bottom:4px;">Interest + Damages</div>
+                        <div id="total_penalty_display" style="font-size:1.2rem; font-weight:800;">
+                            ₹{{ "{:,.0f}".format((payroll.epf_interest_14b or 0) + (payroll.epf_damages_7q or 0)) }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Reference -->
+            <details style="margin-bottom:10px;">
+                <summary style="font-size:0.68rem; color:#64748b; cursor:pointer; font-weight:600;">
+                    <i class="bi bi-info-circle me-1"></i> How is this calculated?
+                </summary>
+                <div style="margin-top:6px; padding:8px 12px; background:#f8fafc; border-radius:6px; font-size:0.65rem; color:#475569;">
+                    <table style="width:100%; max-width:500px; border-collapse:collapse;">
+                        <tr style="border-bottom:1px solid #e2e8f0;">
+                            <th style="padding:3px 8px; text-align:left;">Charge</th>
+                            <th style="padding:3px 8px; text-align:left;">Rate</th>
+                            <th style="padding:3px 8px; text-align:left;">Formula</th>
+                        </tr>
+                        <tr>
+                            <td style="padding:3px 8px; font-weight:600;">Interest (7Q)</td>
+                            <td style="padding:3px 8px;">12% per annum</td>
+                            <td style="padding:3px 8px; font-size:0.6rem;">(EPF Amount × 12% × Delay Days) ÷ 365</td>
+                        </tr>
+                        <tr style="background:#f8fafc;">
+                            <td style="padding:3px 8px; font-weight:600;">Damages (14B)</td>
+                            <td style="padding:3px 8px;">1% per month</td>
+                            <td style="padding:3px 8px; font-size:0.6rem;">EPF Amount × 1% × Months (part month = full month)</td>
+                        </tr>
+                    </table>
+                    <div style="margin-top:4px; color:#94a3b8; font-size:0.58rem;">EPF Due Date is always 15th of the next month. Partial month of delay is counted as full month for damages.</div>
+                </div>
+            </details>
+
+            {% if payroll.status != 'finalized' %}
+            <button type="submit" class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-save me-1"></i> Save EPF Payment Details
+            </button>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<script>
+function calcEpfPenalty() {
+    const paymentDateStr = document.getElementById('epf_payment_date').value;
+    if (!paymentDateStr) return;
+
+    const paymentDate = new Date(paymentDateStr);
+    const dueDate = new Date('{{ payroll.epf_due_date.strftime("%Y-%m-%d") }}');
+    const epfTotal = {{ (payroll.total_epf_employee + payroll.total_epf_employer)|round|int }};
+
+    // Calculate delay days
+    const diffTime = paymentDate - dueDate;
+    const delayDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+
+    // Delay in months (partial month = full month)
+    const delayMonths = delayDays > 0 ? Math.ceil(delayDays / 30) : 0;
+
+    // Update delay display
+    const delayEl = document.getElementById('delay_days_display');
+    const delayMonthsEl = document.getElementById('delay_months_display');
+    const delayCard = document.getElementById('delay_card');
+    const penaltySection = document.getElementById('penalty_section');
+
+    if (delayDays > 0) {
+        delayEl.textContent = delayDays + ' Days';
+        delayEl.style.color = '#dc2626';
+        delayMonthsEl.textContent = delayMonths + ' Month(s)';
+        delayCard.style.background = '#fef2f2';
+        delayCard.style.borderColor = '#fecaca';
+        penaltySection.style.display = 'block';
+
+        // Interest u/s 7Q: 12% per annum, daily calculation
+        // Formula: (EPF Amount × 12% × delay days) / 365
+        const interest = Math.round((epfTotal * 12 * delayDays) / (100 * 365));
+
+        // Damages u/s 14B: 1% per month of EPF contribution
+        // Formula: EPF Amount × 1% × months (partial = full)
+        const damages = Math.round(epfTotal * 1 * delayMonths / 100);
+
+        const totalPenalty = interest + damages;
+
+        // Update displays
+        document.getElementById('interest_display').textContent = '\u20B9' + interest.toLocaleString('en-IN');
+        document.getElementById('damages_display').textContent = '\u20B9' + damages.toLocaleString('en-IN');
+        document.getElementById('damages_rate_info').textContent = '@ 1% per month \u00D7 ' + delayMonths + ' month(s)';
+        document.getElementById('total_penalty_display').textContent = '\u20B9' + totalPenalty.toLocaleString('en-IN');
+
+        // Update hidden inputs for form submission
+        document.getElementById('epf_interest_14b').value = interest;
+        document.getElementById('epf_damages_7q').value = damages;
+    } else {
+        delayEl.textContent = 'On Time';
+        delayEl.style.color = '#16a34a';
+        delayMonthsEl.textContent = '';
+        delayCard.style.background = '#f0fdf4';
+        delayCard.style.borderColor = '#bbf7d0';
+        penaltySection.style.display = 'none';
+
+        document.getElementById('epf_interest_14b').value = 0;
+        document.getElementById('epf_damages_7q').value = 0;
+    }
+}
+</script>
+{% endif %}
+
+{% if payroll.status == 'finalized' %}
+<!-- Password Modal for Finalized Payroll Delete -->
+<div class="modal fade" id="deletePasswordModal" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#fef2f2; border-bottom:1px solid #fecaca;">
+                <h6 class="modal-title" style="color:#dc2626; font-weight:700;">
+                    <i class="bi bi-shield-lock me-1"></i> Delete Finalized Payroll
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('payroll.payroll_delete', payroll_id=payroll.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <p style="font-size:0.85rem; color:#64748b; margin-bottom:12px;">
+                        This payroll for <strong>{{ payroll.period_display }}</strong> is finalized.
+                        Enter the secret password to delete.
+                    </p>
+                    <div class="mb-2">
+                        <label class="form-label" style="font-size:0.8rem; font-weight:600;">Secret Password</label>
+                        <input type="password" name="delete_password" class="form-control" required
+                               placeholder="Enter password" autocomplete="off">
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top:1px solid #f1f5f9;">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-danger">
+                        <i class="bi bi-trash3 me-1"></i> Delete
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% else %}
+<div class="table-container">
+    <div class="empty-state">
+        <div class="empty-state-icon"><i class="bi bi-people"></i></div>
+        <h5>No employees found</h5>
+        <p>There are no active employees in this establishment. Add employees first.</p>
+        <a href="{{ url_for('employee.employee_add', establishment_id=est.id) }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-2"></i>Add Employee
+        </a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Smart absent calculation in real-time
+// Formula: Month Days - Present - Rest Days - Holidays = Absent
+const monthDays = {{ num_days_in_month if num_days_in_month is defined else payroll.working_days }};
+const restDayCount = {{ rest_day_count if rest_day_count is defined else 0 }};
+const holidayCount = {{ holiday_count if holiday_count is defined else 0 }};
+
+function autoCalcAbsent(inputEl, empId) {
+    const present = parseFloat(inputEl.value) || 0;
+    const remaining = monthDays - present;
+    const afterRest = remaining - restDayCount;
+    const afterHolidays = afterRest - holidayCount;
+    const absent = Math.max(0, Math.round(afterHolidays));
+    document.getElementById('absent_display_' + empId).textContent = absent;
+}
+
+// Validation before Save & Calculate
+function validateBeforeSave() {
+    var holidayInput = document.getElementById('holidayDatesInput');
+    if (holidayInput) {
+        var val = (holidayInput.value || '').trim();
+        if (!val) {
+            var proceed = confirm(
+                '⚠️ Holiday Dates are empty!\n\n' +
+                'You have not entered any National Paid Holiday dates for this month.\n' +
+                'This will result in 0 paid holidays in the calculation.\n\n' +
+                'Click OK to continue without holidays, or Cancel to go back and enter holiday dates.'
+            );
+            if (!proceed) {
+                holidayInput.focus();
+                holidayInput.style.border = '2px solid #dc2626';
+                holidayInput.style.background = '#fef2f2';
+                // Scroll to holiday section
+                holidayInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return false;
+            }
+        }
+    }
+    return true;
+}
+</script>
+{% endblock %}

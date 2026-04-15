@@ -1,0 +1,473 @@
+{% extends "base.html" %}
+{% block title %}Daily MIS{% endblock %}
+{% block page_header %}Daily MIS{% endblock %}
+
+{% block content %}
+<style>
+    .mis-card { border-radius: 10px; border: none; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .mis-stat { text-align: center; padding: 14px 8px; }
+    .mis-stat .num { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+    .mis-stat .lbl { font-size: 0.68rem; color: #64748b; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .mis-table th { font-size: 0.7rem; text-transform: uppercase; color: #64748b; letter-spacing: 0.3px; white-space: nowrap; }
+    .mis-table td { font-size: 0.76rem; vertical-align: middle; }
+    .cat-badge { font-size: 0.65rem; padding: 3px 8px; border-radius: 20px; font-weight: 500; }
+    .staff-card { background: #f8fafc; border-radius: 8px; padding: 10px 14px; border: 1px solid #e2e8f0; cursor: pointer; transition: all 0.2s; }
+    .staff-card:hover { border-color: #4f46e5; background: #f0f0ff; }
+    .staff-card .name { font-weight: 600; font-size: 0.82rem; }
+    .staff-card .stats { font-size: 0.7rem; color: #64748b; }
+    .overdue-row { background: #fef2f2 !important; }
+    .alert-panel { background: linear-gradient(135deg, #dc2626, #b91c1c); color: white; border-radius: 10px; padding: 14px 18px; margin-bottom: 12px; }
+    .alert-panel .title { font-size: 0.82rem; font-weight: 700; }
+    .alert-panel .count { font-size: 1.8rem; font-weight: 800; }
+    .assigned-badge { background: #dbeafe; color: #1d4ed8; font-size: 0.62rem; padding: 2px 6px; border-radius: 10px; }
+    .admin-remark { background: #fefce8; border-left: 3px solid #f59e0b; padding: 4px 8px; font-size: 0.7rem; border-radius: 0 4px 4px 0; margin-top: 3px; }
+    .priority-critical { border-left: 4px solid #dc2626 !important; }
+    .priority-urgent { border-left: 4px solid #f59e0b !important; }
+    .status-dropdown { font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; cursor: pointer; border: 1px solid #d1d5db; }
+    .nav-pills-custom .nav-link { font-size: 0.76rem; padding: 6px 14px; color: #64748b; }
+    .nav-pills-custom .nav-link.active { background: #4f46e5; color: white; }
+</style>
+
+<!-- Header Row -->
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+    <div>
+        <h5 class="mb-0" style="font-weight:700; font-size:1.1rem;">
+            <i class="bi bi-journal-check text-primary me-2"></i>Daily MIS
+        </h5>
+        <small class="text-muted" style="font-size:0.72rem;">
+            {% if is_admin %}Admin Dashboard — Monitor all staff work{% else %}My Tasks &amp; Assignments{% endif %}
+        </small>
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <form method="GET" action="{{ url_for('daily_mis.mis_home') }}" class="d-flex align-items-center gap-2">
+            <input type="date" name="date" value="{{ view_date.strftime('%Y-%m-%d') }}"
+                   class="form-control form-control-sm" style="font-size:0.78rem; width:150px;"
+                   onchange="this.form.submit()">
+            {% if view_date != today %}
+            <a href="{{ url_for('daily_mis.mis_home') }}" class="btn btn-outline-secondary btn-sm" style="font-size:0.72rem;">Today</a>
+            {% endif %}
+        </form>
+        {% if is_admin %}
+        <a href="{{ url_for('daily_mis.mis_compliance') }}" class="btn btn-outline-purple btn-sm" style="font-size:0.72rem; color:#7c3aed; border-color:#7c3aed;">
+            <i class="bi bi-clipboard-check me-1"></i>Compliance Tracker
+        </a>
+        {% endif %}
+        <a href="{{ url_for('daily_mis.mis_report') }}" class="btn btn-outline-info btn-sm" style="font-size:0.72rem;">
+            <i class="bi bi-bar-chart me-1"></i>Reports
+        </a>
+        <a href="{{ url_for('daily_mis.mis_add') }}" class="btn btn-primary btn-sm" style="font-size:0.72rem;">
+            <i class="bi bi-plus-lg me-1"></i>{% if is_admin %}Add / Assign Task{% else %}Add Task{% endif %}
+        </a>
+    </div>
+</div>
+
+{% if is_admin and overdue_entries %}
+<!-- OVERDUE ALERT (Admin Only) -->
+<div class="alert-panel">
+    <div class="d-flex align-items-center justify-content-between">
+        <div>
+            <div class="title"><i class="bi bi-exclamation-triangle-fill me-2"></i>OVERDUE TASKS</div>
+            <div style="font-size:0.74rem; opacity:0.9; margin-top:2px;">
+                {{ overdue_entries|length }} task{{ 's' if overdue_entries|length > 1 }} past due date — needs immediate attention
+            </div>
+        </div>
+        <div class="count">{{ overdue_entries|length }}</div>
+    </div>
+    <div class="mt-2" style="font-size:0.72rem;">
+        {% for oe in overdue_entries[:5] %}
+        <div style="background:rgba(255,255,255,0.15); padding:5px 10px; border-radius:6px; margin-top:4px;">
+            <strong>{{ oe.assigned_to_name or oe.staff_name }}</strong> —
+            {% set oe_url = mis_action_url(oe) %}
+            {% if oe_url %}<a href="{{ oe_url }}" style="color:#fbbf24; text-decoration:underline; font-weight:600;">{{ oe.task_type }}</a>{% else %}{{ oe.task_type }}{% endif %}
+            — {{ oe.establishment_name }}
+            <span style="opacity:0.8;">(Due: {{ oe.due_date.strftime('%d-%b') }}, {{ oe.days_overdue }} days overdue)</span>
+            <a href="{{ url_for('daily_mis.mis_edit', entry_id=oe.id) }}" style="color:#fbbf24; text-decoration:none; margin-left:8px;">
+                <i class="bi bi-pencil"></i>
+            </a>
+        </div>
+        {% endfor %}
+        {% if overdue_entries|length > 5 %}
+        <div style="margin-top:6px; opacity:0.8;">...and {{ overdue_entries|length - 5 }} more</div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Date Display -->
+<div class="mb-3">
+    <span style="font-size: 0.82rem; font-weight: 600; color: #334155;">
+        {{ view_date.strftime('%A, %d %B %Y') }}
+    </span>
+    {% if view_date == today %}
+    <span class="badge bg-success" style="font-size:0.62rem; vertical-align:middle;">TODAY</span>
+    {% endif %}
+</div>
+
+<!-- Summary Cards -->
+<div class="row g-2 mb-3">
+    <div class="col-6 col-md-3 col-lg">
+        <div class="card mis-card"><div class="mis-stat">
+            <div class="num text-primary">{{ total_tasks }}</div>
+            <div class="lbl">Total Tasks</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-3 col-lg">
+        <div class="card mis-card"><div class="mis-stat">
+            <div class="num text-success">{{ completed }}</div>
+            <div class="lbl">Completed</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-3 col-lg">
+        <div class="card mis-card"><div class="mis-stat">
+            <div class="num text-danger">{{ pending }}</div>
+            <div class="lbl">Pending</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-3 col-lg">
+        <div class="card mis-card"><div class="mis-stat">
+            <div class="num text-warning">{{ in_progress }}</div>
+            <div class="lbl">In Progress</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-3 col-lg">
+        <div class="card mis-card"><div class="mis-stat">
+            <div class="num" style="color:#7c3aed;">
+                {% if total_amount %}{{ "{:,.0f}".format(total_amount) }}{% else %}0{% endif %}
+            </div>
+            <div class="lbl">Amount (Rs.)</div>
+        </div></div>
+    </div>
+</div>
+
+{% if is_admin and staff_counts %}
+<!-- Staff-wise Summary (Admin Only — Clickable) -->
+<div class="card mis-card mb-3">
+    <div class="card-body py-2 px-3">
+        <h6 style="font-size:0.78rem; font-weight:700; color:#334155; margin-bottom:10px;">
+            <i class="bi bi-people me-1"></i>Staff Performance — {{ view_date.strftime('%d %b %Y') }}
+            <small class="text-muted fw-normal ms-2">(Click name to see all pending)</small>
+        </h6>
+        <div class="row g-2">
+            {% for name, stats in staff_counts.items() %}
+            <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                <a href="{{ url_for('daily_mis.mis_staff_view', staff_name=name) }}" class="text-decoration-none">
+                    <div class="staff-card">
+                        <div class="name text-dark">{{ name }}</div>
+                        <div class="stats mt-1">
+                            <span class="text-primary">{{ stats.total }} tasks</span>
+                            <span class="mx-1">|</span>
+                            <span class="text-success">{{ stats.completed }} done</span>
+                            {% if stats.pending > 0 %}
+                            <span class="mx-1">|</span>
+                            <span class="text-danger fw-bold">{{ stats.pending }} pending</span>
+                            {% endif %}
+                            {% if stats.in_progress > 0 %}
+                            <span class="mx-1">|</span>
+                            <span class="text-warning">{{ stats.in_progress }} WIP</span>
+                            {% endif %}
+                        </div>
+                        <!-- Progress bar -->
+                        <div class="progress mt-2" style="height:4px;">
+                            {% set pct = (stats.completed / stats.total * 100) if stats.total > 0 else 0 %}
+                            <div class="progress-bar bg-success" style="width:{{ pct }}%"></div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if assigned_pending %}
+<!-- Assigned Tasks (Staff: tasks assigned to me / Admin: all assigned pending) -->
+<div class="card mis-card mb-3" style="border-left:4px solid #4f46e5;">
+    <div class="card-body py-2 px-3">
+        <h6 style="font-size:0.78rem; font-weight:700; color:#4f46e5; margin-bottom:10px;">
+            <i class="bi bi-person-check me-1"></i>
+            {% if is_admin %}Assigned Tasks — Pending{% else %}Tasks Assigned to You{% endif %}
+            <span class="badge bg-primary ms-1" style="font-size:0.65rem;">{{ assigned_pending|length }}</span>
+        </h6>
+        <div class="table-responsive">
+            <table class="table table-sm mb-0" style="font-size:0.74rem;">
+                <thead><tr>
+                    <th style="font-size:0.68rem;">Assigned To</th>
+                    <th style="font-size:0.68rem;">Task</th>
+                    <th style="font-size:0.68rem;">Establishment</th>
+                    <th style="font-size:0.68rem;">Due Date</th>
+                    <th style="font-size:0.68rem;">Priority</th>
+                    <th style="font-size:0.68rem;">Status</th>
+                    {% if is_admin %}<th style="font-size:0.68rem;">Action</th>{% endif %}
+                </tr></thead>
+                <tbody>
+                {% for ap in assigned_pending %}
+                <tr class="{% if ap.is_overdue %}overdue-row{% endif %} {% if ap.priority == 'critical' %}priority-critical{% elif ap.priority == 'urgent' %}priority-urgent{% endif %}">
+                    <td><strong>{{ ap.assigned_to_name or ap.staff_name }}</strong></td>
+                    <td>{% set ap_url = mis_action_url(ap) %}{% if ap_url %}<a href="{{ ap_url }}" style="color:#2563eb; font-weight:600;">{{ ap.task_type }} <i class="bi bi-box-arrow-up-right" style="font-size:0.6rem;"></i></a>{% else %}{{ ap.task_type }}{% endif %}</td>
+                    <td>{{ ap.establishment_name }}</td>
+                    <td>
+                        {% if ap.due_date %}
+                        <span class="{% if ap.is_overdue %}text-danger fw-bold{% endif %}">
+                            {{ ap.due_date.strftime('%d-%b') }}
+                            {% if ap.is_overdue %}({{ ap.days_overdue }}d late){% endif %}
+                        </span>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>{{ ap.priority_badge|safe }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('daily_mis.mis_update_status', entry_id=ap.id) }}" style="display:inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <select name="status" class="status-dropdown" onchange="this.form.submit()">
+                                <option value="pending" {% if ap.status == 'pending' %}selected{% endif %}>Pending</option>
+                                <option value="in_progress" {% if ap.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                                <option value="completed" {% if ap.status == 'completed' %}selected{% endif %}>Completed</option>
+                            </select>
+                        </form>
+                    </td>
+                    {% if is_admin %}
+                    <td>
+                        <a href="{{ url_for('daily_mis.mis_edit', entry_id=ap.id) }}" class="btn btn-outline-primary btn-sm" style="font-size:0.65rem; padding:1px 5px;" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% if ap.admin_remarks %}
+                <tr class="{% if ap.is_overdue %}overdue-row{% endif %}">
+                    <td colspan="7" style="padding:0 0 6px 16px; border:none;">
+                        <div class="admin-remark">
+                            <i class="bi bi-chat-left-text me-1" style="color:#f59e0b;"></i>
+                            <strong>Admin:</strong> {{ ap.admin_remarks }}
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if category_counts %}
+<!-- Category Breakdown -->
+<div class="card mis-card mb-3">
+    <div class="card-body py-2 px-3">
+        <h6 style="font-size:0.78rem; font-weight:700; color:#334155; margin-bottom:10px;">
+            <i class="bi bi-grid me-1"></i>Category Breakdown
+        </h6>
+        <div class="d-flex flex-wrap gap-2">
+            {% set cat_colors = {
+                'Payment & Accounts': '#7c3aed', 'Return Filing': '#059669',
+                'Employee / Portal Work': '#2563eb', 'Records & Data Management': '#d97706',
+                'Registration & License': '#dc2626', 'Inspection & Legal': '#be185d',
+                'Communication & Support': '#0891b2', 'Other': '#64748b'
+            } %}
+            {% for cat, count in category_counts.items() %}
+            <span class="cat-badge" style="background:{{ cat_colors.get(cat, '#64748b') }}15; color:{{ cat_colors.get(cat, '#64748b') }}; border:1px solid {{ cat_colors.get(cat, '#64748b') }}30;">
+                {{ cat }}: <strong>{{ count }}</strong>
+            </span>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Entries Table -->
+<div class="card mis-card">
+    <div class="card-body p-0">
+        {% if entries %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 mis-table">
+                <thead style="background:#f8fafc;">
+                    <tr>
+                        <th style="width:30px;">#</th>
+                        {% if is_admin %}<th>Staff</th>{% endif %}
+                        <th>Category</th>
+                        <th>Task</th>
+                        <th>Establishment</th>
+                        <th>Description</th>
+                        <th class="text-end">Amount</th>
+                        <th>Ref</th>
+                        <th>Status</th>
+                        <th>Priority</th>
+                        <th>Voucher</th>
+                        <th style="width:100px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for entry in entries %}
+                <tr class="{% if entry.is_overdue %}overdue-row{% endif %} {% if entry.priority == 'critical' %}priority-critical{% elif entry.priority == 'urgent' %}priority-urgent{% endif %}">
+                    <td class="text-muted">{{ loop.index }}</td>
+                    {% if is_admin %}
+                    <td>
+                        <span style="font-weight:500;">{{ entry.staff_name or '—' }}</span>
+                        {% if entry.is_assigned %}
+                        <br><span class="assigned-badge"><i class="bi bi-arrow-right me-1"></i>{{ entry.assigned_to_name }}</span>
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                    <td>
+                        {% set cat_colors = {
+                            'Payment & Accounts': '#7c3aed', 'Return Filing': '#059669',
+                            'Employee / Portal Work': '#2563eb', 'Records & Data Management': '#d97706',
+                            'Registration & License': '#dc2626', 'Inspection & Legal': '#be185d',
+                            'Communication & Support': '#0891b2', 'Other': '#64748b'
+                        } %}
+                        <span class="cat-badge" style="background:{{ cat_colors.get(entry.category, '#64748b') }}15; color:{{ cat_colors.get(entry.category, '#64748b') }};">
+                            {{ entry.category }}
+                        </span>
+                    </td>
+                    <td style="font-weight:500;">
+                        {% set entry_url = mis_action_url(entry) %}
+                        {% if entry_url %}
+                        <a href="{{ entry_url }}" style="color:#1e40af; text-decoration:none;" title="Go to {{ entry.task_type }}">
+                            {{ entry.task_type }} <i class="bi bi-box-arrow-up-right" style="font-size:0.6rem; opacity:0.5;"></i>
+                        </a>
+                        {% else %}{{ entry.task_type }}{% endif %}
+                    </td>
+                    <td>{{ entry.establishment_name }}</td>
+                    <td>
+                        {% if entry.description %}
+                        <span title="{{ entry.description }}">{{ entry.description[:40] }}{{ '...' if entry.description|length > 40 }}</span>
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                        {% if entry.admin_remarks %}
+                        <div class="admin-remark">
+                            <i class="bi bi-chat-left-text me-1" style="color:#f59e0b;"></i>
+                            <strong>Admin:</strong> {{ entry.admin_remarks[:60] }}{{ '...' if entry.admin_remarks|length > 60 }}
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        {% if entry.amount %}
+                        <strong style="color:#7c3aed;">{{ "{:,.0f}".format(entry.amount) }}</strong>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>
+                        {% if entry.reference %}
+                        <code style="font-size:0.68rem;">{{ entry.reference }}</code>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>
+                        <!-- Quick status change -->
+                        <form method="POST" action="{{ url_for('daily_mis.mis_update_status', entry_id=entry.id) }}" style="display:inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <select name="status" class="status-dropdown" onchange="this.form.submit()"
+                                    style="background:{% if entry.status == 'completed' %}#dcfce7{% elif entry.status == 'pending' %}#fee2e2{% else %}#fef9c3{% endif %};">
+                                <option value="pending" {% if entry.status == 'pending' %}selected{% endif %}>Pending</option>
+                                <option value="in_progress" {% if entry.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                                <option value="completed" {% if entry.status == 'completed' %}selected{% endif %}>Completed</option>
+                            </select>
+                        </form>
+                    </td>
+                    <td>{{ entry.priority_badge|safe }}</td>
+                    <td>
+                        {% if entry.voucher %}
+                        <span class="badge bg-info" style="font-size:0.6rem;">{{ entry.voucher.voucher_number }}</span>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <a href="{{ url_for('daily_mis.mis_edit', entry_id=entry.id) }}"
+                               class="btn btn-outline-primary btn-sm" style="font-size:0.65rem; padding:2px 5px;" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            {% if is_admin %}
+                            <!-- Admin Remark Button -->
+                            <button type="button" class="btn btn-outline-warning btn-sm" style="font-size:0.65rem; padding:2px 5px;"
+                                    title="Add Remark" data-bs-toggle="modal" data-bs-target="#remarkModal{{ entry.id }}">
+                                <i class="bi bi-chat-left-text"></i>
+                            </button>
+                            <!-- Reassign Button -->
+                            <button type="button" class="btn btn-outline-info btn-sm" style="font-size:0.65rem; padding:2px 5px;"
+                                    title="Reassign" data-bs-toggle="modal" data-bs-target="#reassignModal{{ entry.id }}">
+                                <i class="bi bi-person-up"></i>
+                            </button>
+                            <!-- Delete -->
+                            <form method="POST" action="{{ url_for('daily_mis.mis_delete', entry_id=entry.id) }}"
+                                  onsubmit="return confirm('Delete this entry?')" style="display:inline;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-outline-danger btn-sm" style="font-size:0.65rem; padding:2px 5px;" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-journal-x text-muted" style="font-size:2.5rem;"></i>
+            <p class="text-muted mt-2" style="font-size:0.82rem;">No tasks logged for {{ view_date.strftime('%d %B %Y') }}</p>
+            <a href="{{ url_for('daily_mis.mis_add') }}" class="btn btn-primary btn-sm mt-1" style="font-size:0.78rem;">
+                <i class="bi bi-plus-lg me-1"></i>Add First Task
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if is_admin %}
+<!-- Remark Modals -->
+{% for entry in entries %}
+<div class="modal fade" id="remarkModal{{ entry.id }}" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('daily_mis.mis_add_remark', entry_id=entry.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title" style="font-size:0.82rem;"><i class="bi bi-chat-left-text text-warning me-1"></i>Admin Remark</h6>
+                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body py-2">
+                    <p style="font-size:0.72rem; color:#64748b;">{{ entry.task_type }} — {{ entry.establishment_name }}</p>
+                    <textarea name="admin_remarks" class="form-control" rows="3" style="font-size:0.78rem;"
+                              placeholder="Write a remark for staff...">{{ entry.admin_remarks or '' }}</textarea>
+                </div>
+                <div class="modal-footer py-1">
+                    <button type="submit" class="btn btn-warning btn-sm" style="font-size:0.74rem;">Save Remark</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Reassign Modal -->
+<div class="modal fade" id="reassignModal{{ entry.id }}" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('daily_mis.mis_reassign', entry_id=entry.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title" style="font-size:0.82rem;"><i class="bi bi-person-up text-info me-1"></i>Reassign Task</h6>
+                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body py-2">
+                    <p style="font-size:0.72rem; color:#64748b;">{{ entry.task_type }} — {{ entry.establishment_name }}</p>
+                    <p style="font-size:0.72rem;">Currently: <strong>{{ entry.assigned_to_name or entry.staff_name or 'Unassigned' }}</strong></p>
+                    <label style="font-size:0.74rem; font-weight:600;">Assign To:</label>
+                    <select name="assign_to_id" class="form-select form-select-sm" style="font-size:0.78rem;">
+                        <option value="">— Select Staff —</option>
+                        {% for u in staff_counts.keys() %}
+                        <option value="">{{ u }}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="text-muted" style="font-size:0.66rem;">Use the full Add/Edit form for more staff options.</small>
+                </div>
+                <div class="modal-footer py-1">
+                    <button type="submit" class="btn btn-info btn-sm" style="font-size:0.74rem;">Reassign</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% endblock %}

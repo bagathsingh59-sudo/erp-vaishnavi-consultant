@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Day Book — {{ fy_label }}{% endblock %}
+{% block page_header %}Day Book{% endblock %}
+
+{% block content %}
+<div style="max-width:1000px; margin:0 auto;">
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb" style="font-size:0.78rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('accounts.accounts_home') }}" class="text-decoration-none">Accounts</a></li>
+        <li class="breadcrumb-item active">Day Book — {{ fy_label }}</li>
+    </ol>
+</nav>
+<div class="table-container">
+    <div class="table-header">
+        <div class="table-title"><i class="bi bi-journal-text"></i> Day Book <span style="font-size:0.65rem; color:#94a3b8; margin-left:8px;">FY {{ fy_label }}</span></div>
+        <button onclick="window.print()" class="btn btn-sm btn-outline-secondary no-print" style="font-size:0.68rem;"><i class="bi bi-printer me-1"></i>Print</button>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0" style="font-size:0.72rem;">
+            <thead><tr style="background:#f8fafc;"><th style="width:85px;">Date</th><th style="width:70px;">Voucher</th><th>Narration</th><th style="width:70px;">Ref</th><th style="width:90px; text-align:right;">Amount (₹)</th><th style="width:60px;" class="no-print">Action</th></tr></thead>
+            <tbody>
+                {% for v in vouchers %}
+                <tr style="border-bottom:1px solid #e2e8f0;">
+                    <td>{{ v.voucher_date.strftime('%d-%m-%Y') }}</td>
+                    <td>
+                        {% if v.voucher_type in ('receipt', 'part_payment') %}<span class="badge bg-success bg-opacity-10 text-success" style="font-size:0.6rem;">{{ v.voucher_number }}{% if v.voucher_type == 'part_payment' %} (Part){% endif %}</span>
+                        {% elif v.voucher_type == 'payment' %}<span class="badge bg-danger bg-opacity-10 text-danger" style="font-size:0.6rem;">{{ v.voucher_number }}</span>
+                        {% else %}<span class="badge bg-info bg-opacity-10 text-info" style="font-size:0.6rem;">{{ v.voucher_number }}</span>{% endif %}
+                    </td>
+                    <td>
+                        <div style="font-weight:600;">{{ v.narration or '—' }}</div>
+                        <div style="font-size:0.6rem; color:#94a3b8; margin-top:2px;">
+                            {% for e in v.entries %}
+                            <span style="{% if e.entry_type == 'debit' %}color:#dc2626{% else %}color:#16a34a{% endif %}">
+                                {{ 'Dr' if e.entry_type == 'debit' else 'Cr' }} {{ e.account.name }}: {{ "{:,.0f}".format(e.amount) }}
+                            </span>{% if not loop.last %} | {% endif %}
+                            {% endfor %}
+                        </div>
+                    </td>
+                    <td style="font-size:0.62rem; color:#64748b;">{{ v.reference or '' }}</td>
+                    <td style="text-align:right; font-weight:700;">{{ "{:,.0f}".format(v.total_amount) }}</td>
+                    <td class="no-print" style="white-space:nowrap;">
+                        <a href="{{ url_for('accounts.edit_voucher', voucher_id=v.id) }}" class="btn btn-link btn-sm text-primary p-0 me-1" style="font-size:0.6rem;" title="Edit"><i class="bi bi-pencil-square"></i></a>
+                        <form method="POST" action="{{ url_for('accounts.delete_voucher', voucher_id=v.id) }}" style="display:inline;" onsubmit="return confirm('Delete {{ v.voucher_number }}?')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-link btn-sm text-danger p-0" style="font-size:0.6rem;" title="Delete"><i class="bi bi-trash3"></i></button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not vouchers %}<tr><td colspan="5" class="text-center text-muted py-4">No transactions found.</td></tr>{% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+</div>
+{% endblock %}

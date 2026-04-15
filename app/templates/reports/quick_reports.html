@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Quick Reports - {{ est.company_name }}{% endblock %}
+{% block page_header %}Quick Reports{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm" style="border:none; border-radius:14px;">
+    <div class="card-body p-4">
+        <div class="d-flex align-items-center mb-3">
+            <div style="width:44px; height:44px; border-radius:12px; background:#eff6ff; display:flex; align-items:center; justify-content:center; margin-right:12px;">
+                <i class="bi bi-lightning-charge-fill" style="font-size:1.4rem; color:#2563eb;"></i>
+            </div>
+            <div>
+                <h4 style="margin:0; font-weight:700; color:#1e293b;">Quick Reports</h4>
+                <p style="margin:0; color:#64748b; font-size:0.85rem;">
+                    {{ est.company_name }} — Pick month, year &amp; report type to jump instantly
+                </p>
+            </div>
+        </div>
+
+        <hr>
+
+        <form method="POST" action="{{ url_for('reports.quick_reports') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Month <span class="text-danger">*</span></label>
+                    <select name="month" class="form-select" required>
+                        {% for m in range(1, 13) %}
+                            <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>
+                                {{ ['January','February','March','April','May','June','July','August','September','October','November','December'][m-1] }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Year <span class="text-danger">*</span></label>
+                    <select name="year" class="form-select" required>
+                        {% for y in year_range %}
+                            <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Report Type <span class="text-danger">*</span></label>
+                    <select name="report_type" class="form-select" required>
+                        <option value="">— Select a report —</option>
+                        {% for category, items in grouped_reports.items() %}
+                            <optgroup label="{{ category }}">
+                                {% for key, label in items %}
+                                    <option value="{{ key }}">{{ label }}</option>
+                                {% endfor %}
+                            </optgroup>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="mt-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-arrow-right-circle me-1"></i> Open Report
+                </button>
+                <span class="text-muted ms-2" style="font-size:0.8rem;">
+                    <i class="bi bi-info-circle me-1"></i>
+                    If no payroll exists for the selected month/year, you'll be prompted to create it.
+                </span>
+            </div>
+        </form>
+
+        <hr class="mt-4">
+
+        <h6 class="fw-bold mb-3" style="color:#1e293b;">
+            <i class="bi bi-calendar-check me-1"></i> Available Payroll Batches
+            <span class="badge bg-secondary ms-2">{{ payrolls|length }}</span>
+        </h6>
+
+        {% if payrolls %}
+            <div class="table-responsive" style="max-height:320px; overflow-y:auto;">
+                <table class="table table-sm table-hover align-middle" style="font-size:0.85rem;">
+                    <thead class="table-light" style="position:sticky; top:0;">
+                        <tr>
+                            <th>Period</th>
+                            <th>Status</th>
+                            <th class="text-center">Employees</th>
+                            <th class="text-end">Quick Jump</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in payrolls %}
+                            <tr>
+                                <td class="fw-semibold">{{ p.period_display }}</td>
+                                <td>
+                                    {% if p.status == 'finalized' %}
+                                        <span class="badge bg-success bg-opacity-25 text-success">Finalized</span>
+                                    {% else %}
+                                        <span class="badge bg-warning bg-opacity-25 text-warning">Draft</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">{{ p.total_employees or 0 }}</td>
+                                <td class="text-end">
+                                    <a href="{{ url_for('reports.form_b_view', payroll_id=p.id) }}" class="btn btn-sm btn-outline-primary" title="Form B">
+                                        <i class="bi bi-file-text"></i> Form B
+                                    </a>
+                                    <a href="{{ url_for('reports.form_d_view', payroll_id=p.id) }}" class="btn btn-sm btn-outline-secondary" title="Form D">
+                                        <i class="bi bi-calendar2-week"></i> Form D
+                                    </a>
+                                    <a href="{{ url_for('reports.form_d_2625_view', payroll_id=p.id) }}" class="btn btn-sm btn-outline-secondary" title="Form D (26-25)">
+                                        <i class="bi bi-calendar2-range"></i> D (26-25)
+                                    </a>
+                                    <a href="{{ url_for('payroll.payroll_process', payroll_id=p.id) }}" class="btn btn-sm btn-outline-info" title="Open Payroll">
+                                        <i class="bi bi-box-arrow-up-right"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-info py-2 mb-0" style="font-size:0.85rem;">
+                <i class="bi bi-info-circle me-1"></i>
+                No payroll batches exist for this establishment yet.
+                <a href="{{ url_for('payroll.payroll_create') }}" class="fw-bold">Create one now →</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

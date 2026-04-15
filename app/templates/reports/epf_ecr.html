@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}EPF ECR - {{ payroll.period_display }}{% endblock %}
+{% block page_header %}EPF ECR — Electronic Challan cum Return{% endblock %}
+
+{% block content %}
+<style>
+    @page { size: A4 landscape; margin: 10mm; }
+    @media print {
+        .sidebar, .top-navbar, .no-print { display: none !important; }
+        .main-content { margin-left: 0 !important; padding: 0 !important; }
+        .page-content { padding: 0 !important; }
+        body { background: #fff !important; }
+        .ecr-page { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 10px !important; }
+        .ecr-table th, .ecr-table td { font-size: 8px !important; padding: 3px !important; }
+    }
+    .ecr-page { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:24px; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+    .ecr-table { width:100%; border-collapse:collapse; font-size:0.75rem; }
+    .ecr-table th { background:#1e3a8a; color:#fff; padding:6px 8px; text-align:center; font-weight:600; font-size:0.68rem; border:1px solid #1e3a8a; vertical-align:middle; }
+    .ecr-table td { padding:4px 6px; border:1px solid #e2e8f0; text-align:center; vertical-align:middle; }
+    .ecr-table tbody tr:nth-child(even) { background:#f8fafc; }
+    .ecr-table .r { text-align:right; }
+    .ecr-table .l { text-align:left; }
+    .ecr-table .total-row { background:#fef3c7 !important; font-weight:700; }
+    .ecr-table .total-row td { border-top:2px solid #1e293b; border-bottom:2px solid #1e293b; }
+    .ecr-table .warn-row { background:#fef2f2 !important; }
+    .ecr-table .warn-row td { border-color:#fecaca; }
+    .warn-badge { display:inline-block; background:#dc2626; color:#fff; font-size:0.6rem; padding:1px 5px; border-radius:8px; font-weight:600; cursor:help; }
+    .skipped-section { background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:14px 18px; margin-top:16px; font-size:0.78rem; }
+    .skipped-section .title { font-weight:700; color:#92400e; margin-bottom:8px; }
+    .warn-summary { background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:14px 18px; margin-bottom:16px; font-size:0.78rem; }
+    .warn-summary .title { font-weight:700; color:#dc2626; margin-bottom:6px; }
+</style>
+
+<div class="no-print mb-3 d-flex justify-content-between align-items-center">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb" style="font-size:0.85rem; margin:0;">
+            <li class="breadcrumb-item"><a href="{{ url_for('payroll.payroll_list') }}" class="text-decoration-none">Salary Processing</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('payroll.payroll_process', payroll_id=payroll.id) }}" class="text-decoration-none">{{ payroll.period_display }}</a></li>
+            <li class="breadcrumb-item active">EPF ECR</li>
+        </ol>
+    </nav>
+    <div class="d-flex gap-2">
+        <button onclick="window.history.back()" style="background:#e5e7eb; color:#333; border:none; padding:6px 16px; border-radius:6px; cursor:pointer; font-size:0.82rem;"><i class="bi bi-arrow-left me-1"></i> Back to Payroll</button>
+        <a href="{{ url_for('reports.epf_ecr_text', payroll_id=payroll.id) }}" class="btn btn-dark btn-sm">
+            <i class="bi bi-file-earmark-text me-1"></i> Download ECR Text (.txt)
+        </a>
+        <a href="{{ url_for('reports.epf_ecr_csv', payroll_id=payroll.id) }}" class="btn btn-success btn-sm">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i> Download CSV
+        </a>
+        <button onclick="window.print()" class="btn btn-primary btn-sm">
+            <i class="bi bi-printer me-1"></i> Print
+        </button>
+    </div>
+</div>
+
+<div class="ecr-page">
+    <div style="text-align:center; margin-bottom:14px;">
+        <h3 style="font-size:1.1rem; font-weight:700; margin:0; color:#1e3a8a;">EPF — ELECTRONIC CHALLAN CUM RETURN (ECR)</h3>
+        <div style="font-size:0.85rem; font-weight:700; margin-top:4px;">{{ est.company_name }}</div>
+        {% if est.pf_code %}<div style="font-size:0.75rem; color:#64748b;">PF Code: {{ est.pf_code }}</div>{% endif %}
+        <div style="font-size:0.78rem; color:#1e3a8a; font-weight:600; margin-top:4px;">
+            Wage Month: {{ payroll.month_name }} {{ payroll.year }}
+        </div>
+    </div>
+
+    {% set warn_rows = rows|selectattr('warnings')|list %}
+    {% if warn_rows %}
+    <div class="warn-summary no-print">
+        <div class="title"><i class="bi bi-exclamation-triangle-fill me-1"></i> {{ warn_rows|length }} employee(s) have validation warnings</div>
+        {% for r in warn_rows %}
+        <div style="padding:2px 0;">
+            <strong>{{ r.uan }}</strong> — {{ r.name }}: {{ r.warnings|join('; ') }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if skipped %}
+    <div class="skipped-section no-print">
+        <div class="title"><i class="bi bi-person-slash me-1"></i> {{ skipped|length }} employee(s) skipped from ECR</div>
+        {% for s in skipped %}
+        <div style="padding:2px 0;">
+            <strong>{{ s.name }}</strong> — {{ s.reason }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if rows %}
+    <div style="overflow-x:auto;">
+        <table class="ecr-table">
+            <thead>
+                <tr>
+                    <th style="width:30px;">Sl</th>
+                    <th style="width:24px;" class="no-print"></th>
+                    <th style="min-width:100px;">UAN</th>
+                    <th style="min-width:140px; text-align:left;">Member Name</th>
+                    <th>Gross<br>Wages</th>
+                    <th>EPF<br>Wages</th>
+                    <th>EPS<br>Wages</th>
+                    <th>EDLI<br>Wages</th>
+                    <th>EPF Contri<br>(EE 12%)</th>
+                    <th>EPS Contri<br>(8.33%)</th>
+                    <th>EPF Diff<br>(ER 3.67%)</th>
+                    <th>NCP<br>Days</th>
+                    <th>Refund</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set ns = namespace(t_gross=0, t_epf_w=0, t_eps_w=0, t_edli_w=0, t_epf_ee=0, t_eps=0, t_er_diff=0, t_ncp=0) %}
+                {% for r in rows %}
+                <tr{% if r.warnings %} class="warn-row"{% endif %}>
+                    <td style="color:#94a3b8;">{{ loop.index }}</td>
+                    <td class="no-print">{% if r.warnings %}<span class="warn-badge" title="{{ r.warnings|join('; ') }}"><i class="bi bi-exclamation-triangle-fill"></i></span>{% endif %}</td>
+                    <td style="font-family:monospace; font-size:0.72rem;">{{ r.uan }}</td>
+                    <td class="l" style="font-weight:600;">{{ r.name }}</td>
+                    <td class="r">{{ "{:,}".format(r.gross_wages) }}</td>
+                    <td class="r">{{ "{:,}".format(r.epf_wages) }}</td>
+                    <td class="r">{{ "{:,}".format(r.eps_wages) }}</td>
+                    <td class="r">{{ "{:,}".format(r.edli_wages) }}</td>
+                    <td class="r" style="color:#dc2626; font-weight:600;">{{ "{:,}".format(r.epf_ee) }}</td>
+                    <td class="r" style="color:#92400e;">{{ "{:,}".format(r.eps_contribution) }}</td>
+                    <td class="r" style="color:#92400e;">{{ "{:,}".format(r.epf_er_diff) }}</td>
+                    <td class="r">{{ r.ncp_days }}</td>
+                    <td class="r">{{ r.refund }}</td>
+                </tr>
+                {% set ns.t_gross = ns.t_gross + r.gross_wages %}
+                {% set ns.t_epf_w = ns.t_epf_w + r.epf_wages %}
+                {% set ns.t_eps_w = ns.t_eps_w + r.eps_wages %}
+                {% set ns.t_edli_w = ns.t_edli_w + r.edli_wages %}
+                {% set ns.t_epf_ee = ns.t_epf_ee + r.epf_ee %}
+                {% set ns.t_eps = ns.t_eps + r.eps_contribution %}
+                {% set ns.t_er_diff = ns.t_er_diff + r.epf_er_diff %}
+                {% set ns.t_ncp = ns.t_ncp + r.ncp_days %}
+                {% endfor %}
+
+                <tr class="total-row">
+                    <td></td>
+                    <td class="no-print"></td>
+                    <td style="text-align:left; font-weight:700;">TOTAL</td>
+                    <td class="l" style="font-weight:700;">{{ rows|length }} Members</td>
+                    <td class="r">{{ "{:,}".format(ns.t_gross) }}</td>
+                    <td class="r">{{ "{:,}".format(ns.t_epf_w) }}</td>
+                    <td class="r">{{ "{:,}".format(ns.t_eps_w) }}</td>
+                    <td class="r">{{ "{:,}".format(ns.t_edli_w) }}</td>
+                    <td class="r" style="color:#dc2626;">{{ "{:,}".format(ns.t_epf_ee) }}</td>
+                    <td class="r">{{ "{:,}".format(ns.t_eps) }}</td>
+                    <td class="r">{{ "{:,}".format(ns.t_er_diff) }}</td>
+                    <td class="r">{{ ns.t_ncp }}</td>
+                    <td class="r">0</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Summary -->
+    <div style="margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <div style="border:1px solid #e2e8f0; border-radius:6px; padding:12px; font-size:0.75rem;">
+            <div style="font-weight:700; margin-bottom:6px; color:#1e3a8a;">EPF Challan Summary</div>
+            <div style="display:flex; justify-content:space-between; padding:2px 0; border-bottom:1px solid #f1f5f9;">
+                <span style="color:#475569;">A/c 01 — EPF (EE + ER Diff)</span>
+                <strong>{{ "{:,}".format(ns.t_epf_ee + ns.t_er_diff) }}</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding:2px 0; border-bottom:1px solid #f1f5f9;">
+                <span style="color:#475569;">A/c 10 — EPS</span>
+                <strong>{{ "{:,}".format(ns.t_eps) }}</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding:4px 0; border-top:2px solid #1e293b; margin-top:4px; font-size:0.8rem;">
+                <span style="font-weight:700;">Total Challan Amount</span>
+                <strong style="color:#1e3a8a;">{{ "{:,}".format(ns.t_epf_ee + ns.t_er_diff + ns.t_eps) }}</strong>
+            </div>
+        </div>
+        <div style="border:1px solid #e2e8f0; border-radius:6px; padding:12px; font-size:0.75rem;">
+            <div style="font-weight:700; margin-bottom:6px; color:#475569;">File Info</div>
+            <div style="color:#64748b;">
+                <div>ECR Type: Regular Monthly</div>
+                <div>Members: {{ rows|length }}</div>
+                <div>Wage Month: {{ "%02d"|format(payroll.month) }}/{{ payroll.year }}</div>
+                <div>Format: UAN#~#Name#~#Gross#~#EPF Wages#~#EPS Wages#~#EDLI Wages#~#EPF EE#~#EPS#~#EPF ER Diff#~#NCP#~#Refund</div>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <div style="text-align:center; padding:40px; color:#94a3b8;">
+        <i class="bi bi-exclamation-triangle" style="font-size:2rem;"></i>
+        <p style="margin-top:8px;">No employees with UAN found. EPF ECR requires UAN number for all members.</p>
+    </div>
+    {% endif %}
+
+    <div style="margin-top:14px; display:flex; justify-content:space-between; font-size:0.68rem; color:#94a3b8;">
+        <div>Generated: {{ generated_on }}</div>
+        <div>Vaishnavi Consultant</div>
+    </div>
+</div>
+{% endblock %}

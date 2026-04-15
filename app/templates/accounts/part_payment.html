@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Part Payment Entry{% endblock %}
+{% block page_header %}Part Payment Entry{% endblock %}
+
+{% block content %}
+<div style="max-width:800px; margin:0 auto;">
+
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb" style="font-size:0.78rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('accounts.accounts_home') }}" class="text-decoration-none">Accounts</a></li>
+        <li class="breadcrumb-item active">Part Payment Entry</li>
+    </ol>
+</nav>
+
+<div class="table-container">
+    <div class="table-header" style="background:linear-gradient(135deg,#d97706,#f59e0b);">
+        <div class="table-title" style="color:#fff;"><i class="bi bi-cash-coin"></i> Part Payment — Record Additional Payment Against Outstanding Balance</div>
+    </div>
+    <form method="POST" id="partPayForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div style="padding:16px 20px;">
+
+            <!-- Info Banner -->
+            <div style="background:#fefce8; border:1px solid #fde68a; border-radius:6px; padding:10px 14px; margin-bottom:14px; font-size:0.72rem; color:#92400e;">
+                <i class="bi bi-info-circle-fill me-1"></i>
+                <strong>When to use:</strong> Client has already been billed (full Client Payment entry exists) but paid only partial amount. Use this to record the remaining / additional payment.
+            </div>
+
+            <!-- Row 1: Client + Date + Bank -->
+            <div class="row g-3 mb-3">
+                <div class="col-md-5">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">Client (Establishment)</label>
+                    <select name="establishment_id" id="est_select" class="form-select form-select-sm" required onchange="onClientChange()">
+                        <option value="">-- Select Client --</option>
+                        {% for est in establishments %}
+                        <option value="{{ est.id }}" data-balance="{{ client_balances.get(est.id, 0) }}">
+                            {{ est.display_name }}
+                            {% if client_balances.get(est.id, 0) > 0 %} — Due: {{ "{:,.0f}".format(client_balances[est.id]) }}{% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">Date</label>
+                    <input type="date" name="voucher_date" class="form-control form-control-sm" value="{{ today.strftime('%Y-%m-%d') }}" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">Received In (Bank)</label>
+                    <select name="bank_account_id" class="form-select form-select-sm" required>
+                        {% for bank in bank_accounts %}
+                        <option value="{{ bank.id }}">{{ bank.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Outstanding Balance Display -->
+            <div id="outstanding_section" style="display:none; margin-bottom:14px;">
+                <div id="balance_banner" style="border-radius:8px; padding:12px 16px; font-size:0.82rem;">
+                    <!-- Filled by JS -->
+                </div>
+
+                <!-- Previous Payments History -->
+                <div id="payment_history" style="display:none; margin-top:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 14px;">
+                    <div style="font-size:0.68rem; font-weight:700; color:#64748b; margin-bottom:6px;"><i class="bi bi-clock-history me-1"></i>Previous Payments</div>
+                    <div id="payment_list" style="font-size:0.7rem;"></div>
+                </div>
+            </div>
+
+            <hr style="margin:8px 0 14px;">
+
+            <!-- Amount + Reference -->
+            <div class="row g-3 mb-3">
+                <div class="col-md-5">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:700; color:#d97706;">Amount Received in Bank</label>
+                    <input type="number" name="amount" id="pay_amount" class="form-control" required min="1" step="1" placeholder="0" style="font-size:1.1rem; font-weight:700;">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">UTR / Reference</label>
+                    <input type="text" name="reference" class="form-control form-control-sm" placeholder="UTR or transaction reference">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">TDS Deducted</label>
+                    <input type="number" name="tds_amount" id="tds_amount" class="form-control form-control-sm" value="0" min="0" step="1">
+                </div>
+            </div>
+
+            <!-- Narration -->
+            <div class="mb-3">
+                <label class="form-label" style="font-size:0.72rem; font-weight:600;">Narration</label>
+                <input type="text" name="narration" id="narration_field" class="form-control form-control-sm" placeholder="e.g., Balance payment for Jan-2026 EPF/ESIC">
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <a href="{{ url_for('accounts.accounts_home') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i>Back
+                </a>
+                <button type="submit" class="btn btn-warning">
+                    <i class="bi bi-check-lg me-1"></i> Record Part Payment
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function onClientChange(){
+    var estId = document.getElementById('est_select').value;
+    var section = document.getElementById('outstanding_section');
+    var banner = document.getElementById('balance_banner');
+    var historyDiv = document.getElementById('payment_history');
+    var listDiv = document.getElementById('payment_list');
+
+    if(!estId){
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+    banner.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Loading...';
+    banner.style.background = '#f1f5f9';
+    banner.style.border = '1px solid #e2e8f0';
+
+    fetch('/accounts/part-payment/outstanding?est_id=' + estId)
+    .then(r => r.json())
+    .then(data => {
+        if(data.balance > 0){
+            banner.innerHTML = '<i class="bi bi-exclamation-circle-fill me-1"></i>' +
+                '<strong>Outstanding Balance: <span style="font-size:1.1rem;">\u20B9' + data.balance.toLocaleString('en-IN') + '</span></strong>' +
+                '<span style="margin-left:8px; font-size:0.72rem; color:#64748b;">(' + data.debtor_name + ')</span>';
+            banner.style.background = '#fef2f2';
+            banner.style.border = '1px solid #fecaca';
+            banner.style.color = '#dc2626';
+        } else if(data.balance == 0){
+            banner.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i><strong>No outstanding balance</strong> — Client is fully paid.';
+            banner.style.background = '#f0fdf4';
+            banner.style.border = '1px solid #bbf7d0';
+            banner.style.color = '#16a34a';
+        } else {
+            banner.innerHTML = '<i class="bi bi-info-circle me-1"></i><strong>Advance Balance: \u20B9' +
+                Math.abs(data.balance).toLocaleString('en-IN') + '</strong> — Client has overpaid.';
+            banner.style.background = '#fefce8';
+            banner.style.border = '1px solid #fde68a';
+            banner.style.color = '#92400e';
+        }
+
+        // Payment history
+        if(data.payments && data.payments.length > 0){
+            historyDiv.style.display = 'block';
+            var html = '<table style="width:100%; font-size:0.7rem;"><thead><tr style="color:#94a3b8;">' +
+                '<th style="padding:2px 4px;">Date</th><th style="padding:2px 4px;">Voucher</th>' +
+                '<th style="padding:2px 4px;">Type</th><th style="padding:2px 4px; text-align:right;">Amount</th>' +
+                '<th style="padding:2px 4px;">Reference</th></tr></thead><tbody>';
+            data.payments.forEach(function(p){
+                html += '<tr><td style="padding:2px 4px;">' + p.date + '</td>' +
+                    '<td style="padding:2px 4px; font-weight:600;">' + p.number + '</td>' +
+                    '<td style="padding:2px 4px;">' + p.type + '</td>' +
+                    '<td style="padding:2px 4px; text-align:right; font-weight:600;">\u20B9' + p.amount.toLocaleString('en-IN') + '</td>' +
+                    '<td style="padding:2px 4px; color:#64748b;">' + p.reference + '</td></tr>';
+            });
+            html += '</tbody></table>';
+            listDiv.innerHTML = html;
+        } else {
+            historyDiv.style.display = 'none';
+        }
+
+        // Auto-fill narration
+        var estSel = document.getElementById('est_select');
+        var clientName = estSel.options[estSel.selectedIndex].text.split(' —')[0].trim();
+        document.getElementById('narration_field').value = 'Part Payment from ' + clientName;
+    })
+    .catch(function(e){
+        banner.innerHTML = '<i class="bi bi-x-circle me-1"></i>Error loading data.';
+        banner.style.background = '#fef2f2';
+    });
+}
+</script>
+{% endblock %}

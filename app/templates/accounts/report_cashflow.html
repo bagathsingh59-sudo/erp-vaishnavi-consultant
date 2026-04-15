@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Cash Flow Statement — {{ fy_label }}{% endblock %}
+{% block page_header %}Cash Flow Statement{% endblock %}
+
+{% block content %}
+<div style="max-width:800px; margin:0 auto;">
+
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb" style="font-size:0.78rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('accounts.accounts_home') }}" class="text-decoration-none">Accounts</a></li>
+        <li class="breadcrumb-item active">Cash Flow Statement — {{ fy_label }}</li>
+    </ol>
+</nav>
+
+<div class="table-container">
+    <div class="table-header" style="background:linear-gradient(135deg,#059669,#10b981);">
+        <div class="table-title" style="color:#fff;"><i class="bi bi-arrow-left-right"></i> Cash Flow Statement
+            <span style="font-size:0.65rem; opacity:0.8; margin-left:8px;">FY {{ fy_label }}</span>
+        </div>
+        <button onclick="window.print()" class="btn btn-sm btn-light no-print" style="font-size:0.68rem;"><i class="bi bi-printer me-1"></i>Print</button>
+    </div>
+
+    <!-- Opening Balance -->
+    <div style="padding:10px 20px; background:#f0fdf4; border-bottom:1px solid #bbf7d0; display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:0.78rem; font-weight:600; color:#166534;"><i class="bi bi-wallet2 me-1"></i>Opening Balance (Bank + Cash)</span>
+        <span style="font-size:1rem; font-weight:700; color:#166534;">{{ "{:,.0f}".format(opening_bal) }}</span>
+    </div>
+
+    <div style="padding:16px 20px;">
+        <!-- INFLOWS -->
+        <div style="margin-bottom:16px;">
+            <div style="font-size:0.72rem; font-weight:700; color:#16a34a; text-transform:uppercase; border-bottom:2px solid #16a34a; padding-bottom:4px; margin-bottom:8px;">
+                <i class="bi bi-arrow-down-circle me-1"></i> Cash Inflows (Receipts)
+            </div>
+            <table style="width:100%; font-size:0.75rem; border-collapse:collapse;">
+                {% for name, amt in inflows.items()|sort(attribute='1', reverse=True) %}
+                <tr>
+                    <td style="padding:4px 8px; color:#334155;">{{ name }}</td>
+                    <td style="padding:4px 8px; text-align:right; font-weight:600; color:#16a34a;">{{ "{:,.0f}".format(amt) }}</td>
+                </tr>
+                {% endfor %}
+                {% if not inflows %}
+                <tr><td colspan="2" style="padding:8px; color:#94a3b8; text-align:center;">No inflows</td></tr>
+                {% endif %}
+                <tr style="border-top:2px solid #16a34a; font-weight:700;">
+                    <td style="padding:6px 8px; color:#166534;">Total Inflows</td>
+                    <td style="padding:6px 8px; text-align:right; color:#166534; font-size:0.88rem;">{{ "{:,.0f}".format(total_inflow) }}</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- OUTFLOWS -->
+        <div style="margin-bottom:16px;">
+            <div style="font-size:0.72rem; font-weight:700; color:#dc2626; text-transform:uppercase; border-bottom:2px solid #dc2626; padding-bottom:4px; margin-bottom:8px;">
+                <i class="bi bi-arrow-up-circle me-1"></i> Cash Outflows (Payments)
+            </div>
+            <table style="width:100%; font-size:0.75rem; border-collapse:collapse;">
+                {% for name, amt in outflows.items()|sort(attribute='1', reverse=True) %}
+                <tr>
+                    <td style="padding:4px 8px; color:#334155;">{{ name }}</td>
+                    <td style="padding:4px 8px; text-align:right; font-weight:600; color:#dc2626;">{{ "{:,.0f}".format(amt) }}</td>
+                </tr>
+                {% endfor %}
+                {% if not outflows %}
+                <tr><td colspan="2" style="padding:8px; color:#94a3b8; text-align:center;">No outflows</td></tr>
+                {% endif %}
+                <tr style="border-top:2px solid #dc2626; font-weight:700;">
+                    <td style="padding:6px 8px; color:#991b1b;">Total Outflows</td>
+                    <td style="padding:6px 8px; text-align:right; color:#991b1b; font-size:0.88rem;">{{ "{:,.0f}".format(total_outflow) }}</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- NET FLOW -->
+        <div style="background:#f8fafc; border:2px solid #1e293b; border-radius:6px; padding:10px 16px; display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-size:0.82rem; font-weight:700; color:#1e293b;">Net Cash Flow (Inflows - Outflows)</span>
+            <span style="font-size:1.1rem; font-weight:800; color:{% if net_flow >= 0 %}#16a34a{% else %}#dc2626{% endif %};">
+                {% if net_flow >= 0 %}+{% endif %}{{ "{:,.0f}".format(net_flow) }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Closing Balance -->
+    <div style="padding:12px 20px; background:#1e293b; color:#fff; display:flex; justify-content:space-between; align-items:center; border-radius:0 0 8px 8px;">
+        <span style="font-size:0.82rem; font-weight:700;"><i class="bi bi-wallet-fill me-1"></i>Closing Balance (Bank + Cash)</span>
+        <span style="font-size:1.2rem; font-weight:800;">{{ "{:,.0f}".format(closing_bal) }}</span>
+    </div>
+</div>
+</div>
+{% endblock %}

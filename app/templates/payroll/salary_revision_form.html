@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+
+{% block title %}Revise Template: {{ tmpl.name }} - {{ est.company_name }}{% endblock %}
+{% block page_header %}Revise Salary Template{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb" style="font-size:0.85rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('establishment.establishment_view', id=est.id) }}" class="text-decoration-none">{{ est.company_name }}</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('payroll.salary_template_list', est_id=est.id) }}" class="text-decoration-none">Salary Templates</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('payroll.salary_revision', est_id=est.id) }}" class="text-decoration-none">Bulk Revision</a></li>
+        <li class="breadcrumb-item active">{{ tmpl.name }}</li>
+    </ol>
+</nav>
+
+<!-- Header Banner -->
+<div style="background:linear-gradient(135deg, #dc2626, #b91c1c); color:#fff; padding:16px 24px; border-radius:var(--radius); margin-bottom:24px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+    <div style="display:flex; align-items:center; gap:14px;">
+        <div style="width:44px; height:44px; background:rgba(255,255,255,0.15); border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.3rem;">
+            <i class="bi bi-arrow-repeat"></i>
+        </div>
+        <div>
+            <div style="font-weight:700; font-size:1rem;">Revise: {{ tmpl.name }}</div>
+            <div style="opacity:0.8; font-size:0.78rem;">
+                {{ linked_employees|length }} employee(s) will be updated |
+                {% if tmpl.salary_type == 'daily_wages' %}
+                Current: ₹{{ "{:,.0f}".format(tmpl.daily_rate or 0) }}/day
+                {% else %}
+                Current Gross: ₹{{ "{:,.0f}".format(tmpl.gross_salary or 0) }}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Warning -->
+<div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px 16px; margin-bottom:20px; display:flex; gap:10px; align-items:flex-start;">
+    <i class="bi bi-exclamation-triangle" style="color:#dc2626; font-size:1.1rem; margin-top:1px;"></i>
+    <div style="font-size:0.82rem; color:#991b1b;">
+        <strong>Important:</strong> Enter the <strong>NEW</strong> salary amounts below. After preview, this will update the template AND create new salary records for all {{ linked_employees|length }} employee(s) using this template.
+        Old salary records will be kept as history.
+    </div>
+</div>
+
+<div class="form-card">
+    <form method="POST" autocomplete="off">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="preview">
+
+        <div class="form-section">
+            <div class="form-section-title">
+                <i class="bi bi-calendar-event"></i> Revision Details
+            </div>
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <label class="form-label" style="font-weight:600;">Effective From <span class="text-danger">*</span></label>
+                    <input type="date" name="effective_from" class="form-control" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" style="font-weight:600;">Reason</label>
+                    <select name="revision_reason" class="form-select">
+                        <option value="Minimum Wage Revision">Minimum Wage Revision</option>
+                        <option value="DA/VDA Revision">DA/VDA Revision</option>
+                        <option value="Annual Increment">Annual Increment</option>
+                        <option value="Salary Revision">Salary Revision</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+            </div>
+
+            {% if tmpl.salary_type == 'daily_wages' %}
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <label class="form-label" style="font-weight:600;">New Daily Rate (₹) <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                        <span class="input-group-text" style="font-size:0.75rem; color:#94a3b8;">Old: ₹{{ "{:,.0f}".format(tmpl.daily_rate or 0) }}</span>
+                        <input type="number" name="daily_rate" class="form-control" step="0.01" min="0"
+                               value="{{ tmpl.daily_rate or 0 }}" style="font-size:1.1rem; font-weight:700;">
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Salary Structure -->
+        <div class="form-section">
+            <div class="form-section-title">
+                <i class="bi bi-cash-coin"></i> New Salary Structure
+            </div>
+            <div class="form-section-desc">Enter the new amounts. Current amounts are shown for reference.</div>
+
+            {% if config.salary_structure == 'gross_only' %}
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label" style="font-weight:600;">New Gross Salary (₹)</label>
+                    <div class="input-group">
+                        <span class="input-group-text" style="font-size:0.75rem; color:#94a3b8;">Old: ₹{{ "{:,.0f}".format(tmpl.gross_salary or 0) }}</span>
+                        <input type="number" name="gross_salary" class="form-control" step="0.01" min="0"
+                               value="{{ tmpl.gross_salary or 0 }}" style="font-size:1.1rem; font-weight:700;">
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="table-responsive">
+                <table class="table" style="margin:0;">
+                    <thead>
+                        <tr>
+                            <th>Salary Head</th>
+                            <th>Code</th>
+                            <th style="text-align:right; width:140px;">Current (₹)</th>
+                            <th style="width:180px;">New Amount (₹)</th>
+                            <th style="text-align:right; width:100px;">Change</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for head in heads %}
+                        {% set old_amt = head_values.get(head.id, 0) %}
+                        <tr>
+                            <td style="font-weight:600;">{{ head.name }}
+                                {% if head.is_for_compliance %}
+                                <span class="badge bg-info bg-opacity-10 text-info" style="font-size:0.6rem;">Compliance</span>
+                                {% endif %}
+                            </td>
+                            <td><code style="font-size:0.8rem;">{{ head.short_code }}</code></td>
+                            <td style="text-align:right; color:#64748b; font-size:0.88rem;">{{ "{:,.0f}".format(old_amt) }}</td>
+                            <td>
+                                <input type="number" name="head_{{ head.id }}" class="form-control rev-head-amount"
+                                       step="0.01" min="0" value="{{ old_amt }}"
+                                       data-old="{{ old_amt }}"
+                                       data-type="{{ head.head_type }}" data-in-gross="{{ head.is_in_gross|int }}"
+                                       oninput="calcRevision()">
+                            </td>
+                            <td style="text-align:right; font-weight:600;" class="rev-diff" data-head="{{ head.id }}">-</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr style="border-top:2px solid var(--border-color);">
+                            <td colspan="2" style="font-weight:700;">Gross Salary</td>
+                            <td style="text-align:right; font-weight:700; color:#64748b;">{{ "{:,.0f}".format(tmpl.gross_salary or 0) }}</td>
+                            <td>
+                                <div id="revGrossDisplay" style="font-size:1.1rem; font-weight:700; color:var(--primary); padding:4px 12px;">₹0</div>
+                            </td>
+                            <td style="text-align:right; font-weight:700;" id="revGrossDiff">-</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <!-- Quick % helper -->
+            <div style="margin-top:12px; background:#f8fafc; border-radius:8px; padding:10px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                <span style="font-size:0.78rem; font-weight:600; color:#475569;">Quick fill:</span>
+                <div class="input-group" style="max-width:200px;">
+                    <input type="number" id="quickPct" class="form-control form-control-sm" placeholder="%" step="0.5" min="0" style="font-size:0.82rem;">
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="applyQuickPct()" style="font-size:0.78rem;">
+                        Apply % to all
+                    </button>
+                </div>
+                <small style="color:#94a3b8; font-size:0.7rem;">Enter percentage to increase all heads proportionally</small>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Affected Employees -->
+        <div class="form-section">
+            <div class="form-section-title">
+                <i class="bi bi-people"></i> Employees to be Updated ({{ linked_employees|length }})
+            </div>
+            <div style="max-height:200px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:8px;">
+                <table class="table table-sm" style="margin:0; font-size:0.8rem;">
+                    <thead style="position:sticky; top:0; background:#f8fafc;">
+                        <tr>
+                            <th>#</th>
+                            <th>Employee</th>
+                            <th>Code</th>
+                            <th style="text-align:right;">Current Gross</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for emp in linked_employees %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td style="font-weight:600;">{{ emp.name }}</td>
+                            <td><code>{{ emp.uan_number or emp.esic_ip_number or emp.emp_code }}</code></td>
+                            <td style="text-align:right;">₹{{ "{:,.0f}".format(emp.current_gross) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="form-section" style="border-bottom:none; background:#f8fafc;">
+            <div class="d-flex gap-3 justify-content-between">
+                <a href="{{ url_for('payroll.salary_revision', est_id=est.id) }}" class="btn btn-light px-4">
+                    <i class="bi bi-arrow-left me-1"></i> Back
+                </a>
+                <button type="submit" class="btn btn-primary px-4" style="font-weight:600;">
+                    <i class="bi bi-eye me-1"></i> Preview Changes
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+function calcRevision() {
+    let total = 0;
+    let oldTotal = {{ tmpl.gross_salary or 0 }};
+    document.querySelectorAll('.rev-head-amount').forEach(inp => {
+        const newAmt = parseFloat(inp.value) || 0;
+        const oldAmt = parseFloat(inp.dataset.old) || 0;
+        const diff = newAmt - oldAmt;
+
+        // Update diff cell
+        const headId = inp.name.replace('head_', '');
+        const diffCell = document.querySelector('.rev-diff[data-head="' + headId + '"]');
+        if (diffCell) {
+            if (diff > 0) {
+                diffCell.textContent = '+' + diff.toLocaleString('en-IN');
+                diffCell.style.color = '#16a34a';
+            } else if (diff < 0) {
+                diffCell.textContent = diff.toLocaleString('en-IN');
+                diffCell.style.color = '#dc2626';
+            } else {
+                diffCell.textContent = '-';
+                diffCell.style.color = '#94a3b8';
+            }
+        }
+
+        if (inp.dataset.type === 'earning' && inp.dataset.inGross === '1') {
+            total += newAmt;
+        }
+    });
+
+    document.getElementById('revGrossDisplay').textContent = '₹' + total.toLocaleString('en-IN', {maximumFractionDigits: 0});
+
+    const grossDiff = total - oldTotal;
+    const grossDiffEl = document.getElementById('revGrossDiff');
+    if (grossDiff > 0) {
+        grossDiffEl.textContent = '+₹' + grossDiff.toLocaleString('en-IN');
+        grossDiffEl.style.color = '#16a34a';
+    } else if (grossDiff < 0) {
+        grossDiffEl.textContent = '-₹' + Math.abs(grossDiff).toLocaleString('en-IN');
+        grossDiffEl.style.color = '#dc2626';
+    } else {
+        grossDiffEl.textContent = 'No change';
+        grossDiffEl.style.color = '#94a3b8';
+    }
+}
+
+function applyQuickPct() {
+    const pct = parseFloat(document.getElementById('quickPct').value) || 0;
+    if (pct <= 0) { alert('Enter a valid percentage.'); return; }
+
+    const multiplier = 1 + (pct / 100);
+    document.querySelectorAll('.rev-head-amount').forEach(inp => {
+        const oldAmt = parseFloat(inp.dataset.old) || 0;
+        inp.value = Math.round(oldAmt * multiplier);
+    });
+    calcRevision();
+}
+
+document.addEventListener('DOMContentLoaded', calcRevision);
+</script>
+{% endblock %}

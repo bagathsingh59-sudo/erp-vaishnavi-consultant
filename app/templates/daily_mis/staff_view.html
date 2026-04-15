@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block title %}Staff View — {{ staff_name }}{% endblock %}
+{% block page_header %}Staff: {{ staff_name }}{% endblock %}
+
+{% block content %}
+<style>
+    .mis-card { border-radius: 10px; border: none; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .mis-stat { text-align: center; padding: 14px 8px; }
+    .mis-stat .num { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+    .mis-stat .lbl { font-size: 0.68rem; color: #64748b; margin-top: 4px; text-transform: uppercase; }
+    .mis-table th { font-size: 0.7rem; text-transform: uppercase; color: #64748b; white-space: nowrap; }
+    .mis-table td { font-size: 0.76rem; vertical-align: middle; }
+    .overdue-row { background: #fef2f2 !important; }
+    .status-dropdown { font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; cursor: pointer; border: 1px solid #d1d5db; }
+    .admin-remark { background: #fefce8; border-left: 3px solid #f59e0b; padding: 4px 8px; font-size: 0.7rem; border-radius: 0 4px 4px 0; margin-top: 3px; }
+</style>
+
+<!-- Header -->
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+    <div>
+        <h5 class="mb-0" style="font-weight:700; font-size:1.1rem;">
+            <i class="bi bi-person-badge text-primary me-2"></i>{{ staff_name }}
+        </h5>
+        <small class="text-muted" style="font-size:0.72rem;">Staff work overview &amp; pending tasks</small>
+    </div>
+    <a href="{{ url_for('daily_mis.mis_home') }}" class="btn btn-outline-primary btn-sm" style="font-size:0.74rem;">
+        <i class="bi bi-arrow-left me-1"></i>Back to MIS Dashboard
+    </a>
+</div>
+
+<!-- Monthly Stats -->
+<div class="row g-2 mb-3">
+    <div class="col-4">
+        <div class="card mis-card">
+            <div class="mis-stat">
+                <div class="num text-primary">{{ month_total }}</div>
+                <div class="lbl">This Month Total</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="card mis-card">
+            <div class="mis-stat">
+                <div class="num text-success">{{ month_completed }}</div>
+                <div class="lbl">Completed</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="card mis-card">
+            <div class="mis-stat">
+                <div class="num text-danger">{{ month_pending }}</div>
+                <div class="lbl">Pending</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Monthly Progress Bar -->
+<div class="card mis-card mb-3">
+    <div class="card-body py-2 px-3">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <span style="font-size:0.74rem; font-weight:600;">Monthly Performance</span>
+            <span style="font-size:0.72rem; color:#64748b;">
+                {% set pct = (month_completed / month_total * 100) if month_total > 0 else 0 %}
+                {{ "%.0f"|format(pct) }}% completion rate
+            </span>
+        </div>
+        <div class="progress" style="height:8px; border-radius:4px;">
+            <div class="progress-bar bg-success" style="width:{{ pct }}%"></div>
+        </div>
+    </div>
+</div>
+
+{% if pending_entries %}
+<!-- All Pending Tasks -->
+<div class="card mis-card mb-3" style="border-left:4px solid #dc2626;">
+    <div class="card-body py-2 px-3">
+        <h6 style="font-size:0.82rem; font-weight:700; color:#dc2626; margin-bottom:10px;">
+            <i class="bi bi-exclamation-circle me-1"></i>All Pending Tasks
+            <span class="badge bg-danger ms-1" style="font-size:0.65rem;">{{ pending_entries|length }}</span>
+        </h6>
+        <div class="table-responsive">
+            <table class="table table-sm mb-0 mis-table">
+                <thead style="background:#fef2f2;"><tr>
+                    <th>#</th>
+                    <th>Date</th>
+                    <th>Task</th>
+                    <th>Establishment</th>
+                    <th>Due Date</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Admin Remark</th>
+                    <th>Actions</th>
+                </tr></thead>
+                <tbody>
+                {% for pe in pending_entries %}
+                <tr class="{% if pe.is_overdue %}overdue-row{% endif %}">
+                    <td class="text-muted">{{ loop.index }}</td>
+                    <td style="white-space:nowrap;">{{ pe.task_date.strftime('%d-%b') }}</td>
+                    <td style="font-weight:500;">{% set pe_url = mis_action_url(pe) %}{% if pe_url %}<a href="{{ pe_url }}" style="color:#1e40af;">{{ pe.task_type }} <i class="bi bi-box-arrow-up-right" style="font-size:0.6rem; opacity:0.5;"></i></a>{% else %}{{ pe.task_type }}{% endif %}</td>
+                    <td>{{ pe.establishment_name }}</td>
+                    <td>
+                        {% if pe.due_date %}
+                        <span class="{% if pe.is_overdue %}text-danger fw-bold{% endif %}">
+                            {{ pe.due_date.strftime('%d-%b') }}
+                            {% if pe.is_overdue %}({{ pe.days_overdue }}d late){% endif %}
+                        </span>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>{{ pe.priority_badge|safe }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('daily_mis.mis_update_status', entry_id=pe.id) }}" style="display:inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <select name="status" class="status-dropdown" onchange="this.form.submit()">
+                                <option value="pending" {% if pe.status == 'pending' %}selected{% endif %}>Pending</option>
+                                <option value="in_progress" {% if pe.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                                <option value="completed">Completed</option>
+                            </select>
+                        </form>
+                    </td>
+                    <td>
+                        {% if pe.admin_remarks %}
+                        <div class="admin-remark">{{ pe.admin_remarks[:50] }}{{ '...' if pe.admin_remarks|length > 50 }}</div>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <a href="{{ url_for('daily_mis.mis_edit', entry_id=pe.id) }}"
+                               class="btn btn-outline-primary btn-sm" style="font-size:0.65rem; padding:2px 5px;">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <!-- Quick Remark -->
+                            <button type="button" class="btn btn-outline-warning btn-sm" style="font-size:0.65rem; padding:2px 5px;"
+                                    data-bs-toggle="modal" data-bs-target="#remarkModal{{ pe.id }}">
+                                <i class="bi bi-chat-left-text"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Remark Modals for pending entries -->
+{% for pe in pending_entries %}
+<div class="modal fade" id="remarkModal{{ pe.id }}" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('daily_mis.mis_add_remark', entry_id=pe.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title" style="font-size:0.82rem;"><i class="bi bi-chat-left-text text-warning me-1"></i>Admin Remark</h6>
+                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body py-2">
+                    <p style="font-size:0.72rem; color:#64748b;">{{ pe.task_type }} — {{ pe.establishment_name }}</p>
+                    <textarea name="admin_remarks" class="form-control" rows="3" style="font-size:0.78rem;"
+                              placeholder="Write a remark for staff...">{{ pe.admin_remarks or '' }}</textarea>
+                </div>
+                <div class="modal-footer py-1">
+                    <button type="submit" class="btn btn-warning btn-sm" style="font-size:0.74rem;">Save Remark</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if today_entries %}
+<!-- Today's Tasks -->
+<div class="card mis-card">
+    <div class="card-body py-2 px-3">
+        <h6 style="font-size:0.82rem; font-weight:700; color:#334155; margin-bottom:10px;">
+            <i class="bi bi-calendar-check me-1"></i>Today's Tasks
+        </h6>
+        <div class="table-responsive">
+            <table class="table table-sm mb-0 mis-table">
+                <thead style="background:#f8fafc;"><tr>
+                    <th>#</th>
+                    <th>Category</th>
+                    <th>Task</th>
+                    <th>Establishment</th>
+                    <th>Status</th>
+                    <th>Description</th>
+                </tr></thead>
+                <tbody>
+                {% for te in today_entries %}
+                <tr>
+                    <td class="text-muted">{{ loop.index }}</td>
+                    <td style="font-size:0.7rem; color:#64748b;">{{ te.category }}</td>
+                    <td style="font-weight:500;">{% set te_url = mis_action_url(te) %}{% if te_url %}<a href="{{ te_url }}" style="color:#1e40af;">{{ te.task_type }} <i class="bi bi-box-arrow-up-right" style="font-size:0.6rem; opacity:0.5;"></i></a>{% else %}{{ te.task_type }}{% endif %}</td>
+                    <td>{{ te.establishment_name }}</td>
+                    <td>{{ te.status_badge|safe }}</td>
+                    <td>{{ te.description[:50] if te.description else '—' }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if not pending_entries and not today_entries %}
+<div class="text-center py-5">
+    <i class="bi bi-emoji-smile text-success" style="font-size:2.5rem;"></i>
+    <p class="text-muted mt-2" style="font-size:0.82rem;">{{ staff_name }} has no pending tasks. All clear!</p>
+</div>
+{% endif %}
+{% endblock %}

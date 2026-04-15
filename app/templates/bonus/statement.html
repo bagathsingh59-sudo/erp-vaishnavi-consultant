@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Bonus Statement — {{ run.fy_label }}{% endblock %}
+{% block page_header %}Bonus Statement (Month-wise){% endblock %}
+
+{% block content %}
+<style>
+    @page { size: 14in 8.5in; margin: 8mm; }
+    @media print {
+        @page { size: 14in 8.5in landscape; margin: 8mm; }
+        html, body { width: 14in; background:#fff !important;
+            -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        .sidebar, .top-navbar, .no-print { display: none !important; }
+        .main-content { margin-left: 0 !important; padding: 0 !important; width: 100% !important; }
+        .page-content { padding: 0 !important; }
+        .bs-page { box-shadow: none !important; border: none !important; padding: 6px !important; }
+        .bs-table th, .bs-table td { font-size: 7px !important; padding: 2px 3px !important; }
+    }
+    .bs-page { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:18px; }
+    .bs-title { text-align:center; margin-bottom:10px; }
+    .bs-title h3 { font-size:1.1rem; font-weight:700; margin:0; letter-spacing:1px; }
+    .bs-title h4 { font-size:0.88rem; font-weight:600; margin:2px 0; color:#475569; }
+    .bs-info { font-size:0.76rem; margin-bottom:8px; color:#334155; }
+    .bs-table { width:100%; border-collapse:collapse; font-size:0.68rem; }
+    .bs-table th { background:#f1f5f9; border:1px solid #94a3b8; padding:4px; text-align:center; font-size:0.65rem; }
+    .bs-table td { border:1px solid #cbd5e1; padding:3px 4px; vertical-align:middle; }
+    .bs-table .text-right { text-align:right; }
+    .bs-table .text-center { text-align:center; }
+    .bs-table .month-detail { font-size:0.6rem; color:#64748b; display:block; }
+    .bs-table .total-row { background:#dcfce7; font-weight:700; }
+    .bs-table .ineligible { background:#f1f5f9; color:#94a3b8; }
+</style>
+
+<div class="no-print alert alert-warning py-2 px-3 mb-3" style="font-size:0.82rem;">
+    <i class="bi bi-info-circle-fill me-1"></i>
+    <strong>Printing / Save as PDF:</strong> Click <b>Print / PDF</b>, then set
+    <b>Layout = Landscape</b> and <b>Paper size = Legal</b>.
+</div>
+
+<div class="no-print mb-3 d-flex gap-2">
+    <a href="{{ url_for('bonus.bonus_view', run_id=run.id) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+    <a href="{{ url_for('bonus.bonus_statement_excel', run_id=run.id) }}" class="btn btn-sm btn-success"><i class="bi bi-file-earmark-excel"></i> Download Excel</a>
+    <button onclick="window.print()" class="btn btn-sm btn-primary"><i class="bi bi-printer"></i> Print / PDF</button>
+</div>
+
+<div class="bs-page">
+    <div class="bs-title">
+        <h3>BONUS STATEMENT</h3>
+        <h4>{{ run.establishment.company_name.upper() }} &nbsp;|&nbsp; {{ run.fy_label }} (Apr {{ run.start_year }} — Mar {{ run.end_year }})</h4>
+    </div>
+    <div class="bs-info">
+        <strong>Bonus %:</strong> {{ run.bonus_percentage }}% &nbsp;|&nbsp;
+        <strong>Wage Ceiling:</strong> ₹{{ "{:,.0f}".format(run.wage_ceiling) }}
+        {% if run.min_wage_floor %}(Min Wage Floor: ₹{{ "{:,.0f}".format(run.min_wage_floor) }}){% endif %}
+        &nbsp;|&nbsp;
+        <strong>Effective Ceiling:</strong> ₹{{ "{:,.0f}".format(run.effective_ceiling) }} &nbsp;|&nbsp;
+        <strong>Eligibility Cap:</strong> ₹{{ "{:,.0f}".format(run.eligibility_cap) }}
+    </div>
+
+    <table class="bs-table">
+        <thead>
+            <tr>
+                <th rowspan="2">Sr</th>
+                <th rowspan="2">Emp<br>Code</th>
+                <th rowspan="2" style="text-align:left;">Name</th>
+                <th rowspan="2">Designation</th>
+                {% for y, m, lbl, key in months %}
+                <th>{{ lbl }}<br><small>{{ y }}</small></th>
+                {% endfor %}
+                <th rowspan="2">Total<br>Basic+DA</th>
+                <th rowspan="2">Total<br>Capped</th>
+                <th rowspan="2" style="background:#dcfce7;">Bonus<br>@ Ceiling<br>({{ run.bonus_percentage }}%)</th>
+                <th rowspan="2" style="background:#e0f2fe;">Bonus<br>@ Actual<br>({{ run.bonus_percentage }}%)</th>
+            </tr>
+            <tr>
+                {% for y, m, lbl, key in months %}
+                <th style="font-weight:400; color:#94a3b8; font-size:0.55rem;">Basic+DA<br>(Capped)</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% set ns = namespace(t_basic=0, t_cap=0, t_bc=0, t_ba=0) %}
+            {% for e in entries %}
+            <tr class="{% if not e.is_eligible %}ineligible{% endif %}">
+                <td class="text-center">{{ loop.index }}</td>
+                <td class="text-center">{{ e.employee.emp_code }}</td>
+                <td style="text-align:left; font-weight:600;">{{ e.employee.name }}</td>
+                <td>{{ e.employee.designation or '' }}</td>
+                {% for y, m, lbl, key in months %}
+                    {% set md = e.monthly.get(key) %}
+                    <td class="text-right">
+                        {% if md %}
+                            {% if md.eligible %}
+                                {{ "{:,.0f}".format(md.basic_da) }}
+                                {% if md.basic_da != md.capped %}
+                                <span class="month-detail">({{ "{:,.0f}".format(md.capped) }})</span>
+                                {% endif %}
+                            {% else %}
+                                <span style="color:#94a3b8;">—</span>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                {% endfor %}
+                <td class="text-right">{{ "{:,.0f}".format(e.total_basic_da) }}</td>
+                <td class="text-right">{{ "{:,.0f}".format(e.total_capped_wage) }}</td>
+                <td class="text-right" style="background:#f0fdf4; font-weight:700;">
+                    {{ "{:,.0f}".format(e.final_bonus_ceiling) }}
+                </td>
+                <td class="text-right" style="background:#eff6ff; font-weight:700;">
+                    {{ "{:,.0f}".format(e.final_bonus_actual) }}
+                </td>
+            </tr>
+            {% set ns.t_basic = ns.t_basic + e.total_basic_da %}
+            {% set ns.t_cap = ns.t_cap + e.total_capped_wage %}
+            {% set ns.t_bc = ns.t_bc + e.final_bonus_ceiling %}
+            {% set ns.t_ba = ns.t_ba + e.final_bonus_actual %}
+            {% endfor %}
+            <tr class="total-row">
+                <td class="text-center" colspan="{{ 4 + months|length }}"><strong>TOTAL ({{ entries|length }} Employees)</strong></td>
+                <td class="text-right">{{ "{:,.0f}".format(ns.t_basic) }}</td>
+                <td class="text-right">{{ "{:,.0f}".format(ns.t_cap) }}</td>
+                <td class="text-right">{{ "{:,.0f}".format(ns.t_bc) }}</td>
+                <td class="text-right">{{ "{:,.0f}".format(ns.t_ba) }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div style="margin-top:14px; font-size:0.68rem; color:#64748b;">
+        <div><strong>Legend:</strong> Main number = actual Basic+DA of that month. (Number in brackets) = capped to ₹{{ "{:,.0f}".format(run.effective_ceiling) }} if actual exceeds ceiling. — = ineligible month.</div>
+        <div style="margin-top:4px;">Generated: {{ generated_on }} | Vaishnavi Consultant</div>
+    </div>
+</div>
+{% endblock %}

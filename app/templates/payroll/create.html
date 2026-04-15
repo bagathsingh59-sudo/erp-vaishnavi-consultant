@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Create Payroll - {{ establishment.company_name }}{% endblock %}
+{% block page_header %}Create Monthly Payroll{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb" style="font-size:0.85rem;">
+        <li class="breadcrumb-item"><a href="{{ url_for('establishment.establishment_list') }}" class="text-decoration-none">Establishments</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('establishment.establishment_view', id=establishment.id) }}" class="text-decoration-none">{{ establishment.company_name }}</a></li>
+        <li class="breadcrumb-item active">Create Payroll</li>
+    </ol>
+</nav>
+
+<!-- Establishment Banner -->
+<div style="background:linear-gradient(135deg, #10b981, #059669); color:#fff; padding:14px 24px; border-radius:var(--radius); margin-bottom:24px; display:flex; align-items:center; gap:16px;">
+    <div style="width:42px; height:42px; background:rgba(255,255,255,0.15); border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.2rem;">
+        <i class="bi bi-building"></i>
+    </div>
+    <div>
+        <div style="font-weight:700; font-size:1rem;">{{ establishment.company_name }}</div>
+        <div style="opacity:0.75; font-size:0.8rem;">
+            {% if establishment.pf_code %}PF: {{ establishment.pf_code }} | {% endif %}
+            {% if establishment.esic_code %}ESIC: {{ establishment.esic_code }}{% endif %}
+        </div>
+    </div>
+</div>
+
+<form method="POST" autocomplete="off">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="establishment_id" value="{{ establishment.id }}">
+
+    <div class="form-card">
+        <div class="form-section">
+            <div class="form-section-title"><i class="bi bi-calendar-plus"></i> New Monthly Payroll</div>
+            <div class="form-section-desc">Select the month and year to create a payroll batch for <strong>{{ establishment.company_name }}</strong></div>
+
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Month <span class="text-danger">*</span></label>
+                    <select name="month" class="form-select" required>
+                        {% for m in range(1, 13) %}
+                            <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>
+                                {{ ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][m] }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Year <span class="text-danger">*</span></label>
+                    <select name="year" class="form-select" required>
+                        {% for y in range(2019, current_year + 2) %}
+                            <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            {% if previous_payrolls %}
+            <div class="row g-3 mt-1">
+                <div class="col-md-8">
+                    <label class="form-label">
+                        Copy Data from Previous Month <span class="text-muted" style="font-weight:400;">(optional)</span>
+                    </label>
+                    <select name="copy_from_payroll_id" class="form-select">
+                        <option value="">— Start fresh (no copy) —</option>
+                        {% for p in previous_payrolls %}
+                            <option value="{{ p.id }}">
+                                {{ p.period_display }}
+                                ({{ p.total_employees or 0 }} employees, {{ p.status|title }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text" style="font-size:0.78rem;">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Selecting a month will copy attendance (days worked, paid holidays, OT hours) and rate overrides for all matching employees. Perfect for clients with the same data every month.
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="form-section" style="background:#eff6ff; border-bottom:none;">
+            <div style="font-size:0.85rem; color:#1e40af;">
+                <i class="bi bi-info-circle me-1"></i>
+                <strong>What happens next:</strong>
+                <ul style="margin:8px 0 0; padding-left:20px;">
+                    <li>All active employees of <strong>{{ establishment.company_name }}</strong> will be added to the payroll</li>
+                    <li>Default attendance = full working days (you can adjust individual attendance)</li>
+                    <li>Salary will be auto-calculated based on the payroll configuration</li>
+                    <li>You can review, adjust, and finalize before generating payslips</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="form-section" style="border-bottom:none; background:#f8fafc;">
+            <div class="d-flex gap-3 justify-content-between">
+                <a href="{{ url_for('establishment.establishment_view', id=establishment.id) }}" class="btn btn-light px-4">
+                    <i class="bi bi-arrow-left me-1"></i> Back to Establishment
+                </a>
+                <button type="submit" class="btn btn-primary px-4">
+                    <i class="bi bi-plus-lg me-1"></i> Create Payroll
+                </button>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
