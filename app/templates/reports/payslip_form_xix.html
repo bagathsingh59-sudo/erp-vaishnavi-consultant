@@ -6,12 +6,12 @@
     <style>
         @page {
             size: A4 portrait;
-            margin: 10mm 12mm;
+            margin: 8mm 10mm;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: Arial, sans-serif;
-            font-size: 11px;
+            font-size: 10px;
             color: #000;
             background: #fff;
         }
@@ -19,9 +19,9 @@
         .slip-container {
             width: 100%;
             page-break-inside: avoid;
-            border: 2px solid #000;
+            border: 1.5px solid #000;
             padding: 0;
-            margin-bottom: 12px;
+            margin-bottom: 6px;
         }
 
         /* 2 slips per page */
@@ -35,35 +35,35 @@
         .slip-header {
             text-align: center;
             font-weight: bold;
-            font-size: 13px;
-            padding: 6px 0 2px;
+            font-size: 12px;
+            padding: 4px 0 1px;
             border-bottom: 1px solid #000;
             background: #f0f0f0;
         }
         .slip-header small {
-            font-size: 9px;
+            font-size: 8px;
             font-weight: normal;
             display: block;
         }
 
         .info-section {
-            padding: 5px 10px;
+            padding: 3px 8px;
             border-bottom: 1px solid #000;
         }
         .info-row {
             display: flex;
             justify-content: space-between;
-            gap: 10px;
-            margin-bottom: 2px;
+            gap: 8px;
+            margin-bottom: 1px;
         }
         .info-label {
             font-weight: bold;
-            font-size: 10px;
+            font-size: 9px;
             color: #333;
-            min-width: 200px;
+            min-width: 180px;
         }
         .info-value {
-            font-size: 10.5px;
+            font-size: 9.5px;
         }
 
         .details-table {
@@ -71,16 +71,16 @@
             border-collapse: collapse;
         }
         .details-table td {
-            padding: 4px 8px;
+            padding: 2.5px 6px;
             border: 1px solid #000;
-            font-size: 10.5px;
+            font-size: 9.5px;
             vertical-align: top;
         }
         .details-table .label-cell {
             font-weight: bold;
             background: #f5f5f5;
             width: 48%;
-            font-size: 10px;
+            font-size: 9px;
         }
         .details-table .value-cell {
             width: 52%;
@@ -90,24 +90,24 @@
         .details-table .highlight-row td {
             background: #e8e8e8;
             font-weight: bold;
-            font-size: 11px;
+            font-size: 10px;
         }
 
         .signature-section {
             display: flex;
             justify-content: space-between;
-            padding: 6px 15px;
-            font-size: 10px;
+            padding: 4px 12px;
+            font-size: 9px;
             border-top: 1px solid #000;
         }
 
         .cut-line {
             text-align: center;
-            font-size: 8px;
+            font-size: 7px;
             color: #999;
-            margin: 4px 0;
+            margin: 3px 0;
             border-top: 1px dashed #ccc;
-            padding-top: 2px;
+            padding-top: 1px;
         }
 
         /* Print styles */

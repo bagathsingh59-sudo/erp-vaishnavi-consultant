@@ -6,75 +6,72 @@
     <style>
         @page {
             size: A4 portrait;
-            margin: 10mm 12mm;
+            margin: 8mm 10mm;
         }
-        @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600;700&display=swap');
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'DM Sans', 'Segoe UI', Arial, sans-serif;
-            font-size: 11px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 10px;
             color: #1a1a2e;
             background: #fff;
         }
 
         .slip {
             border: 0.5px solid #d0d8e8;
-            border-radius: 8px;
+            border-radius: 6px;
             overflow: hidden;
             page-break-inside: avoid;
-            margin-bottom: 14px;
+            margin-bottom: 8px;
             max-width: 100%;
         }
-        /* 1 slip per page */
-        .slip { page-break-after: always; }
+        /* 2 slips per page */
+        .slip:nth-child(2n) { page-break-after: always; }
         .slip:last-child { page-break-after: avoid; }
 
         /* ── Header Band ── */
         .header {
             background: #0C447C;
             color: #fff;
-            padding: 16px 22px;
+            padding: 8px 16px;
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
+            align-items: center;
         }
         .company-name {
-            font-family: 'DM Serif Display', Georgia, serif;
-            font-size: 19px;
+            font-size: 13px;
+            font-weight: 700;
             letter-spacing: 0.01em;
-            margin-bottom: 3px;
         }
         .company-sub {
-            font-size: 10px;
+            font-size: 8px;
             opacity: 0.7;
-            line-height: 1.5;
+            line-height: 1.4;
         }
         .payslip-label {
             text-align: right;
         }
         .payslip-label h2 {
-            font-size: 12px;
+            font-size: 10px;
             font-weight: 500;
             letter-spacing: 0.12em;
             text-transform: uppercase;
             opacity: 0.75;
-            margin-bottom: 4px;
         }
         .payslip-label p {
-            font-size: 11px;
+            font-size: 9px;
             opacity: 0.65;
         }
 
         /* ── Period Bar ── */
         .period-bar {
             background: #185FA5;
-            padding: 5px 22px;
+            padding: 3px 16px;
             display: flex;
-            gap: 2rem;
+            gap: 1.5rem;
             flex-wrap: wrap;
         }
         .period-bar span {
-            font-size: 10px;
+            font-size: 8.5px;
             color: #B5D4F4;
             letter-spacing: 0.04em;
         }
@@ -88,22 +85,22 @@
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
             gap: 0;
-            padding: 10px 22px;
+            padding: 5px 16px;
             border-bottom: 0.5px solid #e2e8f0;
         }
         .field {
-            padding: 4px 0;
+            padding: 2px 0;
         }
         .field label {
-            font-size: 9px;
+            font-size: 7.5px;
             text-transform: uppercase;
             letter-spacing: 0.08em;
             color: #6b7280;
-            margin-bottom: 2px;
+            margin-bottom: 1px;
             display: block;
         }
         .field p {
-            font-size: 11.5px;
+            font-size: 10px;
             font-weight: 600;
             color: #1a1a2e;
         }
@@ -112,30 +109,30 @@
         .tables {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 1.2rem;
-            padding: 12px 22px;
+            gap: 1rem;
+            padding: 6px 16px 4px;
         }
         .section-title {
-            font-size: 9.5px;
+            font-size: 8px;
             text-transform: uppercase;
             letter-spacing: 0.1em;
             color: #6b7280;
             font-weight: 600;
-            margin-bottom: 6px;
+            margin-bottom: 3px;
         }
         table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 11px;
+            font-size: 9.5px;
         }
         thead tr {
             border-bottom: 0.5px solid #e2e8f0;
         }
         thead th {
             text-align: left;
-            padding: 4px 0;
+            padding: 2px 0;
             font-weight: 500;
-            font-size: 9.5px;
+            font-size: 8px;
             text-transform: uppercase;
             letter-spacing: 0.07em;
             color: #6b7280;
@@ -150,7 +147,7 @@
             border-bottom: none;
         }
         tbody td {
-            padding: 5px 0;
+            padding: 2.5px 0;
             color: #1a1a2e;
         }
         tbody td:last-child {
@@ -161,22 +158,22 @@
 
         .total-row {
             background: #f8fafc;
-            border-radius: 5px;
-            padding: 6px 10px;
+            border-radius: 4px;
+            padding: 3px 8px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-top: 6px;
+            margin-top: 3px;
         }
         .total-row span {
-            font-size: 10px;
+            font-size: 8.5px;
             font-weight: 600;
             color: #6b7280;
             text-transform: uppercase;
             letter-spacing: 0.08em;
         }
         .total-row strong {
-            font-size: 12.5px;
+            font-size: 11px;
             font-weight: 700;
             color: #1a1a2e;
             font-variant-numeric: tabular-nums;
@@ -185,28 +182,28 @@
         /* ── Net Pay Bar ── */
         .net-bar {
             background: #0C447C;
-            border-radius: 6px;
-            padding: 10px 18px;
+            border-radius: 5px;
+            padding: 6px 14px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin: 0 22px 10px;
+            margin: 2px 16px 4px;
         }
         .net-bar .net-label {
             color: #B5D4F4;
-            font-size: 11px;
+            font-size: 9px;
             font-weight: 500;
             letter-spacing: 0.06em;
         }
         .net-bar .net-amount {
             color: #fff;
-            font-size: 22px;
-            font-family: 'DM Serif Display', Georgia, serif;
+            font-size: 16px;
+            font-weight: 700;
             letter-spacing: 0.01em;
         }
         .net-bar .net-words {
             color: #B5D4F4;
-            font-size: 9px;
+            font-size: 7.5px;
             text-align: right;
             margin-top: 1px;
         }
@@ -215,24 +212,23 @@
         .footer-row {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-            padding: 8px 22px 10px;
+            gap: 6px;
+            padding: 4px 16px 5px;
             border-top: 0.5px solid #e2e8f0;
         }
         .stat-card {
             background: #f8fafc;
-            border-radius: 5px;
-            padding: 6px 10px;
+            border-radius: 4px;
+            padding: 3px 8px;
         }
         .stat-card .s-label {
-            font-size: 9px;
+            font-size: 7px;
             color: #6b7280;
             text-transform: uppercase;
             letter-spacing: 0.07em;
-            margin-bottom: 2px;
         }
         .stat-card .s-val {
-            font-size: 11px;
+            font-size: 9px;
             font-weight: 600;
             color: #1a1a2e;
             font-variant-numeric: tabular-nums;
@@ -241,8 +237,8 @@
         /* ── Stamp ── */
         .stamp {
             text-align: center;
-            padding: 6px 0 4px;
-            font-size: 9px;
+            padding: 2px 0;
+            font-size: 7.5px;
             color: #94a3b8;
             letter-spacing: 0.04em;
         }
@@ -297,8 +293,8 @@
                 <div class="company-name">{{ est.company_name }}</div>
                 <div class="company-sub">
                     {% if est.address %}{{ est.address }}{% endif %}
-                    {% if est.pf_code %}<br>PF Code: {{ est.pf_code }}{% endif %}
-                    {% if est.esic_code %} | ESIC Code: {{ est.esic_code }}{% endif %}
+                    {% if est.pf_code %} | PF: {{ est.pf_code }}{% endif %}
+                    {% if est.esic_code %} | ESIC: {{ est.esic_code }}{% endif %}
                 </div>
             </div>
             <div class="payslip-label">
@@ -310,8 +306,8 @@
         <!-- Period Bar -->
         <div class="period-bar">
             <span>Pay Period <strong>01 {{ payroll.month_name[:3] }} – {{ '%02d'|format(payroll.total_days if payroll.total_days else 30) }} {{ payroll.month_name[:3] }} {{ payroll.year }}</strong></span>
-            <span>Pay Date <strong>{{ '%02d'|format(payroll.total_days if payroll.total_days else 30) }} {{ payroll.month_name[:3] }} {{ payroll.year }}</strong></span>
             <span>Days Worked <strong>{{ slip.entry.days_present|int }} / {{ payroll.working_days or 26 }}</strong></span>
+            <span>Payable Days <strong>{{ slip.entry.total_payable_days|int if slip.entry.total_payable_days == slip.entry.total_payable_days|int else slip.entry.total_payable_days }}</strong></span>
         </div>
 
         <!-- Employee Info -->
@@ -416,17 +412,17 @@
         <div class="footer-row">
             <div class="stat-card">
                 <div class="s-label">UAN</div>
-                <div class="s-val" style="font-size:10px;">{{ slip.emp.uan_number or '—' }}</div>
+                <div class="s-val">{{ slip.emp.uan_number or '—' }}</div>
             </div>
             <div class="stat-card">
                 <div class="s-label">ESIC IP No.</div>
-                <div class="s-val" style="font-size:10px;">{{ slip.emp.esic_ip_number or '—' }}</div>
+                <div class="s-val">{{ slip.emp.esic_ip_number or '—' }}</div>
             </div>
             <div class="stat-card">
                 <div class="s-label">Bank A/c</div>
-                <div class="s-val" style="font-size:10px;">
+                <div class="s-val">
                     {% if slip.emp.bank_name %}{{ slip.emp.bank_name }}{% endif %}
-                    {% if slip.emp.account_number %} ···· {{ slip.emp.account_number[-4:] }}{% endif %}
+                    {% if slip.emp.account_number %} {{ slip.emp.account_number[-4:] }}{% endif %}
                     {% if not slip.emp.bank_name and not slip.emp.account_number %}—{% endif %}
                 </div>
             </div>
