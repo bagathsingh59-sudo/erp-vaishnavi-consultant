@@ -46,7 +46,10 @@ def payroll_config(est_id):
 
         # Compliance Basis
         config.compliance_basis = request.form.get('compliance_basis', 'basic_da')
-        config.include_ot_in_compliance = 'include_ot_in_compliance' in request.form
+        config.include_ot_in_epf = 'include_ot_in_epf' in request.form
+        config.include_ot_in_esic = 'include_ot_in_esic' in request.form
+        # Keep legacy field in sync (OR of both)
+        config.include_ot_in_compliance = config.include_ot_in_epf or config.include_ot_in_esic
 
         # Absence
         config.absence_deduction = 'absence_deduction' in request.form
@@ -1619,7 +1622,7 @@ def save_attendance(payroll_id):
             else:
                 compliance_wages = entry.earned_gross
 
-            if getattr(config, 'include_ot_in_compliance', False) and entry.ot_amount > 0:
+            if getattr(config, 'include_ot_in_epf', False) and entry.ot_amount > 0:
                 compliance_wages += entry.ot_amount
 
         # ═══════════════════════════════════════════════════════════
@@ -1785,7 +1788,7 @@ def save_attendance(payroll_id):
                 else:
                     compliance_wages = entry.earned_gross
 
-            if getattr(config, 'include_ot_in_compliance', False) and entry.ot_amount > 0:
+            if getattr(config, 'include_ot_in_epf', False) and entry.ot_amount > 0:
                 compliance_wages += entry.ot_amount
 
         # ========================================
@@ -1856,7 +1859,7 @@ def save_attendance(payroll_id):
             esic_gross = entry.earned_gross - esic_excluded
 
             # Include OT in ESIC wages if enabled in config
-            if getattr(config, 'include_ot_in_compliance', False) and entry.ot_amount > 0:
+            if getattr(config, 'include_ot_in_esic', False) and entry.ot_amount > 0:
                 esic_gross += entry.ot_amount
 
             # Higher deduction = ESIC on full wages (no ceiling check — deduct even above ₹21,000)

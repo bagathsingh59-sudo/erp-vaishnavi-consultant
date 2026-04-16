@@ -352,6 +352,8 @@ def _auto_migrate_columns(db):
     migrations = [
         # (table_name, column_name, column_definition)
         ('payroll_configs', 'include_ot_in_compliance', 'BOOLEAN DEFAULT FALSE'),
+        ('payroll_configs', 'include_ot_in_epf', 'BOOLEAN DEFAULT FALSE'),
+        ('payroll_configs', 'include_ot_in_esic', 'BOOLEAN DEFAULT FALSE'),
         ('payroll_configs', 'esic_contribution_type', "VARCHAR(10) DEFAULT 'ceiling'"),
         ('employee_salaries', 'no_absence_deduction', 'BOOLEAN DEFAULT FALSE'),
         ('payroll_entries', 'rate_overrides', 'TEXT'),
@@ -371,6 +373,17 @@ def _auto_migrate_columns(db):
         except Exception as e:
             db.session.rollback()
             print(f"  [MIGRATE] Skip {table}.{column}: {e}")
+
+    # One-time data migration: copy old include_ot_in_compliance → new split fields
+    try:
+        db.session.execute(db.text(
+            "UPDATE payroll_configs SET include_ot_in_epf = include_ot_in_compliance, "
+            "include_ot_in_esic = include_ot_in_compliance "
+            "WHERE include_ot_in_compliance = TRUE AND include_ot_in_epf = FALSE AND include_ot_in_esic = FALSE"
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 def _seed_default_accounts():

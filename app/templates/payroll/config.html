@@ -130,13 +130,23 @@
                     <small class="text-muted">If salary structure is "Gross Only", compliance will be on gross regardless</small>
                 </div>
                 <div class="col-md-6">
-                    <div class="form-check" style="padding:10px 0; margin-top:22px;">
-                        <input class="form-check-input" type="checkbox" name="include_ot_in_compliance" id="includeOtCompliance"
-                               {% if config and config.include_ot_in_compliance %}checked{% endif %}>
-                        <label class="form-check-label" for="includeOtCompliance">
-                            <strong>Include OT in EPF/ESIC Wages</strong><br>
-                            <small class="text-muted">If checked, overtime amount will be added to compliance wages for EPF/ESIC calculation</small>
-                        </label>
+                    <div style="padding:10px 0; margin-top:22px;">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="include_ot_in_epf" id="includeOtEpf"
+                                   {% if config and config.include_ot_in_epf %}checked{% endif %}>
+                            <label class="form-check-label" for="includeOtEpf">
+                                <strong>Include OT in EPF Wages</strong><br>
+                                <small class="text-muted">If checked, overtime amount will be added to EPF wage calculation</small>
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="include_ot_in_esic" id="includeOtEsic"
+                                   {% if config and config.include_ot_in_esic %}checked{% endif %}>
+                            <label class="form-check-label" for="includeOtEsic">
+                                <strong>Include OT in ESIC Wages</strong><br>
+                                <small class="text-muted">If checked, overtime amount will be added to ESIC wage calculation</small>
+                            </label>
+                        </div>
                     </div>
                 </div>
             </div>

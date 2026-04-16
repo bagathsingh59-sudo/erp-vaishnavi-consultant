@@ -36,7 +36,11 @@ class PayrollConfig(db.Model):
     # Include OT amount in EPF/ESIC wage calculation?
     # True  = compliance_wages includes OT (earned_gross + OT)
     # False = compliance_wages excludes OT (earned_gross only) — default
-    include_ot_in_compliance = db.Column(db.Boolean, default=False)
+    include_ot_in_compliance = db.Column(db.Boolean, default=False)  # Legacy — kept for backward compat
+
+    # Separate OT toggles for EPF and ESIC (replaces single include_ot_in_compliance)
+    include_ot_in_epf = db.Column(db.Boolean, default=False)
+    include_ot_in_esic = db.Column(db.Boolean, default=False)
 
     # --- Absence / Deduction Rules ---
     # True  = Deduct salary for absent days

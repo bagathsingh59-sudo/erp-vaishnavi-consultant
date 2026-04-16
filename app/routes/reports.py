@@ -9,6 +9,7 @@ from app.user_context import verify_est_ownership
 from datetime import datetime
 import calendar
 import io
+import math
 
 reports_bp = Blueprint('reports', __name__)
 
@@ -2169,7 +2170,9 @@ def epf_ecr_text(payroll_id):
     output = io.BytesIO(content.encode('utf-8'))
     output.seek(0)
 
-    filename = f"ECR_{est.company_name.replace(' ', '_')}_{payroll.month_name}_{payroll.year}.txt"
+    # Short filename for EPF portal (under 20 chars): ECR_PFCODE_MMYY.txt
+    pf_code = (est.pf_code or 'NOPF').replace('/', '').replace(' ', '')
+    filename = f"ECR_{pf_code}_{payroll.month:02d}{str(payroll.year)[-2:]}.txt"
     return send_file(output, as_attachment=True, download_name=filename,
                      mimetype='text/plain')
 
@@ -2201,7 +2204,9 @@ def epf_ecr_csv(payroll_id):
     byte_output = io.BytesIO(output.getvalue().encode('utf-8'))
     byte_output.seek(0)
 
-    filename = f"ECR_{est.company_name.replace(' ', '_')}_{payroll.month_name}_{payroll.year}.csv"
+    # Short filename for EPF portal (under 20 chars): ECR_PFCODE_MMYY.csv
+    pf_code = (est.pf_code or 'NOPF').replace('/', '').replace(' ', '')
+    filename = f"ECR_{pf_code}_{payroll.month:02d}{str(payroll.year)[-2:]}.csv"
     return send_file(byte_output, as_attachment=True, download_name=filename,
                      mimetype='text/csv')
 
@@ -2248,7 +2253,7 @@ def esic_excel(payroll_id):
         entries = PayrollEntry.query.filter_by(monthly_payroll_id=payroll_id)\
             .join(Employee).order_by(Employee.name).all()
 
-        rows, skipped = _build_esic_rows(entries, payroll)
+        rows, skipped = _build_esic_rows(entries, payroll, round_up=True)
 
         if not rows:
             flash('No employees with ESIC IP Number found. Cannot generate template.', 'warning')
@@ -2268,10 +2273,11 @@ def esic_excel(payroll_id):
         return redirect(request.referrer or url_for('payroll.payroll_list'))
 
 
-def _build_esic_rows(entries, payroll):
+def _build_esic_rows(entries, payroll, round_up=False):
     """Build ESIC row data matching exact ESIC portal format.
     Returns (rows, skipped) with validation warnings per row.
     Includes: IP format check, duplicate IP detection, wage ceiling check.
+    round_up: If True, use math.ceil for attendance days (ESIC portal requirement).
     Reason Codes (as per ESIC portal):
         0  = Without Reason (default for working employees)
         1  = On Leave
@@ -2311,7 +2317,7 @@ def _build_esic_rows(entries, payroll):
             skipped.append({'name': emp.name, 'reason': 'No ESIC IP assigned'})
             continue
 
-        total_days = int(round(entry.total_payable_days or 0))
+        total_days = math.ceil(entry.total_payable_days or 0) if round_up else int(round(entry.total_payable_days or 0))
         total_wages = int(round(entry.earned_gross or 0))
 
         reason_code = ''
