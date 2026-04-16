@@ -247,6 +247,7 @@
                 <ul class="dropdown-menu">
                     <li><a class="dropdown-item" href="{{ url_for('reports.payslip_form_xix', payroll_id=payroll.id) }}" target="_blank"><i class="bi bi-file-earmark-ruled me-2"></i>Form XIX — Government</a></li>
                     <li><a class="dropdown-item" href="{{ url_for('reports.payslip_professional', payroll_id=payroll.id) }}" target="_blank"><i class="bi bi-file-richtext me-2"></i>Professional Format</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('reports.payslip_elegant', payroll_id=payroll.id) }}" target="_blank"><i class="bi bi-file-earmark-text me-2"></i>Elegant Format</a></li>
                 </ul>
             </div>
             {% if config.epf_applicable %}

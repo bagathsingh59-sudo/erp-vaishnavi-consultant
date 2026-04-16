@@ -2585,6 +2585,17 @@ def payslip_professional(payroll_id):
                            generated_on=generated_on)
 
 
+@reports_bp.route('/payroll/<int:payroll_id>/report/payslip-elegant')
+def payslip_elegant(payroll_id):
+    """Elegant Pay Slip — Premium format with amount in words, 1 slip per page"""
+    payroll, est, config, slips, heads = _build_payslip_data(payroll_id)
+    generated_on = datetime.now().strftime('%d %b %Y, %I:%M %p')
+    return render_template('reports/payslip_elegant.html',
+                           payroll=payroll, est=est, config=config,
+                           slips=slips, heads=heads,
+                           generated_on=generated_on)
+
+
 # =============================================
 # REPORT 6: EPF/ESIC Employer Share Reimbursement Letter
 # =============================================

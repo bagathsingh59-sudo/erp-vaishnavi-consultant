@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pay Slips — Elegant | {{ est.company_name }} | {{ payroll.period_display }}</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 10mm 12mm;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'DM Sans', 'Segoe UI', Arial, sans-serif;
+            font-size: 11px;
+            color: #1a1a2e;
+            background: #fff;
+        }
+
+        .slip {
+            border: 0.5px solid #d0d8e8;
+            border-radius: 8px;
+            overflow: hidden;
+            page-break-inside: avoid;
+            margin-bottom: 14px;
+            max-width: 100%;
+        }
+        /* 1 slip per page */
+        .slip { page-break-after: always; }
+        .slip:last-child { page-break-after: avoid; }
+
+        /* ── Header Band ── */
+        .header {
+            background: #0C447C;
+            color: #fff;
+            padding: 16px 22px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .company-name {
+            font-family: 'DM Serif Display', Georgia, serif;
+            font-size: 19px;
+            letter-spacing: 0.01em;
+            margin-bottom: 3px;
+        }
+        .company-sub {
+            font-size: 10px;
+            opacity: 0.7;
+            line-height: 1.5;
+        }
+        .payslip-label {
+            text-align: right;
+        }
+        .payslip-label h2 {
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            opacity: 0.75;
+            margin-bottom: 4px;
+        }
+        .payslip-label p {
+            font-size: 11px;
+            opacity: 0.65;
+        }
+
+        /* ── Period Bar ── */
+        .period-bar {
+            background: #185FA5;
+            padding: 5px 22px;
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+        .period-bar span {
+            font-size: 10px;
+            color: #B5D4F4;
+            letter-spacing: 0.04em;
+        }
+        .period-bar strong {
+            color: #fff;
+            font-weight: 600;
+        }
+
+        /* ── Employee Info Grid ── */
+        .employee-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 0;
+            padding: 10px 22px;
+            border-bottom: 0.5px solid #e2e8f0;
+        }
+        .field {
+            padding: 4px 0;
+        }
+        .field label {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #6b7280;
+            margin-bottom: 2px;
+            display: block;
+        }
+        .field p {
+            font-size: 11.5px;
+            font-weight: 600;
+            color: #1a1a2e;
+        }
+
+        /* ── Earnings & Deductions Tables ── */
+        .tables {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.2rem;
+            padding: 12px 22px;
+        }
+        .section-title {
+            font-size: 9.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #6b7280;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        thead tr {
+            border-bottom: 0.5px solid #e2e8f0;
+        }
+        thead th {
+            text-align: left;
+            padding: 4px 0;
+            font-weight: 500;
+            font-size: 9.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: #6b7280;
+        }
+        thead th:last-child {
+            text-align: right;
+        }
+        tbody tr {
+            border-bottom: 0.5px solid #f1f5f9;
+        }
+        tbody tr:last-child {
+            border-bottom: none;
+        }
+        tbody td {
+            padding: 5px 0;
+            color: #1a1a2e;
+        }
+        tbody td:last-child {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            font-weight: 500;
+        }
+
+        .total-row {
+            background: #f8fafc;
+            border-radius: 5px;
+            padding: 6px 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 6px;
+        }
+        .total-row span {
+            font-size: 10px;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+        .total-row strong {
+            font-size: 12.5px;
+            font-weight: 700;
+            color: #1a1a2e;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ── Net Pay Bar ── */
+        .net-bar {
+            background: #0C447C;
+            border-radius: 6px;
+            padding: 10px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 0 22px 10px;
+        }
+        .net-bar .net-label {
+            color: #B5D4F4;
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 0.06em;
+        }
+        .net-bar .net-amount {
+            color: #fff;
+            font-size: 22px;
+            font-family: 'DM Serif Display', Georgia, serif;
+            letter-spacing: 0.01em;
+        }
+        .net-bar .net-words {
+            color: #B5D4F4;
+            font-size: 9px;
+            text-align: right;
+            margin-top: 1px;
+        }
+
+        /* ── Footer Info Cards ── */
+        .footer-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            padding: 8px 22px 10px;
+            border-top: 0.5px solid #e2e8f0;
+        }
+        .stat-card {
+            background: #f8fafc;
+            border-radius: 5px;
+            padding: 6px 10px;
+        }
+        .stat-card .s-label {
+            font-size: 9px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            margin-bottom: 2px;
+        }
+        .stat-card .s-val {
+            font-size: 11px;
+            font-weight: 600;
+            color: #1a1a2e;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ── Stamp ── */
+        .stamp {
+            text-align: center;
+            padding: 6px 0 4px;
+            font-size: 9px;
+            color: #94a3b8;
+            letter-spacing: 0.04em;
+        }
+
+        /* ── Print Bar ── */
+        .print-bar {
+            background: #0C447C;
+            color: #fff;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-radius: 6px;
+        }
+        .print-bar button {
+            background: #fff;
+            color: #0C447C;
+            border: none;
+            padding: 6px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        @media print {
+            body { background: #fff; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Print Bar -->
+    <div class="print-bar no-print">
+        <div>
+            <strong>Pay Slips — Elegant Format</strong> |
+            {{ est.company_name }} | {{ payroll.period_display }} |
+            {{ slips|length }} Employee(s)
+        </div>
+        <div>
+            <button onclick="window.print()">Print / Save PDF</button>
+            <button onclick="window.close()" style="margin-left:8px; background:#e5e7eb; color:#333;">Close</button>
+        </div>
+    </div>
+
+    {% for slip in slips %}
+    <div class="slip">
+        <!-- Company Header -->
+        <div class="header">
+            <div>
+                <div class="company-name">{{ est.company_name }}</div>
+                <div class="company-sub">
+                    {% if est.address %}{{ est.address }}{% endif %}
+                    {% if est.pf_code %}<br>PF Code: {{ est.pf_code }}{% endif %}
+                    {% if est.esic_code %} | ESIC Code: {{ est.esic_code }}{% endif %}
+                </div>
+            </div>
+            <div class="payslip-label">
+                <h2>Payslip</h2>
+                <p>{{ payroll.period_display }}</p>
+            </div>
+        </div>
+
+        <!-- Period Bar -->
+        <div class="period-bar">
+            <span>Pay Period <strong>01 {{ payroll.month_name[:3] }} – {{ '%02d'|format(payroll.total_days if payroll.total_days else 30) }} {{ payroll.month_name[:3] }} {{ payroll.year }}</strong></span>
+            <span>Pay Date <strong>{{ '%02d'|format(payroll.total_days if payroll.total_days else 30) }} {{ payroll.month_name[:3] }} {{ payroll.year }}</strong></span>
+            <span>Days Worked <strong>{{ slip.entry.days_present|int }} / {{ payroll.working_days or 26 }}</strong></span>
+        </div>
+
+        <!-- Employee Info -->
+        <div class="employee-row">
+            <div class="field">
+                <label>Employee Name</label>
+                <p>{{ slip.emp.name }}</p>
+            </div>
+            <div class="field">
+                <label>Father / Husband</label>
+                <p>{{ slip.emp.father_husband_name or '—' }}</p>
+            </div>
+            <div class="field">
+                <label>Designation</label>
+                <p>{{ slip.emp.designation or '—' }}</p>
+            </div>
+            <div class="field">
+                <label>UAN</label>
+                <p>{{ slip.emp.uan_number or '—' }}</p>
+            </div>
+            <div class="field">
+                <label>Date of Joining</label>
+                <p>{{ slip.emp.date_of_joining.strftime('%d %b %Y') if slip.emp.date_of_joining else '—' }}</p>
+            </div>
+            <div class="field">
+                <label>ESIC IP Number</label>
+                <p>{{ slip.emp.esic_ip_number or '—' }}</p>
+            </div>
+        </div>
+
+        <!-- Earnings & Deductions -->
+        <div class="tables">
+            <!-- Earnings -->
+            <div>
+                <div class="section-title">Earnings</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Component</th>
+                            <th>Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for e in slip.earnings %}
+                        <tr>
+                            <td>{{ e.name }}</td>
+                            <td>{{ "{:,.0f}".format(e.amount) }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if slip.entry.ot_amount > 0 %}
+                        <tr>
+                            <td>Overtime</td>
+                            <td>{{ "{:,.0f}".format(slip.entry.ot_amount) }}</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+                <div class="total-row">
+                    <span>Gross Earnings</span>
+                    <strong>{{ "{:,.0f}".format(slip.entry.total_earnings) }}</strong>
+                </div>
+            </div>
+
+            <!-- Deductions -->
+            <div>
+                <div class="section-title">Deductions</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Component</th>
+                            <th>Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for d in slip.deductions %}
+                        <tr>
+                            <td>{{ d.name }}</td>
+                            <td>{{ "{:,.0f}".format(d.amount) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <div class="total-row">
+                    <span>Total Deductions</span>
+                    <strong>{{ "{:,.0f}".format(slip.entry.total_deductions) }}</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Net Pay -->
+        <div class="net-bar">
+            <div>
+                <div class="net-label">Net Pay</div>
+            </div>
+            <div style="text-align:right">
+                <div class="net-amount">&#8377; {{ "{:,.0f}".format(slip.entry.net_pay) }}</div>
+                <div class="net-words" id="words_{{ loop.index }}"></div>
+            </div>
+        </div>
+
+        <!-- Footer Cards -->
+        <div class="footer-row">
+            <div class="stat-card">
+                <div class="s-label">UAN</div>
+                <div class="s-val" style="font-size:10px;">{{ slip.emp.uan_number or '—' }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="s-label">ESIC IP No.</div>
+                <div class="s-val" style="font-size:10px;">{{ slip.emp.esic_ip_number or '—' }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="s-label">Bank A/c</div>
+                <div class="s-val" style="font-size:10px;">
+                    {% if slip.emp.bank_name %}{{ slip.emp.bank_name }}{% endif %}
+                    {% if slip.emp.account_number %} ···· {{ slip.emp.account_number[-4:] }}{% endif %}
+                    {% if not slip.emp.bank_name and not slip.emp.account_number %}—{% endif %}
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="s-label">Payable Days</div>
+                <div class="s-val">{{ slip.entry.total_payable_days|int if slip.entry.total_payable_days == slip.entry.total_payable_days|int else slip.entry.total_payable_days }}</div>
+            </div>
+        </div>
+
+        <div class="stamp">This is a computer-generated payslip and does not require a signature.</div>
+    </div>
+    {% endfor %}
+
+    <!-- Number to Words Script -->
+    <script>
+    function numToWords(n) {
+        if (n === 0) return 'Zero';
+        var ones = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
+                     'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen',
+                     'Seventeen','Eighteen','Nineteen'];
+        var tens = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+        var num = Math.floor(n);
+        if (num >= 10000000) return numToWords(Math.floor(num/10000000)) + ' Crore ' + numToWords(num%10000000);
+        if (num >= 100000) return numToWords(Math.floor(num/100000)) + ' Lakh ' + numToWords(num%100000);
+        if (num >= 1000) return numToWords(Math.floor(num/1000)) + ' Thousand ' + numToWords(num%1000);
+        if (num >= 100) return numToWords(Math.floor(num/100)) + ' Hundred ' + numToWords(num%100);
+        if (num >= 20) return tens[Math.floor(num/10)] + (num%10 ? ' ' + ones[num%10] : '');
+        return ones[num];
+    }
+    {% for slip in slips %}
+    document.getElementById('words_{{ loop.index }}').textContent =
+        'Rupees ' + numToWords({{ slip.entry.net_pay|int }}).replace(/\s+/g,' ').trim() + ' Only';
+    {% endfor %}
+    </script>
+</body>
+</html>

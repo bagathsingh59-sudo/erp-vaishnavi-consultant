@@ -3,6 +3,15 @@
 {% block page_header %}TDS Report{% endblock %}
 
 {% block content %}
+<style>
+    @page { size: 14in 8.5in landscape; margin: 8mm; }
+    @media print {
+        body { font-size: 10px; }
+        .no-print { display: none !important; }
+        .sidebar, .top-navbar { display: none !important; }
+        .main-content { margin-left: 0 !important; padding: 0 !important; }
+    }
+</style>
 <div style="max-width:900px; margin:0 auto;">
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb" style="font-size:0.78rem;">
