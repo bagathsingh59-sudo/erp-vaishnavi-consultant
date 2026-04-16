@@ -2338,6 +2338,16 @@ def _build_esic_rows(entries, payroll):
             # Zero wages but not exited — could be No Work or On Leave
             reason_code = '11'  # No Work
 
+        # Wages above ESIC ceiling — ESIC contribution = 0
+        # When payroll already calculated ESIC as 0 (ceiling type), report wages as 0
+        # and reason code as 11 (No Work / Not contributing)
+        esic_ee = int(round(entry.esic_employee or 0))
+        esic_er = int(round(entry.esic_employer or 0))
+        if total_wages > ESIC_WAGE_CEILING and esic_ee == 0 and esic_er == 0:
+            total_wages = 0
+            total_days = 0
+            reason_code = '11'  # No Work — wages crossed ceiling, not covered
+
         # Validation flags
         warnings = []
         warnings.extend(_validate_esic_ip(emp.esic_ip_number))
@@ -2347,16 +2357,12 @@ def _build_esic_rows(entries, payroll):
         if total_days > 0 and total_wages == 0:
             warnings.append('Days worked but zero wages')
 
-        # --- NEW: Duplicate ESIC IP check ---
+        # --- Duplicate ESIC IP check ---
         ip_clean = emp.esic_ip_number.strip()
         if ip_clean in duplicate_ips:
             other_names = [n for n in duplicate_ips[ip_clean] if n != emp.name]
             if other_names:
                 warnings.append(f'Duplicate ESIC IP — shared with {", ".join(other_names)}')
-
-        # --- NEW: Wages above ESIC ceiling check ---
-        if total_wages > ESIC_WAGE_CEILING:
-            warnings.append(f'Wages ₹{total_wages:,} exceed ESIC ceiling of ₹{ESIC_WAGE_CEILING:,} — verify coverage')
 
         rows.append({
             'ip_number': ip_clean,
