@@ -859,18 +859,53 @@ def account_ledger(account_id):
 # ─────────────────────────────────────────────
 @accounts_bp.route('/accounts/client-statement/<int:account_id>')
 def client_statement(account_id):
-    """Professional client statement with month-wise breakup"""
+    """Professional client statement with month-wise breakup.
+    Supports both Financial Year selection and custom Date Range selection."""
     account = AccountHead.query.get_or_404(account_id)
     est = account.establishment
-    fy_str = request.args.get('fy')
-    fy_start, fy_end, fy_label = _get_fy(fy_str)
 
-    # Get all receipt + part payment vouchers for this establishment in this FY
+    # Determine selection mode: 'fy' (default) or 'range' (custom from/to dates)
+    mode = request.args.get('mode', 'fy')
+    from_str = request.args.get('from')
+    to_str = request.args.get('to')
+
+    if mode == 'range' and from_str and to_str:
+        try:
+            period_start = datetime.strptime(from_str, '%Y-%m-%d').date()
+            period_end = datetime.strptime(to_str, '%Y-%m-%d').date()
+            fy_label = f"{period_start.strftime('%d %b %Y')} to {period_end.strftime('%d %b %Y')}"
+        except ValueError:
+            period_start, period_end, fy_label = _get_fy(None)
+            mode = 'fy'
+    else:
+        fy_str = request.args.get('fy')
+        period_start, period_end, fy_label = _get_fy(fy_str)
+        mode = 'fy'
+
+    # Build list of available FYs for dropdown (from earliest voucher to current FY)
+    earliest_voucher = user_vouchers().order_by(Voucher.voucher_date.asc()).first()
+    today = date.today()
+    current_fy_start = today.year if today.month >= 4 else today.year - 1
+    if earliest_voucher:
+        earliest_fy_start = earliest_voucher.voucher_date.year if earliest_voucher.voucher_date.month >= 4 else earliest_voucher.voucher_date.year - 1
+    else:
+        earliest_fy_start = current_fy_start
+    # Always include at least last 5 FYs
+    start_year_range = min(earliest_fy_start, current_fy_start - 4)
+    fy_options = []
+    for y in range(current_fy_start, start_year_range - 1, -1):
+        fy_options.append({
+            'value': f'{y}-{y + 1}',
+            'label': f'FY {y}-{str(y + 1)[-2:]} (Apr {y} – Mar {y + 1})'
+        })
+    selected_fy = request.args.get('fy') or f'{current_fy_start}-{current_fy_start + 1}'
+
+    # Get all receipt + part payment vouchers for this establishment in this period
     vouchers = user_vouchers().filter(
         Voucher.establishment_id == est.id,
         Voucher.voucher_type.in_(['receipt', 'part_payment']),
-        Voucher.voucher_date >= fy_start,
-        Voucher.voucher_date <= fy_end
+        Voucher.voucher_date >= period_start,
+        Voucher.voucher_date <= period_end
     ).order_by(Voucher.voucher_date, Voucher.id).all()
 
     # Build month-wise breakup from voucher entries
@@ -926,6 +961,8 @@ def client_statement(account_id):
         'total_due': sum(r['total_due'] for r in statement_rows),
         'total_received': sum(r['total_received'] for r in statement_rows),
     }
+    # Grand total = EPF + ESIC + Fee + Other (total amount handled for client)
+    totals['grand_total'] = totals['epf'] + totals['esic'] + totals['fee'] + totals['other']
 
     generated_on = datetime.now().strftime('%d %b %Y, %I:%M %p')
 
@@ -933,7 +970,12 @@ def client_statement(account_id):
                            account=account, est=est, fy_label=fy_label,
                            statement_rows=statement_rows, totals=totals,
                            closing_balance=running_balance,
-                           generated_on=generated_on)
+                           generated_on=generated_on,
+                           mode=mode, selected_fy=selected_fy,
+                           fy_options=fy_options,
+                           from_date=from_str or '', to_date=to_str or '',
+                           period_start=period_start, period_end=period_end,
+                           transaction_count=len(statement_rows))
 
 
 # ─────────────────────────────────────────────

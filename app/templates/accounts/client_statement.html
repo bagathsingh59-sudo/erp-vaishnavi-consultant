@@ -10,22 +10,63 @@
     .no-print { display: none !important; }
     .sidebar, .top-navbar { display: none !important; }
     .main-content { margin-left: 0 !important; padding: 0 !important; }
-}
-@media print {
-    .no-print { display:none !important; }
-    body { font-size:11px; }
-    .cs-page { box-shadow:none !important; border:none !important; padding:20px !important; }
+    .cs-page { box-shadow:none !important; border:none !important; padding:0 !important; max-width:100% !important; }
+    .cs-summary-hero { page-break-inside:avoid; }
 }
 .cs-page {
-    max-width:1100px; margin:0 auto; background:#fff;
+    max-width:1150px; margin:0 auto; background:#fff;
     border:1px solid #e2e8f0; border-radius:10px;
     box-shadow:0 4px 20px rgba(0,0,0,0.06); overflow:hidden;
 }
 .cs-header {
     background:linear-gradient(135deg,#1e293b,#334155);
-    color:#fff; padding:20px 28px;
+    color:#fff; padding:22px 30px;
 }
 .cs-badge { display:inline-block; background:rgba(255,255,255,0.12); padding:3px 10px; border-radius:12px; font-size:0.6rem; font-weight:600; }
+
+/* Professional Summary Hero */
+.cs-summary-hero {
+    background:linear-gradient(135deg,#0f172a 0%,#1e293b 60%,#312e81 100%);
+    color:#fff; padding:24px 30px; border-bottom:3px solid #fbbf24;
+}
+.cs-hero-title { font-size:0.65rem; letter-spacing:2px; text-transform:uppercase; opacity:0.7; font-weight:700; }
+.cs-hero-period { font-size:1.15rem; font-weight:700; margin-top:4px; color:#fbbf24; }
+.cs-hero-grand { font-size:2.2rem; font-weight:800; letter-spacing:-1px; margin-top:8px; }
+.cs-hero-grand-label { font-size:0.62rem; letter-spacing:1.5px; text-transform:uppercase; opacity:0.85; font-weight:600; color:#fbbf24; }
+
+.cs-hero-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:18px; }
+.cs-hero-card {
+    background:rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.15);
+    border-radius:10px; padding:12px 14px;
+    backdrop-filter:blur(10px);
+    transition:all 0.2s;
+}
+.cs-hero-card:hover { background:rgba(255,255,255,0.12); transform:translateY(-2px); }
+.cs-hero-card-label { font-size:0.55rem; letter-spacing:1px; text-transform:uppercase; opacity:0.7; font-weight:700; }
+.cs-hero-card-amt { font-size:1.1rem; font-weight:800; margin-top:4px; letter-spacing:-0.3px; }
+.cs-hero-card-desc { font-size:0.6rem; opacity:0.65; margin-top:2px; }
+.cs-hero-card.epf { border-left:3px solid #818cf8; }
+.cs-hero-card.esic { border-left:3px solid #22d3ee; }
+.cs-hero-card.fee { border-left:3px solid #34d399; }
+.cs-hero-card.other { border-left:3px solid #fbbf24; }
+
+/* Filter bar */
+.cs-filter-bar {
+    background:#f8fafc; padding:14px 20px;
+    border-bottom:1px solid #e2e8f0;
+    display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+}
+.cs-filter-bar .btn-group-sm > .btn, .cs-filter-bar .btn-sm { font-size:0.72rem; }
+.cs-mode-toggle {
+    display:inline-flex; background:#e2e8f0; border-radius:8px; padding:3px;
+}
+.cs-mode-btn {
+    padding:5px 14px; border:none; background:transparent;
+    font-size:0.72rem; font-weight:600; color:#64748b; border-radius:6px; cursor:pointer;
+}
+.cs-mode-btn.active { background:#fff; color:#1e293b; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+
 .cs-table { width:100%; border-collapse:collapse; font-size:0.72rem; }
 .cs-table thead th {
     background:#f1f5f9; color:#475569; font-size:0.6rem; font-weight:700;
@@ -47,9 +88,18 @@
 .cs-closing { background:linear-gradient(135deg,#f0fdf4,#ecfdf5); border:2px solid #16a34a; border-radius:8px; padding:12px 20px; margin:16px 28px; display:flex; justify-content:space-between; align-items:center; }
 .cs-closing.has-due { background:linear-gradient(135deg,#fef2f2,#fff5f5); border-color:#dc2626; }
 .cs-tag { display:inline-block; padding:2px 8px; border-radius:10px; font-size:0.55rem; font-weight:700; }
+
+/* Certificate-style footer */
+.cs-cert {
+    background:#fefce8; border:1px dashed #d97706;
+    padding:12px 20px; margin:0 28px 16px; border-radius:8px;
+    font-size:0.65rem; color:#78350f; line-height:1.6;
+}
+.cs-cert-title { font-weight:700; font-size:0.7rem; color:#92400e; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px; }
 </style>
 
-<div class="no-print d-flex justify-content-between align-items-center mb-3" style="max-width:1100px; margin:0 auto;">
+<!-- Action bar (hidden in print) -->
+<div class="no-print d-flex justify-content-between align-items-center mb-3" style="max-width:1150px; margin:0 auto;">
     <div class="d-flex gap-2">
         <a href="{{ url_for('accounts.accounts_home') }}" class="btn btn-sm btn-outline-secondary" style="font-size:0.72rem;">
             <i class="bi bi-arrow-left me-1"></i>Accounts
@@ -69,19 +119,120 @@
         <div style="display:flex; justify-content:space-between; align-items:flex-start;">
             <div>
                 <div style="font-size:0.6rem; opacity:0.6; text-transform:uppercase; letter-spacing:1px;">Client Statement of Account</div>
-                <div style="font-size:1.2rem; font-weight:800; margin-top:2px;">{{ est.display_name }}</div>
+                <div style="font-size:1.25rem; font-weight:800; margin-top:2px;">{{ est.display_name }}</div>
                 {% if est.pf_code %}<div style="font-size:0.68rem; opacity:0.7; margin-top:2px;">PF: {{ est.pf_code }}{% if est.esic_code %} | ESIC: {{ est.esic_code }}{% endif %}</div>{% endif %}
+                {% if est.address %}<div style="font-size:0.6rem; opacity:0.55; margin-top:2px;">{{ est.address }}</div>{% endif %}
             </div>
             <div style="text-align:right;">
-                <div style="font-size:0.6rem; opacity:0.6; text-transform:uppercase;">Financial Year</div>
-                <div style="font-size:1rem; font-weight:700;">{{ fy_label }}</div>
+                <div style="font-size:0.6rem; opacity:0.6; text-transform:uppercase;">Statement Period</div>
+                <div style="font-size:0.95rem; font-weight:700;">{{ fy_label }}</div>
                 <div class="cs-badge" style="margin-top:4px;">VAISHNAVI CONSULTANT</div>
             </div>
         </div>
     </div>
 
+    <!-- Filter Bar (hidden in print) -->
+    <div class="cs-filter-bar no-print">
+        <div class="cs-mode-toggle">
+            <button type="button" class="cs-mode-btn {% if mode == 'fy' %}active{% endif %}" onclick="switchMode('fy')">
+                <i class="bi bi-calendar-event me-1"></i>Financial Year
+            </button>
+            <button type="button" class="cs-mode-btn {% if mode == 'range' %}active{% endif %}" onclick="switchMode('range')">
+                <i class="bi bi-calendar-range me-1"></i>Custom Range
+            </button>
+        </div>
+
+        <!-- FY Mode -->
+        <form id="fyForm" method="get" class="d-flex gap-2 align-items-center" style="{% if mode != 'fy' %}display:none !important;{% endif %}">
+            <input type="hidden" name="mode" value="fy">
+            <label style="font-size:0.7rem; color:#64748b; font-weight:600; margin:0;">Select FY:</label>
+            <select name="fy" class="form-select form-select-sm" style="font-size:0.72rem; width:auto;">
+                {% for opt in fy_options %}
+                <option value="{{ opt.value }}" {% if selected_fy == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm btn-primary" style="font-size:0.72rem;">
+                <i class="bi bi-funnel me-1"></i>Apply
+            </button>
+        </form>
+
+        <!-- Range Mode -->
+        <form id="rangeForm" method="get" class="d-flex gap-2 align-items-center" style="{% if mode != 'range' %}display:none !important;{% endif %}">
+            <input type="hidden" name="mode" value="range">
+            <label style="font-size:0.7rem; color:#64748b; font-weight:600; margin:0;">From:</label>
+            <input type="date" name="from" value="{{ from_date or period_start.strftime('%Y-%m-%d') }}" class="form-control form-control-sm" style="font-size:0.72rem; width:auto;" required>
+            <label style="font-size:0.7rem; color:#64748b; font-weight:600; margin:0;">To:</label>
+            <input type="date" name="to" value="{{ to_date or period_end.strftime('%Y-%m-%d') }}" class="form-control form-control-sm" style="font-size:0.72rem; width:auto;" required>
+            <button type="submit" class="btn btn-sm btn-primary" style="font-size:0.72rem;">
+                <i class="bi bi-funnel me-1"></i>Apply
+            </button>
+        </form>
+
+        <div class="ms-auto" style="font-size:0.68rem; color:#64748b;">
+            <i class="bi bi-receipt me-1"></i><strong>{{ transaction_count }}</strong> transaction{{ 's' if transaction_count != 1 else '' }}
+        </div>
+    </div>
+
+    {% if statement_rows %}
+    <!-- Professional Summary Hero -->
+    <div class="cs-summary-hero">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
+            <div>
+                <div class="cs-hero-title">Total Amount Paid to Vaishnavi Consultant</div>
+                <div class="cs-hero-period">{{ fy_label }}</div>
+                <div class="cs-hero-grand-label" style="margin-top:14px;">Grand Total (EPF + ESIC + Fee + Others)</div>
+                <div class="cs-hero-grand">₹ {{ "{:,.2f}".format(totals.grand_total) }}</div>
+                <div style="font-size:0.65rem; opacity:0.75; margin-top:4px;">
+                    <i class="bi bi-check-circle-fill me-1" style="color:#34d399;"></i>
+                    Out of which ₹ {{ "{:,.2f}".format(totals.total_received) }} received via bank
+                    {% if totals.tds > 0 %}| TDS ₹ {{ "{:,.2f}".format(totals.tds) }}{% endif %}
+                </div>
+            </div>
+            <div style="text-align:right;">
+                <div class="cs-hero-title">Closing Balance</div>
+                <div style="font-size:1.6rem; font-weight:800; letter-spacing:-0.5px; margin-top:6px;
+                    {% if closing_balance > 0 %}color:#fca5a5;{% elif closing_balance < 0 %}color:#86efac;{% else %}color:#cbd5e1;{% endif %}">
+                    ₹ {{ "{:,.2f}".format(closing_balance|abs) }}
+                </div>
+                <div style="font-size:0.65rem; opacity:0.75; margin-top:2px;">
+                    {% if closing_balance > 0 %}<i class="bi bi-exclamation-triangle-fill me-1" style="color:#fca5a5;"></i>Due from Client
+                    {% elif closing_balance < 0 %}<i class="bi bi-arrow-up-circle-fill me-1" style="color:#86efac;"></i>Excess Received
+                    {% else %}<i class="bi bi-check-circle-fill me-1" style="color:#34d399;"></i>All Settled{% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 4 Summary Cards -->
+        <div class="cs-hero-grid">
+            <div class="cs-hero-card epf">
+                <div class="cs-hero-card-label"><i class="bi bi-building me-1"></i>EPF Contribution</div>
+                <div class="cs-hero-card-amt">₹ {{ "{:,.0f}".format(totals.epf) }}</div>
+                <div class="cs-hero-card-desc">Paid to EPFO on your behalf</div>
+            </div>
+            <div class="cs-hero-card esic">
+                <div class="cs-hero-card-label"><i class="bi bi-heart-pulse me-1"></i>ESIC Contribution</div>
+                <div class="cs-hero-card-amt">₹ {{ "{:,.0f}".format(totals.esic) }}</div>
+                <div class="cs-hero-card-desc">Paid to ESIC on your behalf</div>
+            </div>
+            <div class="cs-hero-card fee">
+                <div class="cs-hero-card-label"><i class="bi bi-briefcase me-1"></i>Professional Fees</div>
+                <div class="cs-hero-card-amt">₹ {{ "{:,.0f}".format(totals.fee) }}</div>
+                <div class="cs-hero-card-desc">Consulting fees charged</div>
+            </div>
+            <div class="cs-hero-card other">
+                <div class="cs-hero-card-label"><i class="bi bi-cash-stack me-1"></i>Other Charges</div>
+                <div class="cs-hero-card-amt">₹ {{ "{:,.0f}".format(totals.other) }}</div>
+                <div class="cs-hero-card-desc">UAN/IP & misc. charges</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Statement Table -->
     <div style="padding:16px 20px; overflow-x:auto;">
+        <div style="font-size:0.72rem; font-weight:700; color:#1e293b; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">
+            <i class="bi bi-list-ul me-1"></i>Transaction-wise Breakup
+        </div>
         <table class="cs-table">
             <thead>
                 <tr>
@@ -126,7 +277,10 @@
                 </tr>
                 {% endfor %}
                 {% if not statement_rows %}
-                <tr><td colspan="11" class="text-center text-muted py-4">No transactions recorded for this financial year.</td></tr>
+                <tr><td colspan="11" class="text-center text-muted py-4">
+                    <i class="bi bi-inbox" style="font-size:1.5rem; color:#cbd5e1;"></i><br>
+                    No transactions recorded for this period.
+                </td></tr>
                 {% endif %}
             </tbody>
             {% if statement_rows %}
@@ -147,57 +301,42 @@
         </table>
     </div>
 
-    <!-- Closing Balance -->
+    <!-- Certificate-style note -->
     {% if statement_rows %}
-    <div class="cs-closing {% if closing_balance > 0 %}has-due{% endif %}">
-        <div>
-            <div style="font-size:0.65rem; color:#64748b; text-transform:uppercase; font-weight:600;">Closing Balance</div>
-            <div style="font-size:0.58rem; color:#94a3b8; margin-top:2px;">
-                {% if closing_balance > 0 %}Amount due from client
-                {% elif closing_balance < 0 %}Excess paid by client
-                {% else %}All payments settled{% endif %}
-            </div>
-        </div>
-        <div style="font-size:1.5rem; font-weight:800;
-            {% if closing_balance > 0 %}color:#dc2626;{% elif closing_balance < 0 %}color:#16a34a;{% else %}color:#64748b;{% endif %}">
-            {{ "{:,.0f}".format(closing_balance|abs) }}
-            {% if closing_balance > 0 %}<span style="font-size:0.7rem;"> Due</span>
-            {% elif closing_balance < 0 %}<span style="font-size:0.7rem;"> Excess</span>
-            {% else %}<span style="font-size:0.7rem;"> NIL</span>{% endif %}
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Summary Cards -->
-    {% if statement_rows %}
-    <div style="padding:0 20px 16px; display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:8px;">
-        <div style="background:#eef2ff; border-radius:6px; padding:8px 10px; text-align:center;">
-            <div style="font-size:0.5rem; color:#64748b; text-transform:uppercase; font-weight:600;">Total EPF</div>
-            <div style="font-size:0.88rem; font-weight:700; color:#4338ca;">{{ "{:,.0f}".format(totals.epf) }}</div>
-        </div>
-        <div style="background:#ecfeff; border-radius:6px; padding:8px 10px; text-align:center;">
-            <div style="font-size:0.5rem; color:#64748b; text-transform:uppercase; font-weight:600;">Total ESIC</div>
-            <div style="font-size:0.88rem; font-weight:700; color:#0891b2;">{{ "{:,.0f}".format(totals.esic) }}</div>
-        </div>
-        <div style="background:#ecfdf5; border-radius:6px; padding:8px 10px; text-align:center;">
-            <div style="font-size:0.5rem; color:#64748b; text-transform:uppercase; font-weight:600;">Total Fee</div>
-            <div style="font-size:0.88rem; font-weight:700; color:#059669;">{{ "{:,.0f}".format(totals.fee) }}</div>
-        </div>
-        <div style="background:#fffbeb; border-radius:6px; padding:8px 10px; text-align:center;">
-            <div style="font-size:0.5rem; color:#64748b; text-transform:uppercase; font-weight:600;">Other</div>
-            <div style="font-size:0.88rem; font-weight:700; color:#d97706;">{{ "{:,.0f}".format(totals.other) }}</div>
-        </div>
-        <div style="background:#f0fdf4; border-radius:6px; padding:8px 10px; text-align:center;">
-            <div style="font-size:0.5rem; color:#64748b; text-transform:uppercase; font-weight:600;">Total Received</div>
-            <div style="font-size:0.88rem; font-weight:700; color:#16a34a;">{{ "{:,.0f}".format(totals.total_received) }}</div>
-        </div>
+    <div class="cs-cert">
+        <div class="cs-cert-title"><i class="bi bi-shield-check me-1"></i>Certification</div>
+        This is to certify that the above statement reflects the actual transactions between
+        <strong>{{ est.display_name }}</strong> and <strong>Vaishnavi Consultant</strong> for the period
+        <strong>{{ fy_label }}</strong>. A total of <strong>₹ {{ "{:,.2f}".format(totals.grand_total) }}</strong> was handled on your
+        behalf — including <strong>₹ {{ "{:,.0f}".format(totals.epf) }}</strong> towards EPF,
+        <strong>₹ {{ "{:,.0f}".format(totals.esic) }}</strong> towards ESIC,
+        <strong>₹ {{ "{:,.0f}".format(totals.fee) }}</strong> towards professional fees, and
+        <strong>₹ {{ "{:,.0f}".format(totals.other) }}</strong> towards other charges.
+        Kindly verify and confirm.
     </div>
     {% endif %}
 
     <!-- Footer -->
-    <div style="background:#f8fafc; padding:8px 20px; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; font-size:0.55rem; color:#94a3b8;">
-        <span>Generated by Vaishnavi Consultant</span>
-        <span>{{ generated_on }}</span>
+    <div style="background:#f8fafc; padding:10px 20px; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; font-size:0.6rem; color:#94a3b8;">
+        <span><i class="bi bi-building me-1"></i>Generated by Vaishnavi Consultant ERP</span>
+        <span><i class="bi bi-clock me-1"></i>{{ generated_on }}</span>
     </div>
 </div>
+
+<script>
+function switchMode(mode) {
+    const fyForm = document.getElementById('fyForm');
+    const rangeForm = document.getElementById('rangeForm');
+    const buttons = document.querySelectorAll('.cs-mode-btn');
+    buttons.forEach(b => b.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+    if (mode === 'fy') {
+        fyForm.style.display = 'flex';
+        rangeForm.style.display = 'none';
+    } else {
+        fyForm.style.display = 'none';
+        rangeForm.style.display = 'flex';
+    }
+}
+</script>
 {% endblock %}
