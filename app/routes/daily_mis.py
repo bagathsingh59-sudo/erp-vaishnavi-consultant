@@ -626,6 +626,249 @@ def mis_compliance():
 
 
 # ═════════════════════════════════════════════
+#  FILING STATUS MATRIX — Client × Month Grid
+# ═════════════════════════════════════════════
+@daily_mis_bp.route('/daily-mis/filing-matrix')
+@login_required
+def filing_matrix():
+    """Filing Status Matrix — All establishments vs all months in selected range.
+    Each cell shows EPF and ESIC filing status (Full / Partial / None / N/A).
+    Logic: Wage month M is considered 'filed' if a 'EPF/ESIC Return Filed'
+    task exists with task_date in the calendar month immediately following M.
+    """
+    from app.models.establishment import Establishment
+    from app.models.accounts import Voucher, VoucherEntry, AccountHead
+
+    # ── Parse date range (month-level, YYYY-MM format) ──
+    from_str = request.args.get('from', '')
+    to_str = request.args.get('to', '')
+    today = date.today()
+
+    # Default: current Financial Year (Apr YYYY to Mar YYYY+1)
+    current_fy_start = today.year if today.month >= 4 else today.year - 1
+    default_from = date(current_fy_start, 4, 1)
+    default_to = date(current_fy_start + 1, 3, 1)
+
+    try:
+        if from_str:
+            parts = from_str.split('-')
+            from_month = date(int(parts[0]), int(parts[1]), 1)
+        else:
+            from_month = default_from
+    except (ValueError, IndexError):
+        from_month = default_from
+
+    try:
+        if to_str:
+            parts = to_str.split('-')
+            to_month = date(int(parts[0]), int(parts[1]), 1)
+        else:
+            to_month = default_to
+    except (ValueError, IndexError):
+        to_month = default_to
+
+    # Generate list of wage months from 'from' to 'to' inclusive
+    wage_months = []
+    cur = from_month
+    while cur <= to_month:
+        wage_months.append(cur)
+        # Move to next month
+        if cur.month == 12:
+            cur = date(cur.year + 1, 1, 1)
+        else:
+            cur = date(cur.year, cur.month + 1, 1)
+
+    # ── Get all active establishments (role-scoped) ──
+    establishments = user_establishments(
+        Establishment.query.filter_by(is_active=True)
+    ).order_by(Establishment.company_name).all()
+
+    # ── Helper: month range for filing (M+1 calendar month) ──
+    def filing_window(wage_m):
+        """For wage month M, filing happens in calendar month M+1.
+        Returns (start, end) dates for the filing window."""
+        if wage_m.month == 12:
+            win_start = date(wage_m.year + 1, 1, 1)
+        else:
+            win_start = date(wage_m.year, wage_m.month + 1, 1)
+        # End of that filing month
+        if win_start.month == 12:
+            win_end = date(win_start.year, 12, 31)
+        else:
+            # Last day of filing month
+            next_m = date(win_start.year, win_start.month + 1, 1)
+            win_end = date(next_m.year, next_m.month, 1)
+            from datetime import timedelta
+            win_end = win_end - timedelta(days=1)
+        return win_start, win_end
+
+    # ── Pre-fetch all filing tasks in the wide filing window ──
+    # Widest window: from (from_month+1) to (to_month+1 end)
+    if wage_months:
+        earliest_filing_start, _ = filing_window(wage_months[0])
+        _, latest_filing_end = filing_window(wage_months[-1])
+    else:
+        earliest_filing_start = from_month
+        latest_filing_end = to_month
+
+    all_filings = _user_mis_entries().filter(
+        DailyMISEntry.task_type.in_(['EPF Return Filed', 'ESIC Return Filed']),
+        DailyMISEntry.status == 'completed',
+        DailyMISEntry.task_date >= earliest_filing_start,
+        DailyMISEntry.task_date <= latest_filing_end,
+        DailyMISEntry.establishment_id.isnot(None)
+    ).all()
+
+    # Index filings by (est_id, task_type, year, month of task_date)
+    filing_index = {}
+    for f in all_filings:
+        key = (f.establishment_id, f.task_type, f.task_date.year, f.task_date.month)
+        filing_index[key] = True
+
+    # ── Build matrix ──
+    matrix = []
+    summary_counts = {'full': 0, 'partial': 0, 'none': 0, 'na': 0}
+    month_totals = {i: {'full': 0, 'partial': 0, 'none': 0, 'na': 0} for i in range(len(wage_months))}
+
+    for est in establishments:
+        has_pf = bool(est.pf_code)
+        has_esic = bool(est.esic_code)
+
+        row_cells = []
+        row_full = 0
+        row_partial = 0
+        row_none = 0
+        row_na = 0
+
+        for idx, wm in enumerate(wage_months):
+            fw_start, _ = filing_window(wm)
+            fy = fw_start.year
+            fm = fw_start.month
+
+            epf_filed = filing_index.get((est.id, 'EPF Return Filed', fy, fm), False) if has_pf else None
+            esic_filed = filing_index.get((est.id, 'ESIC Return Filed', fy, fm), False) if has_esic else None
+
+            # Determine cell status
+            if not has_pf and not has_esic:
+                status = 'na'
+            else:
+                applicable = []
+                if has_pf:
+                    applicable.append(epf_filed)
+                if has_esic:
+                    applicable.append(esic_filed)
+                if all(applicable):
+                    status = 'full'
+                elif any(applicable):
+                    status = 'partial'
+                else:
+                    status = 'none'
+
+            row_cells.append({
+                'status': status,
+                'epf': epf_filed,
+                'esic': esic_filed,
+                'wage_month': wm,
+                'has_pf': has_pf,
+                'has_esic': has_esic,
+            })
+
+            month_totals[idx][status] += 1
+            if status == 'full': row_full += 1
+            elif status == 'partial': row_partial += 1
+            elif status == 'none': row_none += 1
+            else: row_na += 1
+
+        # Classify row for summary
+        applicable_cells = row_full + row_partial + row_none
+        if applicable_cells == 0:
+            row_classification = 'na'
+        elif row_full == applicable_cells:
+            row_classification = 'full'
+        elif row_none == applicable_cells:
+            row_classification = 'none'
+        else:
+            row_classification = 'partial'
+
+        summary_counts[row_classification] += 1
+
+        # Compliance % for this establishment
+        if applicable_cells > 0:
+            compliance_pct = round((row_full / applicable_cells) * 100)
+        else:
+            compliance_pct = None
+
+        matrix.append({
+            'est': est,
+            'cells': row_cells,
+            'full': row_full,
+            'partial': row_partial,
+            'none': row_none,
+            'na': row_na,
+            'classification': row_classification,
+            'compliance_pct': compliance_pct,
+            'has_pf': has_pf,
+            'has_esic': has_esic,
+        })
+
+    # ── Fees collected in the period (from vouchers) ──
+    # Total = sum of all "Professional Fees" + "IP & UAN Charges" + "Other Income" credits
+    # within the filing date range (not wage month — fees received during this period)
+    total_fees_collected = 0
+    try:
+        fee_accounts = AccountHead.query.filter(
+            AccountHead.name.in_(['Professional Fees', 'IP & UAN Charges', 'Other Income'])
+        ).all()
+        fee_account_ids = [a.id for a in fee_accounts]
+        if fee_account_ids:
+            # Sum credit entries on these accounts within range
+            entries_q = db.session.query(db.func.sum(VoucherEntry.amount))\
+                .join(Voucher, VoucherEntry.voucher_id == Voucher.id)\
+                .filter(
+                    VoucherEntry.account_id.in_(fee_account_ids),
+                    VoucherEntry.entry_type == 'credit',
+                    Voucher.voucher_date >= from_month,
+                    Voucher.voucher_date <= (wage_months[-1] if wage_months else to_month)
+                )
+            if not is_admin():
+                uid = current_user_id()
+                if uid:
+                    entries_q = entries_q.filter(Voucher.owner_id == uid)
+            total_fees_collected = entries_q.scalar() or 0
+    except Exception:
+        total_fees_collected = 0
+
+    # ── Overall compliance stats ──
+    total_applicable_cells = sum(m['full'] + m['partial'] + m['none'] for m in matrix)
+    total_full_cells = sum(m['full'] for m in matrix)
+    overall_compliance_pct = round((total_full_cells / total_applicable_cells) * 100) if total_applicable_cells else 0
+
+    total_est = len(establishments)
+    total_pending_cells = sum(m['none'] + m['partial'] for m in matrix)
+
+    # Sort matrix: worst compliance first (to highlight priority follow-ups)
+    matrix_sorted = sorted(matrix, key=lambda m: (m['compliance_pct'] if m['compliance_pct'] is not None else 200))
+
+    return render_template('daily_mis/filing_matrix.html',
+                           matrix=matrix_sorted,
+                           wage_months=wage_months,
+                           month_totals=month_totals,
+                           summary_counts=summary_counts,
+                           total_est=total_est,
+                           total_fees_collected=total_fees_collected,
+                           total_applicable_cells=total_applicable_cells,
+                           total_full_cells=total_full_cells,
+                           total_pending_cells=total_pending_cells,
+                           overall_compliance_pct=overall_compliance_pct,
+                           from_month=from_month,
+                           to_month=to_month,
+                           from_month_str=from_month.strftime('%Y-%m'),
+                           to_month_str=to_month.strftime('%Y-%m'),
+                           period_label=f"{from_month.strftime('%b %Y')} to {to_month.strftime('%b %Y')}",
+                           is_admin=is_admin())
+
+
+# ═════════════════════════════════════════════
 #  STAFF PENDING VIEW (Admin clicks on staff name)
 # ═════════════════════════════════════════════
 @daily_mis_bp.route('/daily-mis/staff/<staff_name>')

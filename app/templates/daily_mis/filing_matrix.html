@@ -1,0 +1,343 @@
+{% extends "base.html" %}
+{% block title %}Filing Status Matrix — Vaishnavi Consultant{% endblock %}
+{% block page_header %}Filing Status Matrix{% endblock %}
+
+{% block content %}
+<style>
+@page { size: 14in 8.5in landscape; margin: 8mm; }
+@media print {
+    body { font-size: 9px; }
+    .no-print { display: none !important; }
+    .sidebar, .top-navbar { display: none !important; }
+    .main-content { margin-left: 0 !important; padding: 0 !important; }
+    .fm-page { box-shadow:none !important; border:none !important; }
+    .fm-hero { break-inside:avoid; }
+    .fm-table { font-size:7.5px !important; }
+}
+
+.fm-page {
+    background:#fff; border:1px solid #e2e8f0; border-radius:10px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.06); overflow:hidden;
+}
+
+/* Hero Summary */
+.fm-hero {
+    background:linear-gradient(135deg,#0f172a 0%,#1e293b 60%,#312e81 100%);
+    color:#fff; padding:24px 28px; border-bottom:3px solid #fbbf24;
+}
+.fm-hero-title { font-size:0.62rem; letter-spacing:2px; text-transform:uppercase; opacity:0.7; font-weight:700; }
+.fm-hero-subtitle { font-size:1.3rem; font-weight:800; margin-top:4px; }
+.fm-hero-period { font-size:0.72rem; opacity:0.7; margin-top:2px; }
+
+.fm-stats-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-top:18px; }
+.fm-stat-card {
+    background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15);
+    border-radius:10px; padding:12px 14px; backdrop-filter:blur(10px);
+}
+.fm-stat-label { font-size:0.55rem; letter-spacing:1px; text-transform:uppercase; opacity:0.7; font-weight:700; }
+.fm-stat-value { font-size:1.45rem; font-weight:800; margin-top:4px; letter-spacing:-0.5px; }
+.fm-stat-desc { font-size:0.58rem; opacity:0.65; margin-top:2px; }
+.fm-stat-card.total { border-left:3px solid #60a5fa; }
+.fm-stat-card.full { border-left:3px solid #34d399; }
+.fm-stat-card.partial { border-left:3px solid #fbbf24; }
+.fm-stat-card.pending { border-left:3px solid #fca5a5; }
+.fm-stat-card.fees { border-left:3px solid #a78bfa; }
+
+/* Filter Bar */
+.fm-filter-bar {
+    background:#f8fafc; padding:14px 20px; border-bottom:1px solid #e2e8f0;
+    display:flex; gap:12px; flex-wrap:wrap; align-items:center;
+}
+.fm-quick-btn { font-size:0.65rem; padding:4px 10px; border:1px solid #e2e8f0; background:#fff; border-radius:6px; color:#475569; font-weight:600; cursor:pointer; }
+.fm-quick-btn:hover { background:#eef2ff; border-color:#4338ca; color:#4338ca; }
+
+/* Legend */
+.fm-legend {
+    padding:10px 20px; background:#fafbfd; border-bottom:1px solid #e2e8f0;
+    display:flex; gap:16px; flex-wrap:wrap; font-size:0.65rem; color:#475569;
+}
+.fm-legend-item { display:inline-flex; align-items:center; gap:5px; }
+.fm-legend-dot { width:14px; height:14px; border-radius:3px; display:inline-block; }
+
+/* Matrix Table */
+.fm-table-wrap { padding:14px 16px; overflow-x:auto; }
+.fm-table {
+    width:100%; border-collapse:separate; border-spacing:0;
+    font-size:0.68rem; min-width:800px;
+}
+.fm-table thead th {
+    background:#1e293b; color:#f1f5f9;
+    padding:8px 6px; font-size:0.58rem; font-weight:700;
+    text-transform:uppercase; letter-spacing:0.3px; text-align:center;
+    border-right:1px solid #334155; position:sticky; top:0; z-index:10;
+}
+.fm-table thead th.sticky-col { left:0; z-index:20; background:#0f172a; text-align:left; padding-left:12px; min-width:220px; }
+.fm-table tbody td {
+    padding:4px 3px; border-bottom:1px solid #f1f5f9; border-right:1px solid #f1f5f9;
+    text-align:center; font-weight:600; color:#1e293b;
+}
+.fm-table tbody td.sticky-col {
+    position:sticky; left:0; z-index:5; background:#fff;
+    text-align:left; padding:6px 12px; min-width:220px;
+    border-right:2px solid #e2e8f0;
+}
+.fm-table tbody tr:hover td { background:#fafbfd; }
+.fm-table tbody tr:hover td.sticky-col { background:#eef2ff; }
+
+/* Cell Colors */
+.fm-cell { width:38px; height:32px; display:inline-flex; align-items:center; justify-content:center; border-radius:4px; font-weight:700; }
+.fm-cell.full { background:#dcfce7; color:#166534; border:1px solid #86efac; }
+.fm-cell.partial { background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
+.fm-cell.none { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
+.fm-cell.na { background:#f1f5f9; color:#94a3b8; border:1px solid #e2e8f0; }
+
+/* Client Name Cell */
+.fm-client-name { font-weight:700; font-size:0.72rem; color:#1e293b; }
+.fm-client-codes { font-size:0.55rem; color:#94a3b8; margin-top:2px; }
+.fm-client-compliance { display:inline-block; padding:2px 8px; border-radius:10px; font-size:0.55rem; font-weight:700; margin-left:6px; }
+
+/* Summary row */
+.fm-summary-row td { background:#f8fafc !important; border-top:2px solid #1e293b !important; font-weight:700; }
+.fm-summary-row td.sticky-col { background:#1e293b !important; color:#fff; }
+
+/* Insights */
+.fm-insights {
+    padding:16px 20px; background:#fefce8; border-top:1px solid #fde68a;
+    font-size:0.68rem; color:#78350f; line-height:1.7;
+}
+.fm-insights-title { font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#92400e; margin-bottom:6px; }
+</style>
+
+<!-- Action bar -->
+<div class="no-print d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('daily_mis.mis_home') }}" class="btn btn-sm btn-outline-secondary" style="font-size:0.72rem;">
+            <i class="bi bi-arrow-left me-1"></i>Daily MIS
+        </a>
+        <a href="{{ url_for('daily_mis.mis_compliance') }}" class="btn btn-sm btn-outline-primary" style="font-size:0.72rem;">
+            <i class="bi bi-check2-square me-1"></i>Compliance Tracker
+        </a>
+    </div>
+    <button onclick="window.print()" class="btn btn-sm btn-primary" style="font-size:0.72rem;">
+        <i class="bi bi-printer me-1"></i>Print Matrix
+    </button>
+</div>
+
+<div class="fm-page">
+    <!-- Hero Summary -->
+    <div class="fm-hero">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap;">
+            <div>
+                <div class="fm-hero-title">EPF & ESIC Return Filing Matrix</div>
+                <div class="fm-hero-subtitle">{{ total_est }} Establishments × {{ wage_months|length }} Month{{ 's' if wage_months|length != 1 }}</div>
+                <div class="fm-hero-period"><i class="bi bi-calendar-range me-1"></i>{{ period_label }}</div>
+            </div>
+            <div style="text-align:right;">
+                <div class="fm-hero-title">Overall Compliance</div>
+                <div style="font-size:2.2rem; font-weight:800; letter-spacing:-1px; margin-top:4px;
+                    {% if overall_compliance_pct >= 90 %}color:#86efac;
+                    {% elif overall_compliance_pct >= 70 %}color:#fbbf24;
+                    {% else %}color:#fca5a5;{% endif %}">
+                    {{ overall_compliance_pct }}%
+                </div>
+                <div style="font-size:0.6rem; opacity:0.75;">{{ total_full_cells }} of {{ total_applicable_cells }} cells filed</div>
+            </div>
+        </div>
+
+        <!-- Stats grid -->
+        <div class="fm-stats-grid">
+            <div class="fm-stat-card total">
+                <div class="fm-stat-label"><i class="bi bi-building me-1"></i>Total Clients</div>
+                <div class="fm-stat-value">{{ total_est }}</div>
+                <div class="fm-stat-desc">Active establishments</div>
+            </div>
+            <div class="fm-stat-card full">
+                <div class="fm-stat-label"><i class="bi bi-check-circle me-1"></i>Fully Compliant</div>
+                <div class="fm-stat-value">{{ summary_counts.full }}</div>
+                <div class="fm-stat-desc">All months filed (both EPF+ESIC)</div>
+            </div>
+            <div class="fm-stat-card partial">
+                <div class="fm-stat-label"><i class="bi bi-exclamation-circle me-1"></i>Partial Compliance</div>
+                <div class="fm-stat-value">{{ summary_counts.partial }}</div>
+                <div class="fm-stat-desc">Some months/types missing</div>
+            </div>
+            <div class="fm-stat-card pending">
+                <div class="fm-stat-label"><i class="bi bi-x-circle me-1"></i>Pending Action</div>
+                <div class="fm-stat-value">{{ total_pending_cells }}</div>
+                <div class="fm-stat-desc">Cells needing follow-up</div>
+            </div>
+            <div class="fm-stat-card fees">
+                <div class="fm-stat-label"><i class="bi bi-cash-coin me-1"></i>Fees Collected</div>
+                <div class="fm-stat-value">₹ {{ "{:,.0f}".format(total_fees_collected) }}</div>
+                <div class="fm-stat-desc">In this period</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="fm-filter-bar no-print">
+        <form method="get" class="d-flex gap-2 align-items-center flex-wrap">
+            <label style="font-size:0.7rem; color:#64748b; font-weight:600; margin:0;">From:</label>
+            <input type="month" name="from" value="{{ from_month_str }}" class="form-control form-control-sm" style="font-size:0.72rem; width:auto;">
+            <label style="font-size:0.7rem; color:#64748b; font-weight:600; margin:0;">To:</label>
+            <input type="month" name="to" value="{{ to_month_str }}" class="form-control form-control-sm" style="font-size:0.72rem; width:auto;">
+            <button type="submit" class="btn btn-sm btn-primary" style="font-size:0.72rem;">
+                <i class="bi bi-funnel me-1"></i>Apply
+            </button>
+        </form>
+        <div class="d-flex gap-2 ms-auto">
+            <button type="button" class="fm-quick-btn" onclick="setRange('fy_current')">Current FY</button>
+            <button type="button" class="fm-quick-btn" onclick="setRange('fy_previous')">Previous FY</button>
+            <button type="button" class="fm-quick-btn" onclick="setRange('q_current')">Current Qtr</button>
+            <button type="button" class="fm-quick-btn" onclick="setRange('last_6')">Last 6 Months</button>
+        </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="fm-legend">
+        <span class="fm-legend-item"><span class="fm-legend-dot" style="background:#dcfce7; border:1px solid #86efac;"></span>Fully Filed (EPF+ESIC both)</span>
+        <span class="fm-legend-item"><span class="fm-legend-dot" style="background:#fef3c7; border:1px solid #fcd34d;"></span>Partial (only EPF or only ESIC)</span>
+        <span class="fm-legend-item"><span class="fm-legend-dot" style="background:#fee2e2; border:1px solid #fca5a5;"></span>Not Filed (pending)</span>
+        <span class="fm-legend-item"><span class="fm-legend-dot" style="background:#f1f5f9; border:1px solid #e2e8f0;"></span>Not Applicable (no EPF/ESIC code)</span>
+        <span style="margin-left:auto; font-size:0.62rem; color:#94a3b8;">
+            <i class="bi bi-info-circle"></i> Sorted by compliance % (lowest first — priority follow-ups on top)
+        </span>
+    </div>
+
+    <!-- Matrix Table -->
+    <div class="fm-table-wrap">
+        <table class="fm-table">
+            <thead>
+                <tr>
+                    <th class="sticky-col">Establishment (Client)</th>
+                    {% for wm in wage_months %}
+                    <th>{{ wm.strftime('%b') }}<br><span style="font-size:0.5rem; opacity:0.7;">{{ wm.strftime('%Y') }}</span></th>
+                    {% endfor %}
+                    <th style="background:#312e81;">Compliance %</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in matrix %}
+                <tr>
+                    <td class="sticky-col">
+                        <div class="fm-client-name">{{ row.est.display_name }}</div>
+                        <div class="fm-client-codes">
+                            {% if row.has_pf %}<span style="color:#4338ca;">PF: {{ row.est.pf_code }}</span>{% endif %}
+                            {% if row.has_pf and row.has_esic %} · {% endif %}
+                            {% if row.has_esic %}<span style="color:#0891b2;">ESIC: {{ row.est.esic_code }}</span>{% endif %}
+                            {% if not row.has_pf and not row.has_esic %}<span style="color:#94a3b8;">No EPF / ESIC codes</span>{% endif %}
+                        </div>
+                    </td>
+                    {% for c in row.cells %}
+                    <td>
+                        <span class="fm-cell {{ c.status }}"
+                              title="{{ c.wage_month.strftime('%B %Y') }} — {% if c.status == 'full' %}Both EPF+ESIC Filed ✓{% elif c.status == 'partial' %}Partial ({% if c.epf %}EPF ✓{% else %}EPF ✗{% endif %}, {% if c.esic %}ESIC ✓{% else %}ESIC ✗{% endif %}){% elif c.status == 'none' %}Not Filed{% else %}Not Applicable{% endif %}">
+                            {% if c.status == 'full' %}✓
+                            {% elif c.status == 'partial' %}{% if c.epf %}E{% endif %}{% if c.esic %}I{% endif %}{% if not c.epf %}·I{% endif %}{% if not c.esic %}E·{% endif %}
+                            {% elif c.status == 'none' %}✗
+                            {% else %}—{% endif %}
+                        </span>
+                    </td>
+                    {% endfor %}
+                    <td>
+                        {% if row.compliance_pct is not none %}
+                        <span style="font-weight:700; font-size:0.75rem;
+                            {% if row.compliance_pct >= 90 %}color:#16a34a;
+                            {% elif row.compliance_pct >= 70 %}color:#d97706;
+                            {% else %}color:#dc2626;{% endif %}">
+                            {{ row.compliance_pct }}%
+                        </span>
+                        {% else %}
+                        <span style="color:#94a3b8; font-size:0.65rem;">N/A</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not matrix %}
+                <tr><td colspan="{{ wage_months|length + 2 }}" style="text-align:center; padding:20px; color:#94a3b8;">
+                    <i class="bi bi-inbox" style="font-size:1.5rem;"></i><br>
+                    No establishments found for this period.
+                </td></tr>
+                {% endif %}
+            </tbody>
+            {% if matrix %}
+            <tfoot>
+                <tr class="fm-summary-row">
+                    <td class="sticky-col"><i class="bi bi-calculator me-1"></i>MONTH TOTALS (Filed / Total)</td>
+                    {% for idx in range(wage_months|length) %}
+                    <td>
+                        <div style="font-size:0.65rem;">
+                            <span style="color:#16a34a; font-weight:700;">{{ month_totals[idx].full }}</span>
+                            <span style="color:#94a3b8;">/</span>
+                            <span style="color:#64748b;">{{ month_totals[idx].full + month_totals[idx].partial + month_totals[idx].none }}</span>
+                        </div>
+                    </td>
+                    {% endfor %}
+                    <td>
+                        <span style="font-size:0.65rem; color:#64748b;">Overall</span><br>
+                        <span style="font-weight:700; font-size:0.78rem;
+                            {% if overall_compliance_pct >= 90 %}color:#16a34a;
+                            {% elif overall_compliance_pct >= 70 %}color:#d97706;
+                            {% else %}color:#dc2626;{% endif %}">{{ overall_compliance_pct }}%</span>
+                    </td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+
+    <!-- Business Insights -->
+    {% if matrix %}
+    <div class="fm-insights">
+        <div class="fm-insights-title"><i class="bi bi-lightbulb me-1"></i>Strategic Insights</div>
+        {% if overall_compliance_pct >= 90 %}
+            <strong>Excellent performance!</strong> Your team is maintaining a {{ overall_compliance_pct }}% filing rate across {{ total_est }} clients. This is a strong signal to consider staff increments and bonuses.
+        {% elif overall_compliance_pct >= 70 %}
+            <strong>Good performance with room to improve.</strong> {{ overall_compliance_pct }}% of returns are filed on time. There are <strong>{{ total_pending_cells }}</strong> cells pending follow-up. Focus efforts on the top rows of this matrix (lowest compliance %).
+        {% else %}
+            <strong>Immediate action needed.</strong> Only {{ overall_compliance_pct }}% compliance — <strong>{{ total_pending_cells }}</strong> filings are pending. Priority: concentrate team effort on the top {{ summary_counts.none + summary_counts.partial }} establishments shown first. Consider reviewing workflow before any salary/increment decisions.
+        {% endif %}
+        <br><br>
+        <strong>Revenue Snapshot:</strong> ₹ {{ "{:,.0f}".format(total_fees_collected) }} collected in this period against {{ total_est }} active clients
+        {% if total_est > 0 %}(average ₹ {{ "{:,.0f}".format((total_fees_collected / total_est) | round) }} per client){% endif %}.
+    </div>
+    {% endif %}
+
+    <!-- Footer -->
+    <div style="background:#f8fafc; padding:10px 20px; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; font-size:0.6rem; color:#94a3b8;">
+        <span><i class="bi bi-info-circle me-1"></i>Cell logic: Wage-month return is considered 'filed' if staff logged an 'EPF/ESIC Return Filed' task in the following calendar month.</span>
+        <span><i class="bi bi-building me-1"></i>Vaishnavi Consultant ERP</span>
+    </div>
+</div>
+
+<script>
+function setRange(preset) {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1; // 1-12
+    let fromY, fromM, toY, toM;
+
+    if (preset === 'fy_current') {
+        const fyStart = month >= 4 ? year : year - 1;
+        fromY = fyStart; fromM = 4;
+        toY = fyStart + 1; toM = 3;
+    } else if (preset === 'fy_previous') {
+        const fyStart = month >= 4 ? year - 1 : year - 2;
+        fromY = fyStart; fromM = 4;
+        toY = fyStart + 1; toM = 3;
+    } else if (preset === 'q_current') {
+        const qStart = Math.floor((month - 1) / 3) * 3 + 1;
+        fromY = year; fromM = qStart;
+        toY = year; toM = qStart + 2;
+    } else if (preset === 'last_6') {
+        toY = year; toM = month;
+        const d = new Date(year, month - 7, 1);
+        fromY = d.getFullYear(); fromM = d.getMonth() + 1;
+    }
+    const pad = (n) => n.toString().padStart(2, '0');
+    const fromStr = `${fromY}-${pad(fromM)}`;
+    const toStr = `${toY}-${pad(toM)}`;
+    window.location.href = `?from=${fromStr}&to=${toStr}`;
+}
+</script>
+{% endblock %}
