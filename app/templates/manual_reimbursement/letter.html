@@ -9,26 +9,26 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Georgia', 'Times New Roman', serif;
-            font-size: 12.5px; color: #1a1a1a;
-            background: #f3f4f6; line-height: 1.55;
+            font-size: 11.5px; color: #1a1a1a;
+            background: #f3f4f6; line-height: 1.45;
         }
         .page {
             max-width: 780px; margin: 0 auto; background: #fff;
-            padding: 28px 36px;
+            padding: 16px 24px;
             box-shadow: 0 2px 15px rgba(0,0,0,0.05); border-radius: 4px;
         }
         .letterhead {
-            text-align: center; margin-bottom: 6px;
-            padding-bottom: 14px; border-bottom: 2px solid #1e3a8a;
+            text-align: center; margin-bottom: 4px;
+            padding-bottom: 8px; border-bottom: 2px solid #1e3a8a;
             position: relative;
         }
         .letterhead::after {
             content: ''; position: absolute;
-            bottom: -5px; left: 0; right: 0; height: 1px; background: #1e3a8a;
+            bottom: -4px; left: 0; right: 0; height: 1px; background: #1e3a8a;
         }
         .letterhead .company-name {
-            font-size: 26px; font-weight: bold; letter-spacing: 3px;
-            color: #1e3a8a; margin-bottom: 4px; font-variant: small-caps;
+            font-size: 22px; font-weight: bold; letter-spacing: 2.5px;
+            color: #1e3a8a; margin-bottom: 2px; font-variant: small-caps;
         }
         .letterhead .address {
             font-size: 11.5px; color: #374151; font-style: italic;
@@ -38,14 +38,14 @@
         .letterhead .codes span { margin: 0 10px; }
 
         .letter-title {
-            text-align: center; margin: 16px 0 14px;
-            font-size: 13.5px; font-weight: bold; text-transform: uppercase;
+            text-align: center; margin: 8px 0 8px;
+            font-size: 12px; font-weight: bold; text-transform: uppercase;
             letter-spacing: 2px; color: #1e3a8a;
-            padding: 6px 0;
+            padding: 3px 0;
             border-top: 1px dashed #9ca3af; border-bottom: 1px dashed #9ca3af;
         }
         .ref-row {
-            display: flex; justify-content: space-between; margin-bottom: 14px; font-size: 12px;
+            display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 11px;
         }
         .editable {
             border: none; border-bottom: 1px dotted #9ca3af;
@@ -54,37 +54,37 @@
             min-width: 280px; padding: 1px 4px;
         }
         .editable:focus { border-bottom: 1.5px solid #1e3a8a; background: #fefce8; }
-        .letter-to { font-size: 12.5px; line-height: 1.9; margin-bottom: 10px; }
+        .letter-to { font-size: 11.5px; line-height: 1.55; margin-bottom: 4px; }
         .body-text {
-            text-align: justify; margin: 10px 0 12px;
-            font-size: 12.5px; line-height: 1.7; text-indent: 24px;
+            text-align: justify; margin: 5px 0 5px;
+            font-size: 11.5px; line-height: 1.45; text-indent: 20px;
         }
         .period-highlight { font-weight: bold; text-decoration: underline; color: #1e3a8a; }
 
-        .particulars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 6px; }
+        .particulars { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 6px 0 4px; }
         .part-box { border: 1.5px solid #1e3a8a; border-radius: 4px; overflow: hidden; }
         .part-box .part-head {
-            background: #1e3a8a; color: #fff; padding: 6px 10px;
-            font-size: 11.5px; font-weight: bold; text-transform: uppercase;
-            letter-spacing: 1px; text-align: center;
+            background: #1e3a8a; color: #fff; padding: 3px 10px;
+            font-size: 10.5px; font-weight: bold; text-transform: uppercase;
+            letter-spacing: 0.8px; text-align: center;
         }
-        .part-box .part-body { padding: 8px 12px; font-size: 12px; }
+        .part-box .part-body { padding: 5px 10px; font-size: 11px; }
         .part-box .part-row {
             display: flex; justify-content: space-between;
-            padding: 3px 0; border-bottom: 1px dotted #d1d5db;
+            padding: 2px 0; border-bottom: 1px dotted #d1d5db;
         }
         .part-box .part-row:last-child { border-bottom: none; }
         .part-box .part-label { color: #374151; }
         .part-box .part-value { font-weight: bold; font-family: 'Consolas', monospace; color: #111827; }
 
-        .reim-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 11px; }
+        .reim-table { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 10.5px; }
         .reim-table th, .reim-table td {
-            border: 1px solid #374151; padding: 5px 6px;
+            border: 1px solid #374151; padding: 3px 5px;
             text-align: center; vertical-align: middle;
         }
         .reim-table thead th {
             background: #1e3a8a; color: #fff; font-weight: bold;
-            font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.3px;
+            font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px;
         }
         .reim-table thead th.sub { background: #3b4a89; font-size: 10px; }
         .reim-table td { font-size: 11px; }
@@ -92,24 +92,24 @@
         .reim-table .bold-amt { text-align: right; font-weight: bold; font-family: 'Consolas', monospace; }
         .reim-table .total-row td { background: #fef3c7; font-weight: bold; border-top: 2px solid #1e3a8a; }
 
-        .grand-total { margin: 14px 0; text-align: center; }
+        .grand-total { margin: 8px 0; text-align: center; }
         .grand-total-box {
-            display: inline-block; border: 2.5px solid #1e3a8a;
+            display: inline-block; border: 2px solid #1e3a8a;
             background: linear-gradient(180deg, #fff 0%, #eff6ff 100%);
-            padding: 10px 40px; border-radius: 4px;
+            padding: 6px 32px; border-radius: 4px;
         }
         .grand-total-label {
-            font-size: 11px; font-weight: bold; text-transform: uppercase;
-            letter-spacing: 1.5px; margin-bottom: 4px; color: #1e3a8a;
+            font-size: 10px; font-weight: bold; text-transform: uppercase;
+            letter-spacing: 1.2px; margin-bottom: 2px; color: #1e3a8a;
         }
         .grand-total-amount {
-            font-size: 22px; font-weight: bold; font-family: 'Consolas', monospace; color: #1e3a8a;
+            font-size: 18px; font-weight: bold; font-family: 'Consolas', monospace; color: #1e3a8a;
         }
 
-        .closing { margin-top: 22px; font-size: 12.5px; }
-        .closing .sign-space { margin-top: 45px; }
-        .closing .company-sign { font-weight: bold; font-size: 14px; color: #1e3a8a; }
-        .closing .role { font-style: italic; font-size: 11.5px; margin-top: 3px; color: #4b5563; }
+        .closing { margin-top: 10px; font-size: 11.5px; }
+        .closing .sign-space { margin-top: 28px; }
+        .closing .company-sign { font-weight: bold; font-size: 12.5px; color: #1e3a8a; }
+        .closing .role { font-style: italic; font-size: 10.5px; margin-top: 2px; color: #4b5563; }
 
         @media print {
             body { background: #fff; }
@@ -185,25 +185,21 @@
             <input type="text" class="editable" style="min-width: 200px;" placeholder="City, State — PIN"><br>
         </div>
 
-        <div style="margin-top: 8px; font-size: 12.5px;"><strong>Respected Sir / Madam,</strong></div>
+        <div style="margin-top: 4px; font-size: 11.5px;"><strong>Respected Sir / Madam,</strong></div>
 
         {% if entry.period_label %}
-        <div style="margin-top: 6px; font-size: 12.5px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">
+        <div style="margin-top: 3px; font-size: 11.5px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px;">
             Subject: Reimbursement of Employer's Share of EPF &amp; ESIC for <u>{{ entry.period_label }}</u>
         </div>
         {% endif %}
 
-        <!-- Body -->
+        <!-- Body (combined into one compact paragraph) -->
         <div class="body-text">
-            With reference to the above subject, we respectfully submit that we have duly remitted the statutory contributions towards
-            <strong>Employees' Provident Fund (EPF)</strong> and <strong>Employees' State Insurance Corporation (ESIC)</strong>
+            We have duly remitted the statutory contributions towards <strong>Employees' Provident Fund (EPF)</strong>
+            and <strong>Employees' State Insurance Corporation (ESIC)</strong>
             {% if entry.period_label %}for the wage period <span class="period-highlight">{{ entry.period_label }}</span>,{% endif %}
-            in respect of the employees deployed at your esteemed organization, as mandated under the relevant statutory provisions.
-        </div>
-
-        <div class="body-text">
-            Accordingly, we hereby request you to kindly reimburse the <strong>Employer's Share</strong> of the said contributions.
-            The details of employee head count, salary disbursed, and contribution breakup are furnished below for your kind perusal.
+            on behalf of the employees deployed at your esteemed organization. Accordingly, we request you to kindly
+            reimburse the <strong>Employer's Share</strong> as per the details furnished below.
         </div>
 
         <!-- EPF vs ESIC Particulars -->
@@ -278,20 +274,16 @@
         </table>
 
         <!-- EPF + ESIC Totals -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0 10px;">
-            <div style="border: 1px solid #1e3a8a; padding: 6px 12px; background: #eff6ff;">
-                <strong style="font-size:11px; color:#1e3a8a;">EPF Employer Refund:</strong>
-                <div style="font-family: Consolas, monospace; font-size: 14px; font-weight: bold; margin-top: 3px;">
-                    ₹ {{ "{:,.0f}".format(entry.epf_employer_refund) }}
-                </div>
-                <div style="font-size: 10px; color: #6b7280;">(A/c 01 + EPS + EDLI + Admin)</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 6px;">
+            <div style="border: 1px solid #1e3a8a; padding: 4px 10px; background: #eff6ff;">
+                <strong style="font-size:10.5px; color:#1e3a8a;">EPF Employer Refund:</strong>
+                <span style="font-family: Consolas, monospace; font-size: 12px; font-weight: bold; margin-left:8px;">₹ {{ "{:,.0f}".format(entry.epf_employer_refund) }}</span>
+                <span style="font-size: 9.5px; color: #6b7280; margin-left:4px;">(A/c 01 + EPS + EDLI + Admin)</span>
             </div>
-            <div style="border: 1px solid #1e3a8a; padding: 6px 12px; background: #eff6ff;">
-                <strong style="font-size:11px; color:#1e3a8a;">ESIC Employer Refund:</strong>
-                <div style="font-family: Consolas, monospace; font-size: 14px; font-weight: bold; margin-top: 3px;">
-                    ₹ {{ "{:,.0f}".format(entry.esic_employer_refund) }}
-                </div>
-                <div style="font-size: 10px; color: #6b7280;">(Employer Share @ 3.25%)</div>
+            <div style="border: 1px solid #1e3a8a; padding: 4px 10px; background: #eff6ff;">
+                <strong style="font-size:10.5px; color:#1e3a8a;">ESIC Employer Refund:</strong>
+                <span style="font-family: Consolas, monospace; font-size: 12px; font-weight: bold; margin-left:8px;">₹ {{ "{:,.0f}".format(entry.esic_employer_refund) }}</span>
+                <span style="font-size: 9.5px; color: #6b7280; margin-left:4px;">(Employer Share @ 3.25%)</span>
             </div>
         </div>
 
