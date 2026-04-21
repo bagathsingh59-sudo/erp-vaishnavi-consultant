@@ -134,6 +134,7 @@
                     </a>
                     <form method="POST" action="{{ url_for('manual_reimb.mr_delete', entry_id=e.id) }}"
                           style="display:inline;" onsubmit="return confirm('Delete this letter? This cannot be undone.');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-sm btn-outline-danger btn-icon" title="Delete">
                             <i class="bi bi-trash"></i>
                         </button>

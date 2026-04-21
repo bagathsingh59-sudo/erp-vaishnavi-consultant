@@ -49,6 +49,7 @@
 </div>
 
 <form method="POST" id="mrForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <!-- Client Section -->
     <div class="form-section">
         <div class="form-section-title"><i class="bi bi-building"></i>Client Details</div>
