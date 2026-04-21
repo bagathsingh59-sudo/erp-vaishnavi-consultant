@@ -27,12 +27,14 @@ LEGACY_EXT = '.sql'   # Older backups may be raw SQL
 
 
 def get_backup_dir(user_id=None):
-    """Get the backup directory for a user (or root). Creates if missing."""
+    """Get the backup directory for a user (or root). Creates if missing.
+    backup.py lives at backend/app/backup.py — data/ is at repo root,
+    so we go up 2 levels (backend/app/ → backend/ → repo root → data/)."""
     base_dir = os.path.abspath(os.path.dirname(__file__))
     if user_id:
-        backup_dir = os.path.join(base_dir, '..', 'data', 'backups', user_id)
+        backup_dir = os.path.join(base_dir, '..', '..', 'data', 'backups', user_id)
     else:
-        backup_dir = os.path.join(base_dir, '..', 'data', 'backups')
+        backup_dir = os.path.join(base_dir, '..', '..', 'data', 'backups')
     os.makedirs(backup_dir, exist_ok=True)
     return os.path.abspath(backup_dir)
 

@@ -14,7 +14,13 @@ csrf = CSRFProtect()
 
 
 def create_app():
-    app = Flask(__name__)
+    # Templates + static live in the frontend/ folder at repo root.
+    # From backend/app/ → go up 2 levels → into frontend/
+    app = Flask(
+        __name__,
+        template_folder='../../frontend/templates',
+        static_folder='../../frontend/static',
+    )
 
     # Configuration
     base_dir = os.path.abspath(os.path.dirname(__file__))
