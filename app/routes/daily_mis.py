@@ -626,17 +626,24 @@ def mis_compliance():
 
 
 # ═════════════════════════════════════════════
-#  FILING STATUS MATRIX — Client × Month Grid
+#  FILING STATUS MATRIX — Client × Month Grid (ADMIN ONLY)
 # ═════════════════════════════════════════════
 @daily_mis_bp.route('/daily-mis/filing-matrix')
 @login_required
 def filing_matrix():
-    """Filing Status Matrix — All establishments vs all months in selected range.
+    """Filing Status Matrix — ADMIN-ONLY strategic view.
+    Shows all establishments vs all wage months in selected range.
+    Data source: MonthlyPayroll.status == 'finalized' (i.e., when admin
+    finalizes payroll for a client-month, that month is considered filed).
     Each cell shows EPF and ESIC filing status (Full / Partial / None / N/A).
-    Logic: Wage month M is considered 'filed' if a 'EPF/ESIC Return Filed'
-    task exists with task_date in the calendar month immediately following M.
     """
+    # ── ADMIN-ONLY access ──
+    if not is_admin():
+        flash('This report is available only to Admin users.', 'warning')
+        return redirect(url_for('daily_mis.mis_home'))
+
     from app.models.establishment import Establishment
+    from app.models.payroll import MonthlyPayroll
     from app.models.accounts import Voucher, VoucherEntry, AccountHead
 
     # ── Parse date range (month-level, YYYY-MM format) ──
@@ -678,52 +685,29 @@ def filing_matrix():
         else:
             cur = date(cur.year, cur.month + 1, 1)
 
-    # ── Get all active establishments (role-scoped) ──
-    establishments = user_establishments(
-        Establishment.query.filter_by(is_active=True)
-    ).order_by(Establishment.company_name).all()
+    # ── Get ALL active establishments (admin sees everything) ──
+    establishments = Establishment.query.filter_by(is_active=True)\
+        .order_by(Establishment.company_name).all()
 
-    # ── Helper: month range for filing (M+1 calendar month) ──
-    def filing_window(wage_m):
-        """For wage month M, filing happens in calendar month M+1.
-        Returns (start, end) dates for the filing window."""
-        if wage_m.month == 12:
-            win_start = date(wage_m.year + 1, 1, 1)
-        else:
-            win_start = date(wage_m.year, wage_m.month + 1, 1)
-        # End of that filing month
-        if win_start.month == 12:
-            win_end = date(win_start.year, 12, 31)
-        else:
-            # Last day of filing month
-            next_m = date(win_start.year, win_start.month + 1, 1)
-            win_end = date(next_m.year, next_m.month, 1)
-            from datetime import timedelta
-            win_end = win_end - timedelta(days=1)
-        return win_start, win_end
-
-    # ── Pre-fetch all filing tasks in the wide filing window ──
-    # Widest window: from (from_month+1) to (to_month+1 end)
+    # ── Pre-fetch ALL finalized payrolls within the wage-month range ──
     if wage_months:
-        earliest_filing_start, _ = filing_window(wage_months[0])
-        _, latest_filing_end = filing_window(wage_months[-1])
+        year_month_pairs = [(wm.year, wm.month) for wm in wage_months]
+        min_year = min(wm.year for wm in wage_months)
+        max_year = max(wm.year for wm in wage_months)
     else:
-        earliest_filing_start = from_month
-        latest_filing_end = to_month
+        min_year = today.year
+        max_year = today.year
 
-    all_filings = _user_mis_entries().filter(
-        DailyMISEntry.task_type.in_(['EPF Return Filed', 'ESIC Return Filed']),
-        DailyMISEntry.status == 'completed',
-        DailyMISEntry.task_date >= earliest_filing_start,
-        DailyMISEntry.task_date <= latest_filing_end,
-        DailyMISEntry.establishment_id.isnot(None)
+    all_finalized = MonthlyPayroll.query.filter(
+        MonthlyPayroll.status == 'finalized',
+        MonthlyPayroll.year >= min_year,
+        MonthlyPayroll.year <= max_year
     ).all()
 
-    # Index filings by (est_id, task_type, year, month of task_date)
-    filing_index = {}
-    for f in all_filings:
-        key = (f.establishment_id, f.task_type, f.task_date.year, f.task_date.month)
-        filing_index[key] = True
+    # Index finalized payrolls by (est_id, year, month)
+    finalized_index = {}
+    for p in all_finalized:
+        finalized_index[(p.establishment_id, p.year, p.month)] = True
 
     # ── Build matrix ──
     matrix = []
@@ -741,12 +725,13 @@ def filing_matrix():
         row_na = 0
 
         for idx, wm in enumerate(wage_months):
-            fw_start, _ = filing_window(wm)
-            fy = fw_start.year
-            fm = fw_start.month
+            # Payroll finalized for this (est, year, month)?
+            is_finalized = finalized_index.get((est.id, wm.year, wm.month), False)
 
-            epf_filed = filing_index.get((est.id, 'EPF Return Filed', fy, fm), False) if has_pf else None
-            esic_filed = filing_index.get((est.id, 'ESIC Return Filed', fy, fm), False) if has_esic else None
+            # When payroll is finalized, both EPF and ESIC are considered filed
+            # for whichever codes the establishment has.
+            epf_filed = is_finalized if has_pf else None
+            esic_filed = is_finalized if has_esic else None
 
             # Determine cell status
             if not has_pf and not has_esic:
@@ -771,6 +756,7 @@ def filing_matrix():
                 'wage_month': wm,
                 'has_pf': has_pf,
                 'has_esic': has_esic,
+                'finalized': is_finalized,
             })
 
             month_totals[idx][status] += 1
@@ -811,9 +797,17 @@ def filing_matrix():
             'has_esic': has_esic,
         })
 
-    # ── Fees collected in the period (from vouchers) ──
+    # ── Fees collected in the period (admin sees all — voucher data) ──
     # Total = sum of all "Professional Fees" + "IP & UAN Charges" + "Other Income" credits
-    # within the filing date range (not wage month — fees received during this period)
+    # Date range: from 1st of from_month to last day of to_month
+    from calendar import monthrange
+    if wage_months:
+        last_wm = wage_months[-1]
+        last_day = monthrange(last_wm.year, last_wm.month)[1]
+        period_end = date(last_wm.year, last_wm.month, last_day)
+    else:
+        period_end = to_month
+
     total_fees_collected = 0
     try:
         fee_accounts = AccountHead.query.filter(
@@ -821,19 +815,15 @@ def filing_matrix():
         ).all()
         fee_account_ids = [a.id for a in fee_accounts]
         if fee_account_ids:
-            # Sum credit entries on these accounts within range
+            # Admin sees ALL fees collected (no owner_id filter)
             entries_q = db.session.query(db.func.sum(VoucherEntry.amount))\
                 .join(Voucher, VoucherEntry.voucher_id == Voucher.id)\
                 .filter(
                     VoucherEntry.account_id.in_(fee_account_ids),
                     VoucherEntry.entry_type == 'credit',
                     Voucher.voucher_date >= from_month,
-                    Voucher.voucher_date <= (wage_months[-1] if wage_months else to_month)
+                    Voucher.voucher_date <= period_end
                 )
-            if not is_admin():
-                uid = current_user_id()
-                if uid:
-                    entries_q = entries_q.filter(Voucher.owner_id == uid)
             total_fees_collected = entries_q.scalar() or 0
     except Exception:
         total_fees_collected = 0
