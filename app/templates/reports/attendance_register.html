@@ -4,13 +4,11 @@
 {% block page_header %}Attendance Register{% endblock %}
 
 {% block content %}
+{% set print_size = 'legal-landscape' %}
+{% include '_print_common.html' %}
 <style>
-    @page { size: legal landscape; margin: 8mm; }
     @media print {
-        .sidebar, .top-navbar, .no-print { display: none !important; }
-        .main-content { margin-left: 0 !important; padding: 0 !important; }
         .page-content { padding: 0 !important; }
-        body { background: #fff !important; }
         .att-page { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 8px !important; }
         .att-table th, .att-table td { font-size: 7.5px !important; padding: 2px 3px !important; }
     }

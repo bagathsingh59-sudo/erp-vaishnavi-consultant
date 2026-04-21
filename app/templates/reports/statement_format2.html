@@ -4,13 +4,11 @@
 {% block page_header %}Salary Register — Modern Professional{% endblock %}
 
 {% block content %}
+{% set print_size = 'a4-portrait' %}
+{% include '_print_common.html' %}
 <style>
-    @page { size: legal landscape; margin: 8mm; }
     @media print {
-        .sidebar, .top-navbar, .no-print { display: none !important; }
-        .main-content { margin-left: 0 !important; padding: 0 !important; }
         .page-content { padding: 0 !important; }
-        body { background: #fff !important; }
         .sf2-page { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 12px !important; }
         .sf2-table th, .sf2-table td { font-size: 8px !important; padding: 3px 4px !important; }
         .page-break { page-break-before: always; }

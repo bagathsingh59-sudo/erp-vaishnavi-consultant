@@ -3,14 +3,11 @@
 {% block page_header %}Bonus Statement (Month-wise){% endblock %}
 
 {% block content %}
+{% set print_size = 'legal-landscape' %}
+{% include '_print_common.html' %}
 <style>
-    @page { size: 14in 8.5in; margin: 8mm; }
     @media print {
-        @page { size: 14in 8.5in landscape; margin: 8mm; }
-        html, body { width: 14in; background:#fff !important;
-            -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-        .sidebar, .top-navbar, .no-print { display: none !important; }
-        .main-content { margin-left: 0 !important; padding: 0 !important; width: 100% !important; }
+        html, body { width: 14in; }
         .page-content { padding: 0 !important; }
         .bs-page { box-shadow: none !important; border: none !important; padding: 6px !important; }
         .bs-table th, .bs-table td { font-size: 7px !important; padding: 2px 3px !important; }

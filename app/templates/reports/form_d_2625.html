@@ -4,25 +4,13 @@
 {% block page_header %}Form D (26-25) — Attendance Register{% endblock %}
 
 {% block content %}
+{% set print_size = 'legal-landscape' %}
+{% include '_print_common.html' %}
 <style>
-    /* Force LANDSCAPE — explicit dimensions (width > height) across all browsers */
-    @page {
-        size: 14in 8.5in;         /* Legal landscape: 14" wide x 8.5" tall */
-        margin: 8mm;
-    }
     @media print {
-        @page {
-            size: 14in 8.5in landscape;
-            margin: 8mm;
-        }
         html, body {
             width: 14in;
-            background: #fff !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
         }
-        .sidebar, .top-navbar, .no-print { display: none !important; }
-        .main-content { margin-left: 0 !important; padding: 0 !important; width: 100% !important; }
         .page-content { padding: 0 !important; }
         .fd-page {
             box-shadow: none !important;

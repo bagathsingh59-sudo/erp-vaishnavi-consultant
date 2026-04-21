@@ -3,14 +3,10 @@
 {% block page_header %}Form C — Bonus Paid Register{% endblock %}
 
 {% block content %}
+{% set print_size = 'legal-landscape' %}
+{% include '_print_common.html' %}
 <style>
-    @page { size: 14in 8.5in landscape; margin: 8mm; }
     @media print {
-        @page { size: 14in 8.5in landscape; margin: 8mm; }
-        html, body { background:#fff !important;
-            -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-        .sidebar, .top-navbar, .no-print { display: none !important; }
-        .main-content { margin-left: 0 !important; padding: 0 !important; width: 100% !important; }
         .page-content { padding: 0 !important; }
         .fc-page { box-shadow: none !important; border: none !important; padding: 6px !important; }
         .fc-table th, .fc-table td { font-size: 8.5px !important; padding: 3px 4px !important; }

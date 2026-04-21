@@ -4,13 +4,11 @@
 {% block page_header %}EPF ECR — Electronic Challan cum Return{% endblock %}
 
 {% block content %}
+{% set print_size = 'a4-landscape' %}
+{% include '_print_common.html' %}
 <style>
-    @page { size: 14in 8.5in landscape; margin: 8mm; }
     @media print {
-        .sidebar, .top-navbar, .no-print { display: none !important; }
-        .main-content { margin-left: 0 !important; padding: 0 !important; }
         .page-content { padding: 0 !important; }
-        body { background: #fff !important; }
         .ecr-page { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 10px !important; }
         .ecr-table th, .ecr-table td { font-size: 8px !important; padding: 3px !important; }
     }

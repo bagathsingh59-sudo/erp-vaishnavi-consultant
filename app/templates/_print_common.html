@@ -1,0 +1,66 @@
+{#
+  ═══════════════════════════════════════════════════════════════
+  SHARED PRINT STYLES — one file applies to ALL reports
+  ═══════════════════════════════════════════════════════════════
+  Usage (in any report template):
+    {% set print_size = 'a4-landscape' %}
+    {% include '_print_common.html' %}
+
+  Supported print_size values:
+    - a4-portrait      (default)
+    - a4-landscape
+    - legal-portrait
+    - legal-landscape
+
+  This partial centralizes:
+    • Page size + orientation
+    • Uniform 8mm margin (≈ 8-10px tight border)
+    • Hide sidebar/navbar/action buttons when printing
+    • Remove shadows/borders from page containers when printing
+    • Fix body so report fills the paper correctly
+#}
+{% set _ps = print_size | default('a4-portrait') %}
+<style>
+@page {
+  {% if _ps == 'a4-landscape' %}size: A4 landscape;
+  {% elif _ps == 'legal-portrait' %}size: 8.5in 14in;
+  {% elif _ps == 'legal-landscape' %}size: 14in 8.5in landscape;
+  {% else %}size: A4 portrait;{% endif %}
+  margin: 8mm;
+}
+@media print {
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  /* Hide all UI chrome when printing */
+  .no-print,
+  .sidebar,
+  .top-navbar,
+  .print-bar,
+  #globalBackupReminder,
+  nav,
+  .alert-dismissible { display: none !important; }
+  /* Strip left sidebar offset & container padding on print */
+  .main-content {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  /* Remove shadows/borders/rounded edges from report containers */
+  .page, .cs-page, .fm-page, .mr-page, .report-page,
+  .card, .form-section {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+  /* Ensure tables fit the page */
+  table { page-break-inside: auto; }
+  tr { page-break-inside: avoid; page-break-after: auto; }
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+}
+</style>

@@ -3,13 +3,11 @@
 {% block page_header %}Income Register{% endblock %}
 
 {% block content %}
+{% set print_size = 'a4-landscape' %}
+{% include '_print_common.html' %}
 <style>
-    @page { size: 14in 8.5in landscape; margin: 8mm; }
     @media print {
         body { font-size: 10px; }
-        .no-print { display: none !important; }
-        .sidebar, .top-navbar { display: none !important; }
-        .main-content { margin-left: 0 !important; padding: 0 !important; }
     }
 </style>
 <div style="max-width:1100px; margin:0 auto;">

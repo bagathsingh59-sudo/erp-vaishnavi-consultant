@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <title>Reimbursement Application — {{ est.company_name }} | {{ payroll.period_display }}</title>
+    {% set print_size = 'a4-portrait' %}
+    {% include '_print_common.html' %}
     <style>
-        @page { size: A4 portrait; margin: 14mm 16mm; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Georgia', 'Times New Roman', serif;

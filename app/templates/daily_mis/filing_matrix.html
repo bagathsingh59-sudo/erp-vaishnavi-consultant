@@ -3,13 +3,11 @@
 {% block page_header %}Filing Status Matrix{% endblock %}
 
 {% block content %}
+{% set print_size = 'a4-landscape' %}
+{% include '_print_common.html' %}
 <style>
-@page { size: 14in 8.5in landscape; margin: 8mm; }
 @media print {
     body { font-size: 9px; }
-    .no-print { display: none !important; }
-    .sidebar, .top-navbar { display: none !important; }
-    .main-content { margin-left: 0 !important; padding: 0 !important; }
     .fm-page { box-shadow:none !important; border:none !important; }
     .fm-hero { break-inside:avoid; }
     .fm-table { font-size:7.5px !important; }

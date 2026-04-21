@@ -3,14 +3,11 @@
 {% block page_header %}Bulk Form B + D — Print All{% endblock %}
 
 {% block content %}
+{% set print_size = 'legal-landscape' %}
+{% include '_print_common.html' %}
 <style>
-    @page { size: 14in 8.5in; margin: 8mm; }
     @media print {
-        @page { size: 14in 8.5in landscape; margin: 8mm; }
-        html, body { width: 14in; background:#fff !important;
-            -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-        .sidebar, .top-navbar, .no-print { display: none !important; }
-        .main-content { margin-left: 0 !important; padding: 0 !important; width: 100% !important; }
+        html, body { width: 14in; }
         .page-content { padding: 0 !important; }
         .bulk-section {
             box-shadow: none !important; border: none !important;
@@ -22,8 +19,6 @@
         .form-b-table, .fd-table { width: 100% !important; page-break-inside: auto; }
         .form-b-table th, .form-b-table td { font-size: 8px !important; padding: 3px 4px !important; }
         .fd-table th, .fd-table td { font-size: 7.5px !important; padding: 2px !important; }
-        thead { display: table-header-group; }
-        tr { page-break-inside: avoid; }
     }
     .bulk-section { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:20px; margin-bottom:24px; box-shadow:0 1px 3px rgba(0,0,0,0.1); overflow-x:auto; }
 

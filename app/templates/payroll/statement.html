@@ -4,17 +4,13 @@
 {% block page_header %}Monthly Statement to Client{% endblock %}
 
 {% block content %}
+{% set print_size = 'legal-landscape' %}
+{% include '_print_common.html' %}
 <style>
-    @page {
-        size: legal landscape;
-        margin: 8mm;
-    }
     @media print {
-        .sidebar, .top-navbar, .no-print { display: none !important; }
-        .main-content { margin-left: 0 !important; padding: 0 !important; }
         .page-content { padding: 0 !important; }
         .stmt-page { box-shadow: none !important; border: none !important; margin: 0 !important; }
-        body { background: #fff !important; font-size: 11px !important; }
+        body { font-size: 11px !important; }
         .stmt-table th, .stmt-table td { padding: 4px 6px !important; font-size: 10px !important; }
         .page-break { page-break-before: always; }
     }

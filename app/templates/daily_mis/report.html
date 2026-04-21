@@ -3,6 +3,8 @@
 {% block page_header %}MIS Report{% endblock %}
 
 {% block content %}
+{% set print_size = 'a4-landscape' %}
+{% include '_print_common.html' %}
 <style>
     .mis-card { border-radius: 10px; border: none; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
     .mis-stat { text-align: center; padding: 12px 8px; }
