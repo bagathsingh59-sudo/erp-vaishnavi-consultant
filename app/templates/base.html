@@ -224,6 +224,13 @@
         </a>
         {% endif %}
 
+        <a href="{{ url_for('manual_reimb.mr_home') }}"
+           class="sidebar-link {% if request.endpoint and request.endpoint.startswith('manual_reimb.') %}active{% endif %}"
+           style="color:#f59e0b;">
+            <i class="bi bi-envelope-plus" style="color:#f59e0b;"></i>
+            <span>Manual Reimbursement</span>
+        </a>
+
         <!-- TOOLS Section — Always visible -->
         <div class="sidebar-section-title" style="font-size:0.6rem; color:#64748b; padding:6px 16px; text-transform:uppercase; letter-spacing:0.5px;">TOOLS</div>
 

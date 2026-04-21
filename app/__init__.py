@@ -306,6 +306,10 @@ def create_app():
     from app.routes.bonus import bonus_bp
     app.register_blueprint(bonus_bp)
 
+    # Register Manual Reimbursement blueprint
+    from app.routes.manual_reimbursement import manual_reimb_bp
+    app.register_blueprint(manual_reimb_bp)
+
     # Register Vault blueprint — disabled for now, re-enable later
     # from app.routes.vault import vault_bp
     # app.register_blueprint(vault_bp)
@@ -334,6 +338,7 @@ def create_app():
         from app.models.bonus import BonusRun, BonusEntry
         from app.models.vault import VaultFile
         from app.models.enrollment import Enrollment
+        from app.models.manual_reimbursement import ManualReimbursement
         db.create_all()
 
         # Auto-migrate: add new columns to existing tables (PostgreSQL won't add via create_all)

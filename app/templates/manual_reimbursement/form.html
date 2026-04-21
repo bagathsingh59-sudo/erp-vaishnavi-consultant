@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% block title %}{% if entry %}Edit{% else %}New{% endif %} Manual Reimbursement{% endblock %}
+{% block page_header %}{% if entry %}Edit{% else %}New{% endif %} Manual Reimbursement Letter{% endblock %}
+
+{% block content %}
+<style>
+.form-section {
+    background:#fff; border:1px solid #e2e8f0; border-radius:8px;
+    padding:18px 20px; margin-bottom:16px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.03);
+}
+.form-section-title {
+    font-size:0.8rem; font-weight:700; color:#1e3a8a; text-transform:uppercase;
+    letter-spacing:0.5px; margin-bottom:14px; padding-bottom:8px;
+    border-bottom:2px solid #e2e8f0;
+}
+.form-section-title i { margin-right:6px; }
+.form-label-sm { font-size:0.72rem; font-weight:600; color:#475569; margin-bottom:3px; }
+.form-control-sm { font-size:0.78rem; }
+.mode-toggle { display:inline-flex; background:#e2e8f0; border-radius:8px; padding:3px; }
+.mode-btn {
+    padding:6px 16px; border:none; background:transparent;
+    font-size:0.75rem; font-weight:600; color:#64748b; border-radius:6px; cursor:pointer;
+}
+.mode-btn.active { background:#1e3a8a; color:#fff; }
+.total-strip {
+    background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);
+    border:2px solid #1e3a8a; border-radius:8px; padding:14px 20px;
+    display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-top:14px;
+}
+.total-strip .ts-box { text-align:center; }
+.total-strip .ts-label { font-size:0.62rem; text-transform:uppercase; letter-spacing:1px; color:#1e3a8a; font-weight:700; }
+.total-strip .ts-value { font-size:1.25rem; font-weight:800; color:#1e3a8a; margin-top:4px; }
+.total-strip .ts-box.grand .ts-value { font-size:1.6rem; color:#059669; }
+</style>
+
+<div style="max-width:960px; margin:0 auto;">
+
+<!-- Action bar -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <a href="{{ url_for('manual_reimb.mr_home') }}" class="btn btn-sm btn-outline-secondary" style="font-size:0.72rem;">
+        <i class="bi bi-arrow-left me-1"></i>Back to History
+    </a>
+    {% if entry %}
+    <a href="{{ url_for('manual_reimb.mr_view', entry_id=entry.id) }}" target="_blank" class="btn btn-sm btn-primary" style="font-size:0.72rem;">
+        <i class="bi bi-printer me-1"></i>View / Print
+    </a>
+    {% endif %}
+</div>
+
+<form method="POST" id="mrForm">
+    <!-- Client Section -->
+    <div class="form-section">
+        <div class="form-section-title"><i class="bi bi-building"></i>Client Details</div>
+
+        <div class="mb-3">
+            <label class="form-label-sm">Select Client Source:</label><br>
+            <div class="mode-toggle">
+                <button type="button" class="mode-btn {% if not entry or entry.establishment_id %}active{% endif %}" onclick="switchMode('existing')">
+                    <i class="bi bi-list-ul me-1"></i>Existing Enrolled Client
+                </button>
+                <button type="button" class="mode-btn {% if entry and not entry.establishment_id %}active{% endif %}" onclick="switchMode('manual')">
+                    <i class="bi bi-pencil-square me-1"></i>Enter Manually (New Client)
+                </button>
+            </div>
+            <input type="hidden" name="client_mode" id="client_mode"
+                   value="{% if entry and not entry.establishment_id %}manual{% else %}existing{% endif %}">
+        </div>
+
+        <!-- Existing establishment dropdown -->
+        <div id="existingDiv" style="{% if entry and not entry.establishment_id %}display:none;{% endif %}">
+            <label class="form-label-sm">Establishment <span class="text-danger">*</span></label>
+            <select name="establishment_id" class="form-select form-select-sm">
+                <option value="">— Select Client —</option>
+                {% for est in establishments %}
+                <option value="{{ est.id }}" {% if entry and entry.establishment_id == est.id %}selected{% endif %}>
+                    {{ est.display_name }}{% if est.pf_code %} [PF: {{ est.pf_code }}]{% endif %}{% if est.esic_code %} [ESIC: {{ est.esic_code }}]{% endif %}
+                </option>
+                {% endfor %}
+            </select>
+            <small class="text-muted" style="font-size:0.65rem;">Name and address will be auto-picked as letterhead.</small>
+        </div>
+
+        <!-- Manual entry fields -->
+        <div id="manualDiv" style="{% if not entry or entry.establishment_id %}display:none;{% endif %}">
+            <div class="row g-2">
+                <div class="col-12">
+                    <label class="form-label-sm">Establishment Name <span class="text-danger">*</span></label>
+                    <input type="text" name="manual_name" class="form-control form-control-sm"
+                           value="{{ entry.manual_name if entry else '' }}" placeholder="e.g., ABC Industries Pvt. Ltd.">
+                </div>
+                <div class="col-12">
+                    <label class="form-label-sm">Address</label>
+                    <textarea name="manual_address" class="form-control form-control-sm" rows="2"
+                              placeholder="Complete address with city, state, pincode">{{ entry.manual_address if entry else '' }}</textarea>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label-sm">EPF Code (optional)</label>
+                    <input type="text" name="manual_pf_code" class="form-control form-control-sm"
+                           value="{{ entry.manual_pf_code if entry else '' }}" placeholder="e.g., KNRAK1234567000">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label-sm">ESIC Code (optional)</label>
+                    <input type="text" name="manual_esic_code" class="form-control form-control-sm"
+                           value="{{ entry.manual_esic_code if entry else '' }}" placeholder="e.g., 5312345678000099">
+                </div>
+            </div>
+            <small class="text-muted" style="font-size:0.65rem;">Enter details even if client is not in system — they'll appear as letterhead.</small>
+        </div>
+    </div>
+
+    <!-- Letter Meta -->
+    <div class="form-section">
+        <div class="form-section-title"><i class="bi bi-calendar-event"></i>Letter Details</div>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label-sm">Letter Date <span class="text-danger">*</span></label>
+                <input type="date" name="letter_date" class="form-control form-control-sm"
+                       value="{{ entry.letter_date.strftime('%Y-%m-%d') if entry else today.strftime('%Y-%m-%d') }}" required>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label-sm">Reference Number</label>
+                <input type="text" name="ref_no" class="form-control form-control-sm"
+                       value="{{ entry.ref_no if entry else '' }}" placeholder="e.g., VC/REIMB/2025/001">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label-sm">Wage Period</label>
+                <input type="text" name="period_label" class="form-control form-control-sm"
+                       value="{{ entry.period_label if entry else '' }}" placeholder="e.g., April 2025">
+            </div>
+        </div>
+    </div>
+
+    <!-- EPF Details -->
+    <div class="form-section">
+        <div class="form-section-title" style="color:#4338ca;"><i class="bi bi-shield-check"></i>EPF Particulars</div>
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label-sm">EPF Employees (Head Count)</label>
+                <input type="number" name="epf_count" class="form-control form-control-sm calc-input" min="0"
+                       value="{{ entry.epf_count if entry else 0 }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label-sm">EPF Wages Disbursed (₹)</label>
+                <input type="number" name="epf_wages" class="form-control form-control-sm calc-input" min="0" step="0.01"
+                       value="{{ entry.epf_wages if entry else 0 }}">
+            </div>
+        </div>
+        <hr style="margin:14px 0; border-top:1px dashed #cbd5e1;">
+        <div style="font-size:0.68rem; color:#64748b; font-weight:600; margin-bottom:8px;">Employer Contribution Breakup</div>
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label-sm">A/c 01 (3.67%) ₹</label>
+                <input type="number" name="epf_ac01" class="form-control form-control-sm calc-input" min="0" step="0.01"
+                       value="{{ entry.epf_ac01 if entry else 0 }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label-sm">A/c 10 EPS (8.33%) ₹</label>
+                <input type="number" name="epf_eps" class="form-control form-control-sm calc-input" min="0" step="0.01"
+                       value="{{ entry.epf_eps if entry else 0 }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label-sm">A/c 02 EDLI (0.50%) ₹</label>
+                <input type="number" name="epf_edli" class="form-control form-control-sm calc-input" min="0" step="0.01"
+                       value="{{ entry.epf_edli if entry else 0 }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label-sm">A/c 21 Admin (0.50%) ₹</label>
+                <input type="number" name="epf_admin" class="form-control form-control-sm calc-input" min="0" step="0.01"
+                       value="{{ entry.epf_admin if entry else 0 }}">
+            </div>
+        </div>
+    </div>
+
+    <!-- ESIC Details -->
+    <div class="form-section">
+        <div class="form-section-title" style="color:#0891b2;"><i class="bi bi-heart-pulse"></i>ESIC Particulars</div>
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label-sm">ESIC Employees (Head Count)</label>
+                <input type="number" name="esic_count" class="form-control form-control-sm calc-input" min="0"
+                       value="{{ entry.esic_count if entry else 0 }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label-sm">ESIC Wages Disbursed (₹)</label>
+                <input type="number" name="esic_wages" class="form-control form-control-sm calc-input" min="0" step="0.01"
+                       value="{{ entry.esic_wages if entry else 0 }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label-sm">Employer Share (3.25%) ₹</label>
+                <input type="number" name="esic_employer" class="form-control form-control-sm calc-input" min="0" step="0.01"
+                       value="{{ entry.esic_employer if entry else 0 }}">
+            </div>
+        </div>
+    </div>
+
+    <!-- Auto-calculated totals -->
+    <div class="form-section" style="background:#fafbfd;">
+        <div class="form-section-title"><i class="bi bi-calculator"></i>Auto-Calculated Totals</div>
+        <div class="total-strip">
+            <div class="ts-box">
+                <div class="ts-label">EPF Employer Refund</div>
+                <div class="ts-value" id="epfTotal">₹ 0</div>
+                <div style="font-size:0.6rem; color:#64748b; margin-top:2px;">A/c 01 + EPS + EDLI + Admin</div>
+            </div>
+            <div class="ts-box">
+                <div class="ts-label">ESIC Employer Refund</div>
+                <div class="ts-value" id="esicTotal">₹ 0</div>
+                <div style="font-size:0.6rem; color:#64748b; margin-top:2px;">ESIC Employer Share</div>
+            </div>
+            <div class="ts-box grand">
+                <div class="ts-label">Grand Total Refund</div>
+                <div class="ts-value" id="grandTotal">₹ 0</div>
+                <div style="font-size:0.6rem; color:#64748b; margin-top:2px;">EPF + ESIC</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Remarks -->
+    <div class="form-section">
+        <label class="form-label-sm">Remarks (optional — internal notes, not printed)</label>
+        <textarea name="remarks" class="form-control form-control-sm" rows="2"
+                  placeholder="Any internal notes for your reference">{{ entry.remarks if entry else '' }}</textarea>
+    </div>
+
+    <!-- Submit -->
+    <div style="text-align:right; padding:14px 0;">
+        <a href="{{ url_for('manual_reimb.mr_home') }}" class="btn btn-sm btn-outline-secondary" style="font-size:0.75rem;">Cancel</a>
+        <button type="submit" name="action" value="save" class="btn btn-sm btn-primary ms-2" style="font-size:0.75rem;">
+            <i class="bi bi-save me-1"></i>Save
+        </button>
+        <button type="submit" name="action" value="save_view" class="btn btn-sm btn-success ms-2" style="font-size:0.75rem;">
+            <i class="bi bi-printer me-1"></i>Save &amp; View Letter
+        </button>
+    </div>
+</form>
+</div>
+
+<script>
+function switchMode(mode) {
+    document.getElementById('client_mode').value = mode;
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+    document.getElementById('existingDiv').style.display = (mode === 'existing') ? 'block' : 'none';
+    document.getElementById('manualDiv').style.display = (mode === 'manual') ? 'block' : 'none';
+}
+
+function fmt(n) { return '₹ ' + (n || 0).toLocaleString('en-IN', {minimumFractionDigits: 0, maximumFractionDigits: 2}); }
+
+function recalculate() {
+    const get = (n) => parseFloat(document.querySelector(`[name="${n}"]`).value) || 0;
+    const epf = get('epf_ac01') + get('epf_eps') + get('epf_edli') + get('epf_admin');
+    const esic = get('esic_employer');
+    document.getElementById('epfTotal').textContent = fmt(epf);
+    document.getElementById('esicTotal').textContent = fmt(esic);
+    document.getElementById('grandTotal').textContent = fmt(epf + esic);
+}
+
+document.querySelectorAll('.calc-input').forEach(el => {
+    el.addEventListener('input', recalculate);
+});
+recalculate(); // initial
+</script>
+{% endblock %}

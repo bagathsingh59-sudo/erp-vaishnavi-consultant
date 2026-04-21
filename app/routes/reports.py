@@ -2687,8 +2687,16 @@ def _build_reimbursement_data(payroll_id):
 
 @reports_bp.route('/payroll/<int:payroll_id>/report/reimbursement')
 def reimbursement_view(payroll_id):
-    """EPF/ESIC Employer Share Reimbursement Letter — HTML view"""
+    """EPF/ESIC Employer Share Reimbursement Letter — HTML view.
+    Available only when payroll is FINALIZED."""
     payroll, est, config, data = _build_reimbursement_data(payroll_id)
+
+    # Only allow viewing/downloading when payroll is finalized
+    if payroll.status != 'finalized':
+        flash('Reimbursement letter can be generated only after payroll is finalized. '
+              f'Current status: {payroll.status.title()}. Please finalize the payroll first.', 'warning')
+        return redirect(url_for('payroll.payroll_list'))
+
     letter_date = datetime.now().strftime('%d-%b-%Y')
     return render_template('reports/reimbursement.html',
                            payroll=payroll, est=est, config=config,
