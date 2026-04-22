@@ -161,9 +161,15 @@ def create_app():
             if not selected_est:
                 session.pop('selected_est_id', None)
             elif not is_admin():
-                # Non-admin: verify they own this establishment
+                # Non-admin: verify they can access this establishment.
+                # Access is allowed if they are EITHER:
+                #   - the original creator (owner_id), OR
+                #   - the currently-assigned handler (assigned_to_id)
+                # This keeps the sidebar showing the selected establishment for
+                # users working on clients that admin has assigned to them.
                 uid = current_user_id()
-                if uid and selected_est.owner_id != uid:
+                if uid and selected_est.owner_id != uid \
+                        and getattr(selected_est, 'assigned_to_id', None) != uid:
                     selected_est = None
                     session.pop('selected_est_id', None)
         return dict(selected_est=selected_est)
