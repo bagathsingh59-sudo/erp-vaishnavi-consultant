@@ -1748,3 +1748,149 @@ def report_cash_flow():
 def report_ca_package():
     _, _, fy_label = _get_fy(request.args.get('fy'))
     return render_template('accounts/report_ca.html', fy_label=fy_label)
+
+
+# ═════════════════════════════════════════════════════════════════
+# QUICK EXPENSE ENTRY — simplified UI for recording business expenses
+# Auto-creates a Payment voucher (Dr Expense, Cr Bank/Cash)
+# ═════════════════════════════════════════════════════════════════
+@accounts_bp.route('/accounts/quick-expense', methods=['GET', 'POST'])
+def quick_expense():
+    """Quick expense entry form. Dr expense head / Cr bank or cash."""
+    # Get all expense accounts (Indirect Expenses group)
+    exp_group = AccountGroup.query.filter_by(name='Indirect Expenses').first()
+    expense_heads = []
+    if exp_group:
+        expense_heads = AccountHead.query.filter_by(group_id=exp_group.id)\
+            .order_by(AccountHead.name).all()
+
+    # Get bank/cash accounts (payment sources)
+    bank_group = AccountGroup.query.filter_by(name='Bank Accounts').first()
+    cash_group = AccountGroup.query.filter_by(name='Cash-in-Hand').first()
+    payment_sources = []
+    if bank_group:
+        payment_sources.extend(
+            AccountHead.query.filter_by(group_id=bank_group.id)
+            .order_by(AccountHead.name).all()
+        )
+    if cash_group:
+        payment_sources.extend(
+            AccountHead.query.filter_by(group_id=cash_group.id)
+            .order_by(AccountHead.name).all()
+        )
+
+    if request.method == 'POST':
+        try:
+            v_date_str = request.form.get('voucher_date', '')
+            try:
+                v_date = datetime.strptime(v_date_str, '%Y-%m-%d').date() if v_date_str else date.today()
+            except ValueError:
+                v_date = date.today()
+
+            expense_head_id = request.form.get('expense_head_id')
+            payment_source_id = request.form.get('payment_source_id')
+            amount = request.form.get('amount', '0')
+            narration = (request.form.get('narration') or '').strip()
+            reference = (request.form.get('reference') or '').strip()
+
+            try:
+                amount = float(amount)
+            except (ValueError, TypeError):
+                amount = 0
+
+            if not expense_head_id or not payment_source_id or amount <= 0:
+                flash('Please select expense head, payment source, and enter a valid amount.', 'danger')
+                return redirect(url_for('accounts.quick_expense'))
+
+            expense_head = AccountHead.query.get(int(expense_head_id))
+            payment_source = AccountHead.query.get(int(payment_source_id))
+            if not expense_head or not payment_source:
+                flash('Invalid account selection.', 'danger')
+                return redirect(url_for('accounts.quick_expense'))
+
+            # Create Payment voucher
+            fy_start, fy_end, _ = _get_fy()
+            v_num = _next_voucher_number('payment', fy_start, fy_end)
+
+            voucher = Voucher(
+                voucher_number=v_num,
+                voucher_type='payment',
+                voucher_date=v_date,
+                narration=narration or f"Expense — {expense_head.name}",
+                reference=reference or None,
+                total_amount=amount,
+                establishment_id=None,
+            )
+            set_owner(voucher)
+            db.session.add(voucher)
+            db.session.flush()   # Get the voucher.id
+
+            # Dr Expense Head
+            db.session.add(VoucherEntry(
+                voucher_id=voucher.id,
+                account_id=expense_head.id,
+                entry_type='debit',
+                amount=amount,
+                particulars=f"Expense: {expense_head.name}",
+            ))
+            # Cr Bank/Cash
+            db.session.add(VoucherEntry(
+                voucher_id=voucher.id,
+                account_id=payment_source.id,
+                entry_type='credit',
+                amount=amount,
+                particulars=f"Paid via {payment_source.name}",
+            ))
+
+            db.session.commit()
+            flash(f'Expense saved: {expense_head.name} — ₹{amount:,.0f} '
+                  f'(Voucher {v_num})', 'success')
+
+            # Stay on form if Save & New, else go home
+            action = request.form.get('action', 'save_close')
+            if action == 'save_new':
+                return redirect(url_for('accounts.quick_expense'))
+            return redirect(url_for('accounts.accounts_home'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error saving expense: {str(e)}', 'danger')
+            return redirect(url_for('accounts.quick_expense'))
+
+    # GET — render form
+    # Group expense heads: system (pre-defined) first, then custom
+    system_heads = [h for h in expense_heads if h.is_system]
+    custom_heads = [h for h in expense_heads if not h.is_system]
+
+    return render_template('accounts/quick_expense.html',
+                           system_heads=system_heads,
+                           custom_heads=custom_heads,
+                           payment_sources=payment_sources,
+                           today=date.today())
+
+
+# Add new custom expense head on the fly
+@accounts_bp.route('/accounts/expense-head/add', methods=['POST'])
+def add_expense_head():
+    """Add a new custom expense head (called from quick expense form)."""
+    name = (request.form.get('name') or '').strip()
+    if not name:
+        return jsonify({'success': False, 'error': 'Name is required'}), 400
+
+    # Check duplicate
+    existing = AccountHead.query.filter_by(name=name).first()
+    if existing:
+        return jsonify({'success': False, 'error': 'An account with this name already exists'}), 400
+
+    exp_group = AccountGroup.query.filter_by(name='Indirect Expenses').first()
+    if not exp_group:
+        return jsonify({'success': False, 'error': 'Expense group not found'}), 500
+
+    head = AccountHead(name=name, group_id=exp_group.id, is_system=False)
+    db.session.add(head)
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'id': head.id,
+        'name': head.name,
+    })

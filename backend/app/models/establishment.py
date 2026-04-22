@@ -7,9 +7,12 @@ class Establishment(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
 
-    # Owner — Clerk user_id who owns this establishment
-    # Used for multi-user data isolation (each user sees only their own data)
+    # Owner — Clerk user_id of the creator (historical, does not change)
     owner_id = db.Column(db.String(100), nullable=True, index=True)
+
+    # Handler — Clerk user_id of the currently-assigned staff (admin can re-assign)
+    # If null, falls back to owner_id for visibility.
+    assigned_to_id = db.Column(db.String(100), nullable=True, index=True)
 
     # Parent–Child (Sub-Unit / Branch) hierarchy
     # If parent_id is NULL → this is a main/parent establishment

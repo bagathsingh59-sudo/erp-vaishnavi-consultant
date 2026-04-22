@@ -69,9 +69,14 @@ def user_establishments(query=None):
     """
     Filter Establishment query based on role.
     Admin: return ALL establishments (no filter).
-    User: return only owned establishments.
+    User: return establishments where they are the CREATOR or the current HANDLER.
+
+    A user sees an establishment if:
+      - they created it (owner_id = uid), OR
+      - admin has assigned it to them (assigned_to_id = uid)
     """
     from app.models.establishment import Establishment
+    from sqlalchemy import or_
     if query is None:
         query = Establishment.query
 
@@ -80,7 +85,11 @@ def user_establishments(query=None):
 
     uid = current_user_id()
     if uid:
-        return query.filter(Establishment.owner_id == uid)
+        # Users see establishments they created OR that have been assigned to them
+        return query.filter(or_(
+            Establishment.owner_id == uid,
+            Establishment.assigned_to_id == uid,
+        ))
     else:
         return query.filter(Establishment.owner_id == '__none__')  # No data
 

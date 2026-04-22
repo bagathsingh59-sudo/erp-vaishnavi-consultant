@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% block title %}{% if loan %}Edit Loan{% else %}New Loan{% endif %}{% endblock %}
+{% block page_header %}{% if loan %}Edit Loan{% else %}New Loan Account{% endif %}{% endblock %}
+
+{% block content %}
+<style>
+.ln-form-wrap { max-width: 860px; margin: 0 auto; }
+.ln-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
+.ln-header {
+    background: linear-gradient(135deg, #1e3a8a, #312e81);
+    color: #fff; padding: 16px 22px;
+}
+.ln-type-toggle { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.ln-type-btn {
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+    padding: 6px 14px; border-radius: 6px; color: #fff;
+    font-size: 0.72rem; font-weight: 600; cursor: pointer;
+    transition: all 0.15s;
+}
+.ln-type-btn.active { background: #fbbf24; color: #78350f; border-color: #fbbf24; }
+.ln-type-btn:hover { background: rgba(255,255,255,0.2); }
+.ln-type-btn.active:hover { background: #f59e0b; }
+
+.ln-body { padding: 20px 24px; }
+.ln-section { margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px dashed #e2e8f0; }
+.ln-section:last-child { border-bottom: none; }
+.ln-section-title {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.5px; color: #4338ca; margin-bottom: 10px;
+}
+.ln-label { font-size: 0.7rem; font-weight: 600; color: #475569; margin-bottom: 3px; display: block; }
+.ln-input, .ln-select, .ln-textarea {
+    width: 100%; padding: 7px 10px; font-size: 0.78rem;
+    border: 1px solid #e2e8f0; border-radius: 6px;
+}
+.ln-row { display: grid; gap: 12px; margin-bottom: 12px; }
+.ln-row.cols-2 { grid-template-columns: 1fr 1fr; }
+.ln-row.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+.ln-calc-preview {
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 6px;
+    margin-top: 10px; display: none;
+}
+.ln-calc-preview.visible { display: block; }
+.ln-calc-row {
+    display: flex; justify-content: space-between;
+    padding: 3px 0; font-size: 0.78rem; color: #78350f;
+}
+.ln-calc-row strong { color: #92400e; font-family: 'Consolas', monospace; }
+
+.ln-actions {
+    padding: 14px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0;
+    display: flex; gap: 8px; justify-content: flex-end;
+}
+</style>
+
+<div class="ln-form-wrap">
+    <div class="mb-3">
+        <a href="{{ url_for('loan.loan_home') }}" class="btn btn-sm btn-outline-secondary" style="font-size:0.72rem;">
+            <i class="bi bi-arrow-left me-1"></i>Back to Loans
+        </a>
+    </div>
+
+    <form method="POST" id="loanForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="ln-card">
+            <div class="ln-header">
+                <h5 style="font-weight:800; margin:0; font-size:1rem;">
+                    <i class="bi bi-bank me-2"></i>{% if loan %}Edit{% else %}New{% endif %} Loan Account
+                </h5>
+                <div style="font-size:0.65rem; opacity:0.85; margin-top:3px;">
+                    Pick loan type, enter amount &amp; terms — EMI auto-calculated
+                </div>
+
+                <!-- Loan Type Toggle -->
+                <div class="ln-type-toggle">
+                    <input type="hidden" name="loan_type" id="loan_type"
+                           value="{% if loan %}{{ loan.loan_type }}{% else %}{{ preselect_type }}{% endif %}">
+                    <div class="ln-type-btn" data-value="staff_advance" onclick="pickType(this)">
+                        <i class="bi bi-person-badge me-1"></i>Staff Advance
+                    </div>
+                    <div class="ln-type-btn" data-value="client_loan" onclick="pickType(this)">
+                        <i class="bi bi-building me-1"></i>Client Loan
+                    </div>
+                    <div class="ln-type-btn" data-value="given_other" onclick="pickType(this)">
+                        <i class="bi bi-arrow-up-right me-1"></i>Other (Given)
+                    </div>
+                    <div class="ln-type-btn" data-value="taken" onclick="pickType(this)">
+                        <i class="bi bi-bank me-1"></i>Loan Taken
+                    </div>
+                </div>
+            </div>
+
+            <div class="ln-body">
+
+                <!-- Party Details -->
+                <div class="ln-section">
+                    <div class="ln-section-title"><i class="bi bi-person"></i> Party Details</div>
+                    <div class="ln-row cols-2">
+                        <div>
+                            <label class="ln-label">Party Name <span class="text-danger">*</span></label>
+                            <input type="text" name="party_name" class="ln-input" required
+                                   value="{{ loan.party_name if loan else '' }}"
+                                   placeholder="e.g., Ravi Kumar / HDFC Bank / ABC Traders">
+                        </div>
+                        <div>
+                            <label class="ln-label">Phone</label>
+                            <input type="text" name="party_phone" class="ln-input"
+                                   value="{{ loan.party_phone if loan else '' }}" placeholder="Optional">
+                        </div>
+                    </div>
+
+                    <div class="ln-row cols-2" id="linkStaffRow" style="display:none;">
+                        <div>
+                            <label class="ln-label">Link to Employee (optional)</label>
+                            <select name="employee_id" class="ln-select">
+                                <option value="">— Not linked —</option>
+                                {% for e in employees %}
+                                <option value="{{ e.id }}" {% if loan and loan.employee_id == e.id %}selected{% endif %}>
+                                    {{ e.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="ln-row cols-2" id="linkClientRow" style="display:none;">
+                        <div>
+                            <label class="ln-label">Link to Establishment (optional)</label>
+                            <select name="establishment_id" class="ln-select">
+                                <option value="">— Not linked —</option>
+                                {% for est in establishments %}
+                                <option value="{{ est.id }}" {% if loan and loan.establishment_id == est.id %}selected{% endif %}>
+                                    {{ est.display_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loan Terms -->
+                <div class="ln-section">
+                    <div class="ln-section-title"><i class="bi bi-calculator"></i> Loan Terms</div>
+                    <div class="ln-row cols-3">
+                        <div>
+                            <label class="ln-label">Principal Amount (₹) <span class="text-danger">*</span></label>
+                            <input type="number" name="principal_amount" id="principalInput" class="ln-input" required
+                                   step="0.01" min="0" value="{{ loan.principal_amount if loan else '' }}">
+                        </div>
+                        <div>
+                            <label class="ln-label">Interest Rate (% per annum)</label>
+                            <input type="number" name="interest_rate_pa" id="rateInput" class="ln-input"
+                                   step="0.01" min="0" value="{{ loan.interest_rate_pa if loan else 0 }}"
+                                   placeholder="0 for interest-free">
+                        </div>
+                        <div>
+                            <label class="ln-label">Term (months)</label>
+                            <input type="number" name="term_months" id="termInput" class="ln-input"
+                                   min="0" value="{{ loan.term_months if loan else '' }}"
+                                   placeholder="Optional — leave blank for open-ended">
+                        </div>
+                    </div>
+                    <div class="ln-row cols-2">
+                        <div>
+                            <label class="ln-label">Start Date <span class="text-danger">*</span></label>
+                            <input type="date" name="start_date" class="ln-input" required
+                                   value="{% if loan %}{{ loan.start_date.strftime('%Y-%m-%d') }}{% else %}{{ today.strftime('%Y-%m-%d') }}{% endif %}">
+                        </div>
+                    </div>
+
+                    <!-- EMI Preview -->
+                    <div class="ln-calc-preview" id="calcPreview">
+                        <div class="ln-calc-row"><span><i class="bi bi-cash me-1"></i>Monthly EMI:</span>
+                            <strong id="calcEmi">—</strong></div>
+                        <div class="ln-calc-row"><span><i class="bi bi-wallet2 me-1"></i>Total Payable:</span>
+                            <strong id="calcTotal">—</strong></div>
+                        <div class="ln-calc-row"><span><i class="bi bi-percent me-1"></i>Total Interest:</span>
+                            <strong id="calcInterest">—</strong></div>
+                    </div>
+                </div>
+
+                <!-- Purpose / Remarks -->
+                <div class="ln-section" style="border-bottom:none;">
+                    <div class="ln-section-title"><i class="bi bi-journal-text"></i> Purpose &amp; Remarks</div>
+                    <div class="ln-row">
+                        <div>
+                            <label class="ln-label">Purpose</label>
+                            <input type="text" name="purpose" class="ln-input"
+                                   value="{{ loan.purpose if loan else '' }}"
+                                   placeholder="e.g., Medical expense, Car loan, Compliance payment">
+                        </div>
+                    </div>
+                    <div class="ln-row">
+                        <div>
+                            <label class="ln-label">Remarks (internal notes)</label>
+                            <textarea name="remarks" class="ln-textarea" rows="2"
+                                      placeholder="Any additional notes...">{{ loan.remarks if loan else '' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ln-actions">
+                <a href="{{ url_for('loan.loan_home') }}" class="btn btn-outline-secondary btn-sm"
+                   style="font-size:0.75rem;">Cancel</a>
+                <button type="submit" class="btn btn-primary btn-sm" style="font-size:0.75rem; font-weight:700;">
+                    <i class="bi bi-save me-1"></i>{% if loan %}Update{% else %}Create{% endif %} Loan
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+function pickType(el) {
+    document.querySelectorAll('.ln-type-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('loan_type').value = el.dataset.value;
+    updateLinkRows();
+}
+
+function updateLinkRows() {
+    const type = document.getElementById('loan_type').value;
+    document.getElementById('linkStaffRow').style.display = (type === 'staff_advance') ? 'grid' : 'none';
+    document.getElementById('linkClientRow').style.display = (type === 'client_loan') ? 'grid' : 'none';
+}
+
+// Auto-select saved type
+(function() {
+    const current = document.getElementById('loan_type').value;
+    document.querySelectorAll('.ln-type-btn').forEach(b => {
+        if (b.dataset.value === current) b.classList.add('active');
+    });
+    updateLinkRows();
+})();
+
+// Live EMI calculator
+function updateEmiPreview() {
+    const p = parseFloat(document.getElementById('principalInput').value) || 0;
+    const r = parseFloat(document.getElementById('rateInput').value) || 0;
+    const t = parseInt(document.getElementById('termInput').value) || 0;
+    const preview = document.getElementById('calcPreview');
+
+    if (p <= 0 || t <= 0) { preview.classList.remove('visible'); return; }
+
+    fetch(`{{ url_for("loan.calc_emi_api") }}?principal=${p}&rate=${r}&term=${t}`)
+        .then(res => res.json())
+        .then(data => {
+            preview.classList.add('visible');
+            const fmt = v => '₹ ' + (v || 0).toLocaleString('en-IN', {minimumFractionDigits: 0, maximumFractionDigits: 2});
+            document.getElementById('calcEmi').textContent = fmt(data.emi);
+            document.getElementById('calcTotal').textContent = fmt(data.total_payable);
+            document.getElementById('calcInterest').textContent = fmt(data.total_interest);
+        });
+}
+
+['principalInput', 'rateInput', 'termInput'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updateEmiPreview);
+});
+updateEmiPreview();
+</script>
+{% endblock %}

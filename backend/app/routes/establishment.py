@@ -473,6 +473,8 @@ def _save_establishment_form(est, is_new=False):
 
     if is_new:
         est.owner_id = current_user_id()
+        # Auto-assign to creator — admin can reassign later from staff dashboard
+        est.assigned_to_id = current_user_id()
         est.is_active = True
         db.session.add(est)
         db.session.flush()  # Get est.id for related tables

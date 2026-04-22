@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+{% block title %}{{ loan.party_name }} — Loan Details{% endblock %}
+{% block page_header %}Loan Details{% endblock %}
+
+{% block content %}
+<style>
+.lv-wrap { max-width: 1100px; margin: 0 auto; }
+.lv-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+.lv-header {
+    background: linear-gradient(135deg, #1e3a8a 0%, #312e81 100%);
+    color: #fff; padding: 20px 26px;
+}
+.lv-title { font-size: 1.3rem; font-weight: 800; margin: 0; }
+.lv-subtitle { font-size: 0.75rem; opacity: 0.8; margin-top: 3px; }
+
+.lv-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 14px; }
+.lv-stat { background: rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; }
+.lv-stat-label { font-size: 0.58rem; letter-spacing: 1px; text-transform: uppercase; opacity: 0.7; }
+.lv-stat-value { font-size: 1.1rem; font-weight: 800; margin-top: 3px; }
+
+.lv-section-title {
+    font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.5px; color: #1e3a8a; padding: 14px 20px;
+    border-bottom: 1px solid #e2e8f0;
+}
+.lv-info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 18px 22px; }
+.lv-info-item { font-size: 0.78rem; }
+.lv-info-label { font-size: 0.62rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+.lv-info-value { font-weight: 600; color: #1e293b; margin-top: 2px; }
+
+.lv-add-payment {
+    background: #fef3c7; border: 2px dashed #f59e0b;
+    padding: 16px 22px; margin: 0; border-radius: 8px;
+}
+.lv-pay-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; align-items: end; }
+.lv-input { padding: 7px 10px; font-size: 0.78rem; border: 1px solid #fcd34d; border-radius: 6px; width: 100%; }
+.lv-label { font-size: 0.65rem; font-weight: 700; color: #92400e; margin-bottom: 2px; display: block; }
+
+.lv-table { width: 100%; border-collapse: collapse; font-size: 0.72rem; }
+.lv-table thead th {
+    background: #f1f5f9; color: #475569; font-size: 0.58rem;
+    font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
+    padding: 8px 10px; border-bottom: 2px solid #e2e8f0; white-space: nowrap;
+}
+.lv-table tbody td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.lv-table tbody tr:hover { background: #fafbfd; }
+.lv-amt { text-align: right; font-family: 'Consolas', monospace; font-weight: 600; }
+</style>
+
+<div class="lv-wrap">
+    <!-- Back bar -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <a href="{{ url_for('loan.loan_home') }}" class="btn btn-sm btn-outline-secondary" style="font-size:0.72rem;">
+            <i class="bi bi-arrow-left me-1"></i>Back to Loans
+        </a>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('loan.loan_edit', loan_id=loan.id) }}" class="btn btn-sm btn-outline-primary" style="font-size:0.72rem;">
+                <i class="bi bi-pencil me-1"></i>Edit
+            </a>
+            <form method="POST" action="{{ url_for('loan.loan_delete', loan_id=loan.id) }}"
+                  style="display:inline;" onsubmit="return confirm('Delete this loan and all its payment history? This cannot be undone.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger" style="font-size:0.72rem;">
+                    <i class="bi bi-trash me-1"></i>Delete
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <div class="lv-card">
+        <div class="lv-header">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap;">
+                <div>
+                    <div style="font-size:0.6rem; opacity:0.7; text-transform:uppercase; letter-spacing:1px;">{{ loan.loan_type_display }}</div>
+                    <div class="lv-title">{{ loan.party_name }}</div>
+                    <div class="lv-subtitle">
+                        {% if loan.purpose %}{{ loan.purpose }}{% endif %}
+                        <span class="badge bg-{{ loan.status_badge_class }} ms-2">{{ loan.status.upper() }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="lv-stats">
+                <div class="lv-stat">
+                    <div class="lv-stat-label">Principal</div>
+                    <div class="lv-stat-value">₹ {{ "{:,.0f}".format(loan.principal_amount) }}</div>
+                </div>
+                <div class="lv-stat">
+                    <div class="lv-stat-label">Paid So Far</div>
+                    <div class="lv-stat-value">₹ {{ "{:,.0f}".format(loan.total_paid or 0) }}</div>
+                </div>
+                <div class="lv-stat">
+                    <div class="lv-stat-label">Outstanding</div>
+                    <div class="lv-stat-value" style="color:{% if loan.outstanding_balance > 0 %}#fca5a5{% else %}#86efac{% endif %};">
+                        ₹ {{ "{:,.0f}".format(loan.outstanding_balance or 0) }}
+                    </div>
+                </div>
+                <div class="lv-stat">
+                    <div class="lv-stat-label">Progress</div>
+                    <div class="lv-stat-value">{{ loan.progress_pct }}%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loan Info Details -->
+        <div class="lv-info-grid">
+            <div class="lv-info-item">
+                <div class="lv-info-label">Start Date</div>
+                <div class="lv-info-value">{{ loan.start_date.strftime('%d-%m-%Y') }}</div>
+            </div>
+            <div class="lv-info-item">
+                <div class="lv-info-label">End Date</div>
+                <div class="lv-info-value">
+                    {% if loan.end_date %}{{ loan.end_date.strftime('%d-%m-%Y') }}{% else %}—{% endif %}
+                </div>
+            </div>
+            <div class="lv-info-item">
+                <div class="lv-info-label">Interest Rate</div>
+                <div class="lv-info-value">{{ loan.interest_rate_pa or 0 }}% p.a.</div>
+            </div>
+            <div class="lv-info-item">
+                <div class="lv-info-label">Term</div>
+                <div class="lv-info-value">
+                    {% if loan.term_months %}{{ loan.term_months }} months{% else %}Open-ended{% endif %}
+                </div>
+            </div>
+            <div class="lv-info-item">
+                <div class="lv-info-label">EMI</div>
+                <div class="lv-info-value">
+                    {% if loan.emi_amount and loan.emi_amount > 0 %}₹ {{ "{:,.2f}".format(loan.emi_amount) }}{% else %}—{% endif %}
+                </div>
+            </div>
+            <div class="lv-info-item">
+                <div class="lv-info-label">Total Interest Paid</div>
+                <div class="lv-info-value">₹ {{ "{:,.0f}".format(loan.total_interest_paid or 0) }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Payment -->
+    {% if loan.status == 'active' %}
+    <div class="lv-card">
+        <div class="lv-section-title" style="background:#fffbeb;">
+            <i class="bi bi-plus-circle me-1"></i>Record Payment / EMI
+        </div>
+        <form method="POST" action="{{ url_for('loan.loan_add_payment', loan_id=loan.id) }}" class="lv-add-payment">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="lv-pay-row">
+                <div>
+                    <label class="lv-label">Payment Date</label>
+                    <input type="date" name="payment_date" class="lv-input" required
+                           value="{{ today.strftime('%Y-%m-%d') if today else '' }}">
+                </div>
+                <div>
+                    <label class="lv-label">Amount Paid (₹)</label>
+                    <input type="number" name="amount_paid" class="lv-input" required step="0.01" min="0"
+                           placeholder="e.g., 10000">
+                </div>
+                <div>
+                    <label class="lv-label">Method</label>
+                    <select name="payment_method" class="lv-input">
+                        <option value="">— Select —</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Bank Transfer">Bank Transfer</option>
+                        <option value="Cheque">Cheque</option>
+                        <option value="Salary Deduction">Salary Deduction</option>
+                        <option value="UPI">UPI</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <button type="submit" class="btn btn-warning" style="width:100%; font-weight:700; font-size:0.78rem;">
+                        <i class="bi bi-check-lg me-1"></i>Record Payment
+                    </button>
+                </div>
+            </div>
+            <div class="lv-pay-row" style="margin-top:10px;">
+                <div>
+                    <label class="lv-label">Reference (optional)</label>
+                    <input type="text" name="reference" class="lv-input" placeholder="UTR / Cheque # / etc.">
+                </div>
+                <div style="grid-column: span 3;">
+                    <label class="lv-label">Narration (optional)</label>
+                    <input type="text" name="narration" class="lv-input" placeholder="e.g., April EMI">
+                </div>
+            </div>
+            <div style="font-size:0.65rem; color:#78350f; margin-top:8px;">
+                <i class="bi bi-info-circle"></i>
+                Principal/Interest will be auto-split based on current outstanding balance &amp; rate.
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Payment History -->
+    <div class="lv-card">
+        <div class="lv-section-title">
+            <i class="bi bi-clock-history me-1"></i>Payment History
+            <span style="font-weight:400; font-size:0.68rem; color:#64748b; margin-left:6px;">
+                ({{ payments|length }} payment{{ 's' if payments|length != 1 }})
+            </span>
+        </div>
+        {% if payments %}
+        <table class="lv-table">
+            <thead>
+                <tr>
+                    <th style="width:40px;">#</th>
+                    <th style="width:95px;">Date</th>
+                    <th style="text-align:right;">Amount Paid</th>
+                    <th style="text-align:right;">Principal</th>
+                    <th style="text-align:right;">Interest</th>
+                    <th style="text-align:right;">Balance After</th>
+                    <th>Method</th>
+                    <th>Reference</th>
+                    <th style="width:60px; text-align:center;">Delete</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in payments %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ p.payment_date.strftime('%d-%m-%Y') }}</td>
+                    <td class="lv-amt" style="color:#16a34a;">₹ {{ "{:,.0f}".format(p.amount_paid) }}</td>
+                    <td class="lv-amt" style="color:#4338ca;">₹ {{ "{:,.0f}".format(p.principal_portion or 0) }}</td>
+                    <td class="lv-amt" style="color:#d97706;">₹ {{ "{:,.0f}".format(p.interest_portion or 0) }}</td>
+                    <td class="lv-amt" style="color:#64748b;">₹ {{ "{:,.0f}".format(p.outstanding_after or 0) }}</td>
+                    <td style="font-size:0.7rem; color:#64748b;">{{ p.payment_method or '—' }}</td>
+                    <td style="font-size:0.66rem; color:#94a3b8;">{{ p.reference or '—' }}</td>
+                    <td style="text-align:center;">
+                        <form method="POST" action="{{ url_for('loan.loan_delete_payment', loan_id=loan.id, payment_id=p.id) }}"
+                              style="display:inline;" onsubmit="return confirm('Delete this payment? Balance will recalculate.');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" style="font-size:0.62rem; padding:2px 6px;">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div style="padding:30px; text-align:center; color:#94a3b8; font-size:0.78rem;">
+            No payments recorded yet.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Projected EMI Schedule -->
+    {% if schedule %}
+    <div class="lv-card">
+        <div class="lv-section-title">
+            <i class="bi bi-calendar-event me-1"></i>Projected EMI Schedule
+            <span style="font-weight:400; font-size:0.68rem; color:#64748b; margin-left:6px;">
+                (Based on original terms — actual payments may differ)
+            </span>
+        </div>
+        <div style="max-height: 400px; overflow-y: auto;">
+        <table class="lv-table">
+            <thead>
+                <tr>
+                    <th style="width:40px;">#</th>
+                    <th style="width:95px;">Due Date</th>
+                    <th style="text-align:right;">EMI</th>
+                    <th style="text-align:right;">Principal</th>
+                    <th style="text-align:right;">Interest</th>
+                    <th style="text-align:right;">Balance After</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in schedule %}
+                <tr>
+                    <td>{{ s.month_no }}</td>
+                    <td>{{ s.due_date.strftime('%d-%m-%Y') }}</td>
+                    <td class="lv-amt">₹ {{ "{:,.2f}".format(s.emi) }}</td>
+                    <td class="lv-amt" style="color:#4338ca;">₹ {{ "{:,.2f}".format(s.principal) }}</td>
+                    <td class="lv-amt" style="color:#d97706;">₹ {{ "{:,.2f}".format(s.interest) }}</td>
+                    <td class="lv-amt" style="color:#64748b;">₹ {{ "{:,.2f}".format(s.balance_after) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Remarks -->
+    {% if loan.remarks %}
+    <div class="lv-card" style="padding:16px 22px;">
+        <div class="lv-info-label">Remarks (Internal)</div>
+        <div style="font-size:0.78rem; color:#475569; margin-top:4px; white-space:pre-line;">{{ loan.remarks }}</div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

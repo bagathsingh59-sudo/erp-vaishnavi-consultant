@@ -316,6 +316,10 @@ def create_app():
     from app.routes.manual_reimbursement import manual_reimb_bp
     app.register_blueprint(manual_reimb_bp)
 
+    # Register Loan blueprint
+    from app.routes.loan import loan_bp
+    app.register_blueprint(loan_bp)
+
     # Register Vault blueprint — disabled for now, re-enable later
     # from app.routes.vault import vault_bp
     # app.register_blueprint(vault_bp)
@@ -345,6 +349,8 @@ def create_app():
         from app.models.vault import VaultFile
         from app.models.enrollment import Enrollment
         from app.models.manual_reimbursement import ManualReimbursement
+        from app.models.loan import LoanAccount, LoanPayment
+        from app.models.assignment_log import EstablishmentAssignmentLog
         db.create_all()
 
         # Auto-migrate: add new columns to existing tables (PostgreSQL won't add via create_all)
@@ -352,6 +358,9 @@ def create_app():
 
         # Seed default account groups and heads (only once)
         _seed_default_accounts()
+
+        # Seed any newly added account heads for existing DBs
+        _seed_missing_account_heads()
 
     return app
 
@@ -369,6 +378,7 @@ def _auto_migrate_columns(db):
         ('employee_salaries', 'no_absence_deduction', 'BOOLEAN DEFAULT FALSE'),
         ('payroll_entries', 'rate_overrides', 'TEXT'),
         ('establishments', 'bonus_min_wage', 'FLOAT'),
+        ('establishments', 'assigned_to_id', 'VARCHAR(100)'),
     ]
     for table, column, col_def in migrations:
         try:
@@ -391,6 +401,17 @@ def _auto_migrate_columns(db):
             "UPDATE payroll_configs SET include_ot_in_epf = include_ot_in_compliance, "
             "include_ot_in_esic = include_ot_in_compliance "
             "WHERE include_ot_in_compliance = TRUE AND include_ot_in_epf = FALSE AND include_ot_in_esic = FALSE"
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    # One-time data migration: backfill assigned_to_id with owner_id
+    # So existing establishments stay visible to the user who created them.
+    try:
+        db.session.execute(db.text(
+            "UPDATE establishments SET assigned_to_id = owner_id "
+            "WHERE assigned_to_id IS NULL AND owner_id IS NOT NULL"
         ))
         db.session.commit()
     except Exception:
@@ -449,6 +470,30 @@ def _seed_default_accounts():
         ('IP & UAN Charges',        'Indirect Income',     True),
         ('Other Income',            'Indirect Income',     True),
         ('Bank Charges',            'Indirect Expenses',   True),
+        # Standard expense heads — pre-seeded for one-click expense entry
+        ('Office Rent',             'Indirect Expenses',   True),
+        ('Electricity Bill',        'Indirect Expenses',   True),
+        ('Internet Bill',           'Indirect Expenses',   True),
+        ('Telephone Bill',          'Indirect Expenses',   True),
+        ('Water Charges',           'Indirect Expenses',   True),
+        ('Staff Salaries',          'Indirect Expenses',   True),
+        ('Staff Incentive',         'Indirect Expenses',   True),
+        ('Office Maintenance',      'Indirect Expenses',   True),
+        ('Transport / Fuel',        'Indirect Expenses',   True),
+        ('Donation',                'Indirect Expenses',   True),
+        ('Interest Paid',           'Indirect Expenses',   True),
+        ('EMI Paid',                'Indirect Expenses',   True),
+        ('Printing & Stationery',   'Indirect Expenses',   True),
+        ('Professional Tax (Own)',  'Indirect Expenses',   True),
+        ('Repair & Maintenance',    'Indirect Expenses',   True),
+        ('Food / Refreshments',     'Indirect Expenses',   True),
+        ('Travel & Conveyance',     'Indirect Expenses',   True),
+        ('Hosting / Software',      'Indirect Expenses',   True),
+        ('Miscellaneous Expenses',  'Indirect Expenses',   True),
+        # Loan accounts — pre-seeded for loan module
+        ('Loans Given (Staff)',     'Current Assets',      True),
+        ('Loans Given (Client)',    'Current Assets',      True),
+        ('Loans Taken',             'Current Liabilities', True),
     ]
 
     for head_name, group_name, is_sys in heads:
@@ -457,3 +502,53 @@ def _seed_default_accounts():
         db.session.add(h)
 
     db.session.commit()
+
+
+def _seed_missing_account_heads():
+    """Add any newly introduced system accounts to existing databases.
+    Safe to run repeatedly — only creates missing heads."""
+    from app.models.accounts import AccountGroup, AccountHead
+
+    # Only run if groups already exist (i.e., not a fresh DB)
+    if not AccountGroup.query.first():
+        return
+
+    group_map = {g.name: g for g in AccountGroup.query.all()}
+
+    new_heads = [
+        ('Office Rent',             'Indirect Expenses'),
+        ('Electricity Bill',        'Indirect Expenses'),
+        ('Internet Bill',           'Indirect Expenses'),
+        ('Telephone Bill',          'Indirect Expenses'),
+        ('Water Charges',           'Indirect Expenses'),
+        ('Staff Salaries',          'Indirect Expenses'),
+        ('Staff Incentive',         'Indirect Expenses'),
+        ('Office Maintenance',      'Indirect Expenses'),
+        ('Transport / Fuel',        'Indirect Expenses'),
+        ('Donation',                'Indirect Expenses'),
+        ('Interest Paid',           'Indirect Expenses'),
+        ('EMI Paid',                'Indirect Expenses'),
+        ('Printing & Stationery',   'Indirect Expenses'),
+        ('Professional Tax (Own)',  'Indirect Expenses'),
+        ('Repair & Maintenance',    'Indirect Expenses'),
+        ('Food / Refreshments',     'Indirect Expenses'),
+        ('Travel & Conveyance',     'Indirect Expenses'),
+        ('Hosting / Software',      'Indirect Expenses'),
+        ('Miscellaneous Expenses',  'Indirect Expenses'),
+        ('Loans Given (Staff)',     'Current Assets'),
+        ('Loans Given (Client)',    'Current Assets'),
+        ('Loans Taken',             'Current Liabilities'),
+    ]
+
+    for head_name, group_name in new_heads:
+        group = group_map.get(group_name)
+        if not group:
+            continue
+        existing = AccountHead.query.filter_by(name=head_name).first()
+        if not existing:
+            h = AccountHead(name=head_name, group_id=group.id, is_system=True)
+            db.session.add(h)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()

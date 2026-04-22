@@ -170,9 +170,28 @@
             <div class="sidebar-section-title">ACCOUNTS</div>
 
             <a href="{{ url_for('accounts.accounts_home') }}"
-               class="sidebar-link {% if request.endpoint and 'accounts' in (request.endpoint or '') %}active{% endif %}">
+               class="sidebar-link {% if request.endpoint and 'accounts' in (request.endpoint or '') and request.endpoint != 'accounts.quick_expense' %}active{% endif %}">
                 <i class="bi bi-book-half"></i>
                 <span>Accounts</span>
+            </a>
+            <a href="{{ url_for('accounts.quick_expense') }}"
+               class="sidebar-link {% if request.endpoint == 'accounts.quick_expense' %}active{% endif %}"
+               style="color:#dc2626;">
+                <i class="bi bi-cash-stack" style="color:#dc2626;"></i>
+                <span>Quick Expense</span>
+            </a>
+            <a href="{{ url_for('loan.loan_home') }}"
+               class="sidebar-link {% if request.endpoint and request.endpoint.startswith('loan.') %}active{% endif %}"
+               style="color:#1e3a8a;">
+                <i class="bi bi-bank" style="color:#1e3a8a;"></i>
+                <span>Loan Accounts</span>
+            </a>
+            <a href="{{ url_for('admin.staff_performance') }}"
+               class="sidebar-link {% if request.endpoint in ('admin.staff_performance', 'admin.reassign_staff_clients') %}active{% endif %}"
+               style="color:#7c3aed;">
+                <i class="bi bi-speedometer2" style="color:#7c3aed;"></i>
+                <span>Staff Performance</span>
+                <span style="font-size:0.5rem; background:#fef3c7; color:#92400e; padding:1px 5px; border-radius:8px; margin-left:4px; font-weight:700;">ADMIN</span>
             </a>
             {% endif %}
 

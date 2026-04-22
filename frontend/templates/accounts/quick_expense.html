@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% block title %}Quick Expense Entry{% endblock %}
+{% block page_header %}Quick Expense Entry{% endblock %}
+
+{% block content %}
+<style>
+.qe-wrap { max-width: 720px; margin: 0 auto; }
+.qe-card {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05); overflow: hidden;
+}
+.qe-header {
+    background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+    color: #fff; padding: 18px 22px;
+}
+.qe-header h5 { font-weight: 800; margin: 0; font-size: 1.05rem; }
+.qe-header p { opacity: 0.85; font-size: 0.72rem; margin: 4px 0 0; }
+
+.qe-body { padding: 22px 24px; }
+.qe-label { font-size: 0.72rem; font-weight: 600; color: #475569; margin-bottom: 4px; display: block; }
+.qe-field { margin-bottom: 14px; }
+.qe-field input, .qe-field select, .qe-field textarea {
+    width: 100%; padding: 8px 12px; font-size: 0.8rem;
+    border: 1px solid #e2e8f0; border-radius: 8px;
+}
+.qe-field input:focus, .qe-field select:focus {
+    outline: none; border-color: #4f46e5;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.qe-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.qe-amount-wrap {
+    background: #fef3c7; border: 2px solid #fbbf24; border-radius: 10px;
+    padding: 14px 18px; margin: 10px 0 16px;
+}
+.qe-amount-wrap input {
+    font-size: 1.4rem; font-weight: 800; color: #92400e;
+    background: transparent; border: none; text-align: right;
+    font-family: 'Consolas', monospace;
+}
+.qe-amount-wrap label { color: #92400e; font-weight: 700; }
+
+.qe-actions {
+    padding: 16px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0;
+    display: flex; gap: 8px; justify-content: flex-end;
+}
+.qe-add-custom {
+    font-size: 0.65rem; color: #4f46e5; cursor: pointer;
+    text-decoration: underline; margin-left: 6px;
+}
+.qe-info {
+    background: #eef2ff; border-left: 4px solid #4338ca; border-radius: 6px;
+    padding: 10px 14px; margin-bottom: 16px; font-size: 0.72rem; color: #1e1b4b;
+}
+</style>
+
+<div class="qe-wrap">
+    <div class="qe-info">
+        <i class="bi bi-info-circle me-1"></i>
+        <strong>Quick Expense:</strong> Records a business expense and auto-creates a Payment voucher.
+        This makes your Profit &amp; Loss statement accurate.
+    </div>
+
+    <div class="qe-card">
+        <div class="qe-header">
+            <h5><i class="bi bi-cash-stack me-2"></i>Record Business Expense</h5>
+            <p>Pick expense type → enter amount → select payment source → save</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('accounts.quick_expense') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="qe-body">
+                <!-- Date -->
+                <div class="qe-field">
+                    <label class="qe-label">Date <span class="text-danger">*</span></label>
+                    <input type="date" name="voucher_date"
+                           value="{{ today.strftime('%Y-%m-%d') }}" required>
+                </div>
+
+                <!-- Expense Head -->
+                <div class="qe-field">
+                    <label class="qe-label">
+                        Expense Category <span class="text-danger">*</span>
+                        <span class="qe-add-custom" onclick="showAddCustom()">
+                            <i class="bi bi-plus-circle"></i> Add New Custom
+                        </span>
+                    </label>
+                    <select name="expense_head_id" id="expenseHead" required>
+                        <option value="">— Select Expense —</option>
+                        <optgroup label="📋 Standard Expenses">
+                            {% for h in system_heads %}
+                            <option value="{{ h.id }}">{{ h.name }}</option>
+                            {% endfor %}
+                        </optgroup>
+                        {% if custom_heads %}
+                        <optgroup label="✨ Custom Expenses">
+                            {% for h in custom_heads %}
+                            <option value="{{ h.id }}">{{ h.name }}</option>
+                            {% endfor %}
+                        </optgroup>
+                        {% endif %}
+                    </select>
+                </div>
+
+                <!-- Add Custom Expense Inline -->
+                <div id="customWrap" style="display:none; margin-bottom:14px;">
+                    <div style="background:#fffbeb; border:1px dashed #f59e0b; padding:10px 12px; border-radius:8px;">
+                        <label class="qe-label">New Expense Name</label>
+                        <div style="display:flex; gap:6px;">
+                            <input type="text" id="customName" placeholder="e.g., Security Charges"
+                                   style="flex:1; padding:6px 10px; font-size:0.75rem; border:1px solid #fde68a; border-radius:6px;">
+                            <button type="button" onclick="addCustomExpense()"
+                                    class="btn btn-sm btn-warning" style="font-size:0.7rem;">
+                                <i class="bi bi-check-lg"></i> Add
+                            </button>
+                            <button type="button" onclick="hideAddCustom()"
+                                    class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Amount (prominent) -->
+                <div class="qe-amount-wrap">
+                    <label class="qe-label">Amount (₹) <span class="text-danger">*</span></label>
+                    <input type="number" name="amount" step="0.01" min="0" placeholder="0" required autofocus>
+                </div>
+
+                <!-- Payment Source -->
+                <div class="qe-field">
+                    <label class="qe-label">Paid Via <span class="text-danger">*</span></label>
+                    <select name="payment_source_id" required>
+                        <option value="">— Select Bank / Cash —</option>
+                        {% for s in payment_sources %}
+                        <option value="{{ s.id }}">{{ s.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Narration & Reference -->
+                <div class="qe-row">
+                    <div class="qe-field">
+                        <label class="qe-label">Narration</label>
+                        <input type="text" name="narration" placeholder="e.g., April 2026 rent"
+                               maxlength="300">
+                    </div>
+                    <div class="qe-field">
+                        <label class="qe-label">Bill / Ref No.</label>
+                        <input type="text" name="reference" placeholder="e.g., INV-1234" maxlength="100">
+                    </div>
+                </div>
+            </div>
+
+            <div class="qe-actions">
+                <a href="{{ url_for('accounts.accounts_home') }}" class="btn btn-outline-secondary btn-sm"
+                   style="font-size:0.75rem;">Cancel</a>
+                <button type="submit" name="action" value="save_new"
+                        class="btn btn-outline-primary btn-sm" style="font-size:0.75rem;">
+                    <i class="bi bi-plus-circle me-1"></i>Save &amp; Add Another
+                </button>
+                <button type="submit" name="action" value="save_close"
+                        class="btn btn-danger btn-sm" style="font-size:0.75rem; font-weight:700;">
+                    <i class="bi bi-check-circle me-1"></i>Save Expense
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function showAddCustom() { document.getElementById('customWrap').style.display = 'block'; }
+function hideAddCustom() {
+    document.getElementById('customWrap').style.display = 'none';
+    document.getElementById('customName').value = '';
+}
+
+function addCustomExpense() {
+    const name = document.getElementById('customName').value.trim();
+    if (!name) { alert('Please enter an expense name'); return; }
+
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('csrf_token', '{{ csrf_token() }}');
+
+    fetch('{{ url_for("accounts.add_expense_head") }}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            // Add to select + select it
+            const select = document.getElementById('expenseHead');
+            let customGroup = null;
+            for (let i = 0; i < select.children.length; i++) {
+                if (select.children[i].label === '✨ Custom Expenses') {
+                    customGroup = select.children[i];
+                    break;
+                }
+            }
+            if (!customGroup) {
+                customGroup = document.createElement('optgroup');
+                customGroup.label = '✨ Custom Expenses';
+                select.appendChild(customGroup);
+            }
+            const opt = document.createElement('option');
+            opt.value = data.id;
+            opt.textContent = data.name;
+            opt.selected = true;
+            customGroup.appendChild(opt);
+            hideAddCustom();
+        } else {
+            alert(data.error || 'Failed to add expense');
+        }
+    })
+    .catch(err => alert('Error: ' + err));
+}
+</script>
+{% endblock %}

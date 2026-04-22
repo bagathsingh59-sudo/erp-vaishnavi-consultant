@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}Staff Performance — Admin{% endblock %}
+{% block page_header %}Staff Performance Dashboard{% endblock %}
+
+{% block content %}
+<style>
+.sp-hero {
+    background: linear-gradient(135deg, #0f172a 0%, #312e81 100%);
+    color: #fff; padding: 22px 28px; border-radius: 10px 10px 0 0;
+    border-bottom: 3px solid #fbbf24;
+}
+.sp-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 16px; }
+.sp-stat {
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px; padding: 12px 14px;
+}
+.sp-stat-label { font-size: 0.6rem; letter-spacing: 1px; text-transform: uppercase; opacity: 0.7; font-weight: 700; }
+.sp-stat-value { font-size: 1.4rem; font-weight: 800; margin-top: 4px; }
+
+.sp-staff-card {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+    margin-bottom: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.sp-staff-header {
+    padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid #f1f5f9; flex-wrap: wrap; gap: 10px;
+}
+.sp-staff-name { font-size: 1rem; font-weight: 700; color: #1e293b; }
+.sp-staff-role { font-size: 0.65rem; padding: 2px 8px; border-radius: 10px; background: #e0e7ff; color: #4338ca; margin-left: 6px; }
+.sp-staff-role.admin { background: #fee2e2; color: #991b1b; }
+
+.sp-grade {
+    padding: 4px 14px; border-radius: 20px; font-size: 0.65rem;
+    font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;
+    background: #fff;
+}
+
+.sp-metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; padding: 16px 20px; }
+.sp-metric { border-left: 3px solid #e2e8f0; padding-left: 10px; }
+.sp-metric-label { font-size: 0.58rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+.sp-metric-value { font-size: 1.2rem; font-weight: 800; color: #1e293b; margin-top: 2px; }
+.sp-metric-sub { font-size: 0.6rem; color: #94a3b8; margin-top: 1px; }
+
+.sp-metric.clients { border-left-color: #4338ca; }
+.sp-metric.filed { border-left-color: #16a34a; }
+.sp-metric.pending { border-left-color: #f59e0b; }
+.sp-metric.compliance { border-left-color: #7c3aed; }
+.sp-metric.fees { border-left-color: #059669; }
+
+.sp-footer {
+    padding: 12px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0;
+    display: flex; justify-content: space-between; align-items: center;
+}
+</style>
+
+<div class="sp-hero">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;">
+        <div>
+            <div style="font-size: 0.6rem; letter-spacing: 2px; text-transform: uppercase; opacity: 0.7; font-weight: 700;">Admin Monitoring</div>
+            <div style="font-size: 1.35rem; font-weight: 800; margin-top: 2px;">Staff Performance Dashboard</div>
+            <div style="font-size: 0.7rem; opacity: 0.7; margin-top: 2px;">
+                <i class="bi bi-calendar-range me-1"></i>FY {{ fy_label }}
+            </div>
+        </div>
+    </div>
+
+    <div class="sp-stats">
+        <div class="sp-stat">
+            <div class="sp-stat-label"><i class="bi bi-people me-1"></i>Total Staff</div>
+            <div class="sp-stat-value">{{ total_staff }}</div>
+        </div>
+        <div class="sp-stat">
+            <div class="sp-stat-label"><i class="bi bi-building me-1"></i>Active Clients</div>
+            <div class="sp-stat-value">{{ total_active_est }}</div>
+        </div>
+        <div class="sp-stat">
+            <div class="sp-stat-label"><i class="bi bi-question-circle me-1"></i>Unassigned</div>
+            <div class="sp-stat-value" style="color:{% if unassigned_count > 0 %}#fca5a5{% else %}#86efac{% endif %};">
+                {{ unassigned_count }}
+            </div>
+        </div>
+        <div class="sp-stat">
+            <div class="sp-stat-label"><i class="bi bi-calculator me-1"></i>Avg per Staff</div>
+            <div class="sp-stat-value">
+                {% if total_staff > 0 %}{{ (total_active_est / total_staff)|round|int }}{% else %}0{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Staff Cards -->
+<div style="margin-top: 16px;">
+    {% for m in staff_metrics %}
+    <div class="sp-staff-card">
+        <div class="sp-staff-header">
+            <div>
+                <span class="sp-staff-name">
+                    <i class="bi bi-person-circle me-1" style="color:#4338ca;"></i>
+                    {{ m.user.name or m.user.email or 'Unknown' }}
+                </span>
+                <span class="sp-staff-role {% if m.user.role == 'admin' %}admin{% endif %}">{{ m.user.role|upper }}</span>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <span class="sp-grade" style="background:{{ m.grade_color }}22; color:{{ m.grade_color }}; border:1px solid {{ m.grade_color }};">
+                    {% if m.grade == 'excellent' %}⭐ {% elif m.grade == 'moderate' %}⚠️ {% elif m.grade == 'attention' %}🔴 {% endif %}
+                    {{ m.grade_label }}
+                </span>
+                {% if m.est_count > 0 %}
+                <a href="{{ url_for('admin.reassign_staff_clients', clerk_user_id=m.user.clerk_user_id) }}"
+                   class="btn btn-sm btn-outline-primary" style="font-size:0.68rem;">
+                    <i class="bi bi-arrow-left-right me-1"></i>Reassign
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="sp-metrics">
+            <div class="sp-metric clients">
+                <div class="sp-metric-label">Assigned Clients</div>
+                <div class="sp-metric-value">{{ m.est_count }}</div>
+                <div class="sp-metric-sub">establishments</div>
+            </div>
+            <div class="sp-metric filed">
+                <div class="sp-metric-label">Fully Compliant</div>
+                <div class="sp-metric-value" style="color:#16a34a;">{{ m.fully_filed }}</div>
+                <div class="sp-metric-sub">≥9 months filed</div>
+            </div>
+            <div class="sp-metric pending">
+                <div class="sp-metric-label">Partial / Pending</div>
+                <div class="sp-metric-value" style="color:#f59e0b;">{{ m.partial_filed + m.not_filed }}</div>
+                <div class="sp-metric-sub">{{ m.partial_filed }} partial + {{ m.not_filed }} none</div>
+            </div>
+            <div class="sp-metric compliance">
+                <div class="sp-metric-label">Compliance %</div>
+                <div class="sp-metric-value" style="color:{{ m.grade_color }};">
+                    {% if m.compliance_pct is not none %}{{ m.compliance_pct }}%{% else %}—{% endif %}
+                </div>
+                <div class="sp-metric-sub">full-filed / total</div>
+            </div>
+            <div class="sp-metric fees">
+                <div class="sp-metric-label">Fees Collected FY</div>
+                <div class="sp-metric-value" style="color:#059669;">₹ {{ "{:,.0f}".format(m.fees_collected) }}</div>
+                <div class="sp-metric-sub">Avg ₹{{ "{:,.0f}".format(m.avg_per_client) }}/client</div>
+            </div>
+        </div>
+
+        {% if m.est_count == 0 %}
+        <div class="sp-footer">
+            <span style="font-size: 0.72rem; color: #94a3b8;">
+                <i class="bi bi-info-circle me-1"></i>No clients assigned yet.
+            </span>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    {% if not staff_metrics %}
+    <div style="text-align:center; padding:40px; color:#94a3b8;">
+        No active staff users found.
+    </div>
+    {% endif %}
+</div>
+
+<!-- Insights -->
+<div style="background: #fefce8; border-left: 4px solid #d97706; border-radius: 8px; padding: 16px 20px; margin-top: 20px;">
+    <div style="font-size: 0.72rem; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 0.5px;">
+        <i class="bi bi-lightbulb me-1"></i>Strategic Insights
+    </div>
+    <div style="font-size: 0.78rem; color: #78350f; margin-top: 6px; line-height: 1.7;">
+        {% if unassigned_count > 0 %}
+            <strong>⚠️ {{ unassigned_count }} establishment(s) are unassigned</strong> — please assign them to staff for accountability.<br>
+        {% endif %}
+        {% set attention_staff = staff_metrics|selectattr('grade', 'equalto', 'attention')|list %}
+        {% if attention_staff %}
+            <strong>🔴 Action needed:</strong> {{ attention_staff|length }} staff member(s) have compliance below 70%. Consider workload review or training.<br>
+        {% endif %}
+        {% set excellent_staff = staff_metrics|selectattr('grade', 'equalto', 'excellent')|list %}
+        {% if excellent_staff %}
+            <strong>⭐ Top performers:</strong>
+            {{ excellent_staff|map(attribute='user.name')|join(', ') }} — consider appreciation / incentive.<br>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
