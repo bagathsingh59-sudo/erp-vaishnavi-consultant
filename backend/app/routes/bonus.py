@@ -8,13 +8,25 @@ from app.models.establishment import Establishment
 from app.models.employee import Employee
 from app.models.payroll import (MonthlyPayroll, PayrollEntry, PayrollEntryHead,
                                  SalaryHead, PayrollConfig)
-from app.user_context import user_establishments, verify_est_ownership, current_user_id
+from app.user_context import (user_establishments, verify_est_ownership, current_user_id,
+                               ensure_est_selected_for_user)
 from datetime import datetime, date
 import json
 import io
 import calendar
 
 bonus_bp = Blueprint('bonus', __name__)
+
+
+# ═════════════════════════════════════════════════════════════════
+# Before-request guard: NON-ADMIN users must have an establishment
+# selected before any bonus page. Admin is bypassed.
+# ═════════════════════════════════════════════════════════════════
+@bonus_bp.before_request
+def _bonus_require_establishment():
+    if request.path and '/api/' in request.path:
+        return None
+    return ensure_est_selected_for_user()
 
 
 # =====================================================

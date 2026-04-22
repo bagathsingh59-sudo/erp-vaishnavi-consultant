@@ -6,10 +6,23 @@ from app.models.payroll import (PayrollEntry, PayrollConfig, EmployeeSalary,
                                  EmployeeSalaryHead, SalaryHead, SalaryTemplate,
                                  MonthlyPayroll)
 from app.user_context import (current_user_id, is_admin, user_establishments,
-                               verify_est_ownership, get_user_est_ids, log_activity)
+                               verify_est_ownership, get_user_est_ids, log_activity,
+                               ensure_est_selected_for_user)
 from datetime import datetime, date
 
 employee_bp = Blueprint('employee', __name__)
+
+
+# ═════════════════════════════════════════════════════════════════
+# Before-request guard: NON-ADMIN users must have an establishment
+# selected before any employee page. Admin is bypassed.
+# AJAX endpoints (/api/) are skipped.
+# ═════════════════════════════════════════════════════════════════
+@employee_bp.before_request
+def _employee_require_establishment():
+    if request.path and '/api/' in request.path:
+        return None
+    return ensure_est_selected_for_user()
 
 
 @employee_bp.app_context_processor

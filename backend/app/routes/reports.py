@@ -5,13 +5,28 @@ from app.models.payroll import (PayrollConfig, SalaryHead, EmployeeSalary,
                                  PayrollEntryHead)
 from app.models.establishment import Establishment
 from app.models.employee import Employee
-from app.user_context import verify_est_ownership
+from app.user_context import verify_est_ownership, ensure_est_selected_for_user
 from datetime import datetime
 import calendar
 import io
 import math
 
 reports_bp = Blueprint('reports', __name__)
+
+
+# ═════════════════════════════════════════════════════════════════
+# Before-request guard: NON-ADMIN users must have an establishment
+# selected before any report page. Admin is bypassed.
+# ═════════════════════════════════════════════════════════════════
+@reports_bp.before_request
+def _reports_require_establishment():
+    if request.path and '/api/' in request.path:
+        return None
+    # reimbursement_multi handles cross-month selection internally
+    if request.endpoint == 'reports.reimbursement_multi':
+        return None
+    return ensure_est_selected_for_user()
+
 
 import re
 
