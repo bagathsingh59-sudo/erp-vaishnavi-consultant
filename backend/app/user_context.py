@@ -188,52 +188,24 @@ def set_owner(obj):
     return obj
 
 
-def ensure_est_selected_for_user():
+def capture_est_from_url():
     """
-    Enforce establishment selection for NON-ADMIN users on client-scoped pages.
+    Role-agnostic helper: if session['selected_est_id'] is missing but the
+    URL has ?establishment=X (or form field establishment_id), promote it
+    to session so subsequent navigation stays scoped.
 
-    Behavior:
-      - Admin: always returns None (no-op; admin uses session OR global views).
-      - User WITH session['selected_est_id']: returns None (pass through).
-      - User WITHOUT session but URL has ?establishment=X: sets session, pass through.
-      - User WITHOUT session AND only 1 accessible establishment: auto-select.
-      - User WITHOUT session AND multiple establishments: redirect to selection.
-      - User WITHOUT session AND zero establishments: redirect with warning.
-
-    Use as a Flask blueprint before_request handler:
-      @some_bp.before_request
-      def _require_est():
-          return ensure_est_selected_for_user()
+    Safe to call from any route. Does NOT check role. Does NOT redirect.
+    Used by templates that pass establishment=X in URLs as a fallback for
+    lost sessions — works identically for admin and user.
     """
-    from flask import session, request, flash, redirect, url_for
+    from flask import session, request
 
-    # Admin is never constrained
-    if is_admin():
-        return None
-
-    # Already have a selected establishment — pass through
     if session.get('selected_est_id'):
-        return None
+        return
 
-    # Fallback: URL query param carries the establishment id
     url_est = request.args.get('establishment') or request.form.get('establishment')
     if url_est and str(url_est).isdigit():
         session['selected_est_id'] = int(url_est)
-        return None
-
-    # Session missing and no URL hint — check accessible count
-    user_ids = get_user_est_ids()
-    if len(user_ids) == 0:
-        flash('No establishments are assigned to you yet. Please contact admin.', 'warning')
-        return redirect(url_for('establishment.establishment_list'))
-    elif len(user_ids) == 1:
-        # Only 1 establishment — auto-select it silently
-        session['selected_est_id'] = user_ids[0]
-        return None
-    else:
-        # Multiple — user must explicitly pick one
-        flash('Please click on an establishment first to work on it.', 'info')
-        return redirect(url_for('establishment.establishment_list'))
 
 
 def log_activity(action, entity_type, entity_id=None, entity_name=None,

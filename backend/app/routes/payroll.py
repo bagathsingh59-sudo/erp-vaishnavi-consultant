@@ -10,22 +10,19 @@ import calendar
 import math
 from app.user_context import (current_user_id, is_admin, user_establishments,
                                verify_est_ownership, get_user_est_ids, log_activity,
-                               ensure_est_selected_for_user)
+                               capture_est_from_url)
 
 payroll_bp = Blueprint('payroll', __name__)
 
 
-# ═════════════════════════════════════════════════════════════════
-# Before-request guard: NON-ADMIN users must have an establishment
-# selected before any payroll page/action. Admin is bypassed.
-# AJAX/API routes (under /api/) are skipped so JS calls still work.
-# ═════════════════════════════════════════════════════════════════
+# Role-agnostic hook: let ?establishment=X in URL restore session when lost.
+# Works identically for admin and user — no role branches.
 @payroll_bp.before_request
-def _payroll_require_establishment():
-    # Skip AJAX/JSON API endpoints — they handle errors differently
+def _capture_url_establishment():
     if request.path and '/api/' in request.path:
         return None
-    return ensure_est_selected_for_user()
+    capture_est_from_url()
+    return None
 
 
 # =============================================

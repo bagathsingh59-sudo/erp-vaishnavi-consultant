@@ -7,22 +7,20 @@ from app.models.payroll import (PayrollEntry, PayrollConfig, EmployeeSalary,
                                  MonthlyPayroll)
 from app.user_context import (current_user_id, is_admin, user_establishments,
                                verify_est_ownership, get_user_est_ids, log_activity,
-                               ensure_est_selected_for_user)
+                               capture_est_from_url)
 from datetime import datetime, date
 
 employee_bp = Blueprint('employee', __name__)
 
 
-# ═════════════════════════════════════════════════════════════════
-# Before-request guard: NON-ADMIN users must have an establishment
-# selected before any employee page. Admin is bypassed.
-# AJAX endpoints (/api/) are skipped.
-# ═════════════════════════════════════════════════════════════════
+# Role-agnostic hook: let ?establishment=X in URL restore session when lost.
+# Works identically for admin and user — no role branches.
 @employee_bp.before_request
-def _employee_require_establishment():
+def _capture_url_establishment():
     if request.path and '/api/' in request.path:
         return None
-    return ensure_est_selected_for_user()
+    capture_est_from_url()
+    return None
 
 
 @employee_bp.app_context_processor
