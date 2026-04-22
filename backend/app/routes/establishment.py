@@ -618,9 +618,14 @@ def establishment_add():
 
 @establishment_bp.route('/establishments/<int:id>')
 def establishment_view(id):
-    """View establishment details"""
+    """View establishment details.
+    Also scopes the session to this establishment — so 'View Details' acts
+    as an implicit 'work on this client' action, matching user expectation.
+    """
     establishment = Establishment.query.get_or_404(id)
     verify_est_ownership(establishment)
+    # Scope the session so subsequent Employees/Payroll pages filter correctly
+    session['selected_est_id'] = establishment.id
     config = PayrollConfig.query.filter_by(establishment_id=establishment.id).first()
     sf = _build_stat_flags(config)
     from datetime import date as _date

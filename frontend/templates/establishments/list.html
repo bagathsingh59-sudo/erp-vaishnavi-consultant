@@ -76,8 +76,9 @@
                 <tr>
                     <td style="color:var(--text-light);">{{ loop.index }}</td>
                     <td>
-                        <a href="{{ url_for('establishment.establishment_view', id=est.id) }}"
-                           class="text-decoration-none company-name-cell">
+                        <a href="{{ url_for('establishment.select_establishment', est_id=est.id) }}"
+                           class="text-decoration-none company-name-cell"
+                           title="Click to start working on this client">
                             {{ est.company_name }}
                         </a>
                         {% if est.type_of_industry %}
