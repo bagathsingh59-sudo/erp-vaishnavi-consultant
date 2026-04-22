@@ -3,13 +3,19 @@ Loan Account Routes
 =====================
 Manage staff advances, client loans, business loans.
 Each loan tracks EMI schedule, payments, and auto-closes when fully paid.
+
+IMPORTANT terminology in this codebase:
+  - "Staff" = Vaishnavi Consultant's own 5 firm members (AppUser table)
+  - "Employee" = Client workers for payroll processing (Employee table)
+  - "Staff Advance" loans link to AppUser via staff_user_id (Clerk user_id)
+  - "Client Loan" loans link to Establishment via establishment_id
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from app import db
 from app.models.loan import LoanAccount, LoanPayment, calculate_emi
-from app.models.employee import Employee
 from app.models.establishment import Establishment
+from app.models.app_user import AppUser
 from app.auth import login_required
 from app.user_context import (current_user_id, current_user_name, is_admin,
                                user_establishments, set_owner)
@@ -109,19 +115,12 @@ def loan_edit(loan_id):
 
 
 def _render_loan_form(loan=None):
-    from app.models.establishment import Establishment
-    from app.models.employee import Employee
+    # Firm staff (AppUser) — the 5 users of Vaishnavi Consultant software.
+    # "Staff Advance" loans link to these people, NOT to client workers.
+    staff_users = AppUser.query.filter_by(is_active=True)\
+        .order_by(AppUser.name).all()
 
-    # Only active employees + establishments for dropdown
-    employees = Employee.query.filter_by(is_active=True)\
-        .order_by(Employee.name).all() if is_admin() else []
-    if not is_admin():
-        # Scope to user
-        uid = current_user_id()
-        employees = Employee.query.filter_by(is_active=True)\
-            .filter(Employee.owner_id == uid)\
-            .order_by(Employee.name).all()
-
+    # Clients (Establishments) — borrowers for "Client Loan" type.
     establishments = user_establishments(
         Establishment.query.filter_by(is_active=True)
     ).order_by(Establishment.company_name).all()
@@ -131,7 +130,7 @@ def _render_loan_form(loan=None):
 
     return render_template('loan/form.html',
                            loan=loan,
-                           employees=employees,
+                           staff_users=staff_users,
                            establishments=establishments,
                            preselect_type=preselect,
                            today=date.today())
@@ -146,13 +145,28 @@ def _save_loan(loan=None):
     loan.loan_type = request.form.get('loan_type', 'staff_advance')
     loan.party_name = (request.form.get('party_name') or '').strip()
 
-    # Optional linkage
-    emp_id = request.form.get('employee_id')
-    loan.employee_id = int(emp_id) if emp_id and emp_id.isdigit() else None
+    # Optional linkage:
+    #   staff_user_id → AppUser (firm staff)    [Staff Advance]
+    #   establishment_id → Establishment (client) [Client Loan]
+    staff_uid = (request.form.get('staff_user_id') or '').strip()
+    loan.staff_user_id = staff_uid or None
+    # Clear legacy employee_id to avoid confusion
+    loan.employee_id = None
+
     est_id = request.form.get('establishment_id')
     loan.establishment_id = int(est_id) if est_id and est_id.isdigit() else None
 
     loan.party_phone = (request.form.get('party_phone') or '').strip() or None
+
+    # Auto-populate party_name from staff/establishment if empty but linked
+    if not loan.party_name and loan.staff_user_id:
+        su = AppUser.query.filter_by(clerk_user_id=loan.staff_user_id).first()
+        if su:
+            loan.party_name = su.name or su.email or 'Staff'
+    if not loan.party_name and loan.establishment_id:
+        est = Establishment.query.get(loan.establishment_id)
+        if est:
+            loan.party_name = est.display_name
 
     # Loan terms
     loan.principal_amount = _parse_float(request.form.get('principal_amount'))

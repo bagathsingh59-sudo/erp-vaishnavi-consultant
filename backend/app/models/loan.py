@@ -28,8 +28,13 @@ class LoanAccount(db.Model):
 
     # Party (borrower or lender)
     party_name = db.Column(db.String(200), nullable=False)
+
     # Optional links to existing records
-    employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=True)
+    # IMPORTANT: For "Staff Advance", use staff_user_id (Clerk user_id) — links to AppUser.
+    #            For "Client Loan", use establishment_id — links to Establishment.
+    #            employee_id is LEGACY (client worker) — not used for new loans.
+    staff_user_id = db.Column(db.String(100), nullable=True, index=True)    # AppUser.clerk_user_id
+    employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=True)   # LEGACY
     establishment_id = db.Column(db.Integer, db.ForeignKey('establishments.id'), nullable=True)
     party_phone = db.Column(db.String(15), nullable=True)
 
@@ -60,11 +65,27 @@ class LoanAccount(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    employee = db.relationship('Employee', foreign_keys=[employee_id], lazy=True)
+    employee = db.relationship('Employee', foreign_keys=[employee_id], lazy=True)   # LEGACY
     establishment = db.relationship('Establishment', foreign_keys=[establishment_id], lazy=True)
     payments = db.relationship('LoanPayment', backref='loan',
                                 lazy='dynamic', cascade='all, delete-orphan',
                                 order_by='LoanPayment.payment_date.desc()')
+
+    @property
+    def staff_user(self):
+        """Look up the AppUser (firm staff member) for this loan, if staff_user_id is set."""
+        if not self.staff_user_id:
+            return None
+        from app.models.app_user import AppUser
+        return AppUser.query.filter_by(clerk_user_id=self.staff_user_id).first()
+
+    @property
+    def staff_name(self):
+        """Human-readable staff name (or None)."""
+        u = self.staff_user
+        if u:
+            return u.name or u.email or 'Staff'
+        return None
 
     @property
     def loan_type_display(self):

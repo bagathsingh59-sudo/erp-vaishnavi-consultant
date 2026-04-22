@@ -379,6 +379,7 @@ def _auto_migrate_columns(db):
         ('payroll_entries', 'rate_overrides', 'TEXT'),
         ('establishments', 'bonus_min_wage', 'FLOAT'),
         ('establishments', 'assigned_to_id', 'VARCHAR(100)'),
+        ('loan_accounts', 'staff_user_id', 'VARCHAR(100)'),
     ]
     for table, column, col_def in migrations:
         try:

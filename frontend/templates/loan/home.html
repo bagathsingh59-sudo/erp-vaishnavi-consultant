@@ -126,7 +126,7 @@
                 <td>
                     <div class="ln-party">{{ l.party_name }}</div>
                     <div class="ln-party-sub">
-                        {% if l.employee %}<i class="bi bi-person me-1"></i>{{ l.employee.name }}{% endif %}
+                        {% if l.staff_name %}<i class="bi bi-person-badge me-1"></i>Firm Staff: {{ l.staff_name }}{% endif %}
                         {% if l.establishment %}<i class="bi bi-building me-1"></i>{{ l.establishment.company_name }}{% endif %}
                         {% if l.purpose %}· {{ l.purpose[:50] }}{% endif %}
                     </div>

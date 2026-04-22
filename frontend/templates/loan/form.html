@@ -114,15 +114,24 @@
 
                     <div class="ln-row cols-2" id="linkStaffRow" style="display:none;">
                         <div>
-                            <label class="ln-label">Link to Employee (optional)</label>
-                            <select name="employee_id" class="ln-select">
+                            <label class="ln-label">
+                                Select Staff Member (firm staff)
+                                <span style="font-size:0.6rem; color:#64748b; font-weight:400;">
+                                    — Vaishnavi Consultant's staff, not client employees
+                                </span>
+                            </label>
+                            <select name="staff_user_id" class="ln-select">
                                 <option value="">— Not linked —</option>
-                                {% for e in employees %}
-                                <option value="{{ e.id }}" {% if loan and loan.employee_id == e.id %}selected{% endif %}>
-                                    {{ e.name }}
+                                {% for u in staff_users %}
+                                <option value="{{ u.clerk_user_id }}" {% if loan and loan.staff_user_id == u.clerk_user_id %}selected{% endif %}>
+                                    {{ u.name or u.email or 'Staff' }} ({{ u.role|upper }})
                                 </option>
                                 {% endfor %}
                             </select>
+                            <div style="font-size:0.62rem; color:#94a3b8; margin-top:4px;">
+                                <i class="bi bi-info-circle"></i>
+                                Selecting here auto-fills the Party Name above if left blank.
+                            </div>
                         </div>
                     </div>
 
