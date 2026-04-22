@@ -1235,17 +1235,23 @@ def payroll_create():
     # ── GUARD: Non-admin users must have an establishment selected ──
     # Admin behaviour is untouched.
     if not is_admin() and not selected_est_id:
-        user_ids = get_user_est_ids()
-        if len(user_ids) == 0:
-            flash('No establishments assigned to you yet.', 'warning')
-            return redirect(url_for('establishment.establishment_list'))
-        elif len(user_ids) == 1:
-            # Auto-select the only one
-            session['selected_est_id'] = user_ids[0]
-            selected_est_id = user_ids[0]
+        # Accept URL param as fallback if session lost
+        url_est = request.args.get('establishment') or request.form.get('establishment_id')
+        if url_est and str(url_est).isdigit():
+            session['selected_est_id'] = int(url_est)
+            selected_est_id = int(url_est)
         else:
-            flash('Please click on an establishment first to create a new payroll for it.', 'info')
-            return redirect(url_for('establishment.establishment_list'))
+            user_ids = get_user_est_ids()
+            if len(user_ids) == 0:
+                flash('No establishments assigned to you yet.', 'warning')
+                return redirect(url_for('establishment.establishment_list'))
+            elif len(user_ids) == 1:
+                # Auto-select the only one
+                session['selected_est_id'] = user_ids[0]
+                selected_est_id = user_ids[0]
+            else:
+                flash('Please click on an establishment first to create a new payroll for it.', 'info')
+                return redirect(url_for('establishment.establishment_list'))
 
     if request.method == 'POST':
         est_id = int(request.form.get('establishment_id') or selected_est_id or 0)

@@ -79,7 +79,7 @@
                 <span>Establishment Info</span>
             </a>
 
-            <a href="{{ url_for('employee.employee_list') }}"
+            <a href="{{ url_for('employee.employee_list', establishment=selected_est.id) }}"
                class="sidebar-link {% if request.endpoint and 'employee' in request.endpoint %}active{% endif %}">
                 <i class="bi bi-people"></i>
                 <span>Employees</span>
@@ -121,13 +121,13 @@
 
             <div class="sidebar-section-title">REPORTS</div>
 
-            <a href="{{ url_for('reports.quick_reports') }}"
+            <a href="{{ url_for('reports.quick_reports', establishment=selected_est.id) }}"
                class="sidebar-link {% if request.endpoint == 'reports.quick_reports' %}active{% endif %}">
                 <i class="bi bi-lightning-charge-fill"></i>
                 <span>Quick Reports</span>
             </a>
 
-            <a href="{{ url_for('reports.bulk_bd') }}"
+            <a href="{{ url_for('reports.bulk_bd', establishment=selected_est.id) }}"
                class="sidebar-link {% if request.endpoint == 'reports.bulk_bd' %}active{% endif %}">
                 <i class="bi bi-file-earmark-pdf-fill"></i>
                 <span>Bulk Form B+D PDF</span>
@@ -402,10 +402,10 @@
             <a href="{{ url_for('establishment.client_dashboard') }}" class="btn btn-sm btn-outline-primary" style="font-size:0.72rem; padding:2px 10px;">
                 <i class="bi bi-speedometer2 me-1"></i>{{ selected_est.display_name }}
             </a>
-            <a href="{{ url_for('payroll.payroll_list') }}" class="btn btn-sm btn-outline-secondary" style="font-size:0.72rem; padding:2px 10px;">
+            <a href="{{ url_for('payroll.payroll_list', establishment=selected_est.id) }}" class="btn btn-sm btn-outline-secondary" style="font-size:0.72rem; padding:2px 10px;">
                 <i class="bi bi-calculator me-1"></i>Payroll
             </a>
-            <a href="{{ url_for('employee.employee_list') }}" class="btn btn-sm btn-outline-secondary" style="font-size:0.72rem; padding:2px 10px;">
+            <a href="{{ url_for('employee.employee_list', establishment=selected_est.id) }}" class="btn btn-sm btn-outline-secondary" style="font-size:0.72rem; padding:2px 10px;">
                 <i class="bi bi-people me-1"></i>Employees
             </a>
             {% endif %}

@@ -76,6 +76,14 @@ QUICK_REPORT_TYPES = [
 def quick_reports():
     """Dynamic report launcher — pick month + year + report type and jump."""
     selected_est_id = session.get('selected_est_id')
+
+    # Fallback: accept establishment via URL param if session lost
+    if not selected_est_id:
+        url_est = request.args.get('establishment') or request.form.get('establishment')
+        if url_est and str(url_est).isdigit():
+            selected_est_id = int(url_est)
+            session['selected_est_id'] = selected_est_id
+
     if not selected_est_id:
         flash('Please select an establishment first to use Quick Reports.', 'info')
         return redirect(url_for('establishment.establishment_list'))

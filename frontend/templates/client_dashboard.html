@@ -202,7 +202,7 @@
                 </h6>
                 <div class="d-grid gap-2">
                     <!-- PRIMARY: Salary Processing (single entry point) -->
-                    <a href="{{ url_for('payroll.payroll_list') }}" class="btn btn-success btn-sm text-start" style="padding:10px 14px; font-weight:600;">
+                    <a href="{{ url_for('payroll.payroll_list', establishment=est.id) }}" class="btn btn-success btn-sm text-start" style="padding:10px 14px; font-weight:600;">
                         <i class="bi bi-calculator me-2" style="font-size:1rem;"></i>Salary Processing
                         <span style="float:right; opacity:0.7; font-size:0.65rem; margin-top:2px;">Create & Manage</span>
                     </a>
@@ -210,7 +210,7 @@
                     <hr style="margin:4px 0; border-color:#e2e8f0;">
 
                     <!-- Employees -->
-                    <a href="{{ url_for('employee.employee_list') }}" class="btn btn-outline-primary btn-sm text-start">
+                    <a href="{{ url_for('employee.employee_list', establishment=est.id) }}" class="btn btn-outline-primary btn-sm text-start">
                         <i class="bi bi-people me-2"></i>View Employees
                     </a>
                     <a href="{{ url_for('employee.employee_add', establishment_id=est.id) }}" class="btn btn-outline-primary btn-sm text-start">
