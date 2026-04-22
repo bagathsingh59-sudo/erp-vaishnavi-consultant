@@ -1154,11 +1154,33 @@ def salary_revision_percentage(est_id):
 
 @payroll_bp.route('/payroll')
 def payroll_list():
-    """List all monthly payrolls — supports FY (Apr-Mar) filtering"""
+    """List all monthly payrolls — supports FY (Apr-Mar) filtering.
+    For non-admin users: requires an establishment to be selected, so data
+    never appears merged across multiple clients."""
     # Auto-scope to selected establishment
     scoped_est_id = session.get('selected_est_id')
     est_id = request.args.get('establishment', '')
     tab = request.args.get('tab', 'payroll')
+
+    # ── GUARD: Non-admin users must work inside ONE establishment at a time ──
+    # Admin behaviour is untouched — admin can see all payrolls merged.
+    if not is_admin() and not scoped_est_id:
+        # Accept URL param as fallback if session lost
+        if est_id and est_id.isdigit():
+            session['selected_est_id'] = int(est_id)
+            scoped_est_id = int(est_id)
+        else:
+            user_ids = get_user_est_ids()
+            if len(user_ids) == 0:
+                flash('No establishments assigned to you yet.', 'warning')
+                return redirect(url_for('establishment.establishment_list'))
+            elif len(user_ids) == 1:
+                # Auto-select the only one
+                session['selected_est_id'] = user_ids[0]
+                scoped_est_id = user_ids[0]
+            else:
+                flash('Please click on an establishment first to process its payroll.', 'info')
+                return redirect(url_for('establishment.establishment_list'))
 
     # Financial Year logic: FY 2025-26 = April 2025 to March 2026
     now = datetime.now()
@@ -1209,6 +1231,21 @@ def payroll_create():
     """Create a new monthly payroll"""
     # Use selected establishment from session (no dropdown needed)
     selected_est_id = session.get('selected_est_id')
+
+    # ── GUARD: Non-admin users must have an establishment selected ──
+    # Admin behaviour is untouched.
+    if not is_admin() and not selected_est_id:
+        user_ids = get_user_est_ids()
+        if len(user_ids) == 0:
+            flash('No establishments assigned to you yet.', 'warning')
+            return redirect(url_for('establishment.establishment_list'))
+        elif len(user_ids) == 1:
+            # Auto-select the only one
+            session['selected_est_id'] = user_ids[0]
+            selected_est_id = user_ids[0]
+        else:
+            flash('Please click on an establishment first to create a new payroll for it.', 'info')
+            return redirect(url_for('establishment.establishment_list'))
 
     if request.method == 'POST':
         est_id = int(request.form.get('establishment_id') or selected_est_id or 0)

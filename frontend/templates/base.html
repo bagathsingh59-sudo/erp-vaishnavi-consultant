@@ -93,13 +93,13 @@
 
             <div class="sidebar-section-title">PAYROLL</div>
 
-            <a href="{{ url_for('payroll.payroll_list') }}"
+            <a href="{{ url_for('payroll.payroll_list', establishment=selected_est.id) }}"
                class="sidebar-link {% if request.endpoint and 'payroll' in request.endpoint and request.args.get('tab', 'payroll') == 'payroll' and request.endpoint == 'payroll.payroll_list' %}active{% endif %}">
                 <i class="bi bi-calculator"></i>
                 <span>Salary Processing</span>
             </a>
 
-            <a href="{{ url_for('payroll.payroll_list', tab='payslips') }}"
+            <a href="{{ url_for('payroll.payroll_list', tab='payslips', establishment=selected_est.id) }}"
                class="sidebar-link {% if request.args.get('tab') == 'payslips' %}active{% endif %}">
                 <i class="bi bi-receipt"></i>
                 <span>Pay Slips</span>
@@ -107,13 +107,13 @@
 
             <div class="sidebar-section-title">COMPLIANCE</div>
 
-            <a href="{{ url_for('payroll.payroll_list', tab='epf') }}"
+            <a href="{{ url_for('payroll.payroll_list', tab='epf', establishment=selected_est.id) }}"
                class="sidebar-link {% if request.args.get('tab') == 'epf' %}active{% endif %}">
                 <i class="bi bi-shield-check"></i>
                 <span>EPF Returns</span>
             </a>
 
-            <a href="{{ url_for('payroll.payroll_list', tab='esic') }}"
+            <a href="{{ url_for('payroll.payroll_list', tab='esic', establishment=selected_est.id) }}"
                class="sidebar-link {% if request.args.get('tab') == 'esic' %}active{% endif %}">
                 <i class="bi bi-hospital"></i>
                 <span>ESIC Returns</span>
@@ -141,19 +141,19 @@
 
             {# Document Vault — disabled for now, will enable after 3-6 months #}
 
-            <a href="{{ url_for('payroll.payroll_list', tab='reports') }}"
+            <a href="{{ url_for('payroll.payroll_list', tab='reports', establishment=selected_est.id) }}"
                class="sidebar-link {% if request.args.get('tab') == 'reports' %}active{% endif %}">
                 <i class="bi bi-file-earmark-bar-graph"></i>
                 <span>Reports</span>
             </a>
 
-            <a href="{{ url_for('payroll.payroll_list', tab='compliance') }}"
+            <a href="{{ url_for('payroll.payroll_list', tab='compliance', establishment=selected_est.id) }}"
                class="sidebar-link {% if request.args.get('tab') == 'compliance' %}active{% endif %}">
                 <i class="bi bi-clipboard-data"></i>
                 <span>Compliance Statement</span>
             </a>
 
-            <a href="{{ url_for('payroll.payroll_list', tab='reimbursement') }}"
+            <a href="{{ url_for('payroll.payroll_list', tab='reimbursement', establishment=selected_est.id) }}"
                class="sidebar-link {% if request.args.get('tab') == 'reimbursement' %}active{% endif %}">
                 <i class="bi bi-envelope-paper"></i>
                 <span>Reimbursement</span>
