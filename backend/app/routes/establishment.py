@@ -186,10 +186,15 @@ def dashboard():
     # Sort: expired first, then by days_left ascending
     license_alerts.sort(key=lambda x: x['days_left'])
 
-    # ── Current Month Progress (how many drafts/processing for this month) ──
+    # ── Current WAGE Month Progress (previous calendar month — what's
+    # actually being processed/filed right now). Shows drafts/processing
+    # for the wage month, not the running calendar month (which has no
+    # payroll yet because wages aren't earned yet). ──
+    from app.utils.date_helpers import current_wage_month
+    wm_year, wm_month = current_wage_month()
     current_month_payrolls = MonthlyPayroll.query.filter(
-        MonthlyPayroll.month == now.month,
-        MonthlyPayroll.year == now.year,
+        MonthlyPayroll.month == wm_month,
+        MonthlyPayroll.year == wm_year,
         MonthlyPayroll.establishment_id.in_(user_est_ids) if user_est_ids else False
     ).all()
     current_month_draft = sum(1 for p in current_month_payrolls if p.status == 'draft')
@@ -245,8 +250,8 @@ def dashboard():
                            acc_esic_pending=round(acc_esic_pending),
                            acc_tds_balance=round(acc_tds_balance),
                            license_alerts=license_alerts,
-                           cur_month_name=cal.month_name[now.month],
-                           cur_year=now.year,
+                           cur_month_name=cal.month_name[wm_month],
+                           cur_year=wm_year,
                            cur_month_draft=current_month_draft,
                            cur_month_processing=current_month_processing,
                            cur_month_finalized=current_month_finalized,

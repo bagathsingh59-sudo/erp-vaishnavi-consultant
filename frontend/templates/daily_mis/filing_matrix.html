@@ -309,16 +309,34 @@
 </div>
 
 <script>
+// Wage month = previous calendar month. Use this for range "to" so the
+// matrix never includes the running calendar month (those wages aren't
+// yet payable).
+function getWageMonth() {
+    const now = new Date();
+    let y = now.getFullYear();
+    let m = now.getMonth() + 1;  // 1-12
+    m = m - 1;
+    if (m < 1) { m = 12; y = y - 1; }
+    return { year: y, month: m };
+}
+
 function setRange(preset) {
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth() + 1; // 1-12
+    const wage = getWageMonth();       // previous calendar month
     let fromY, fromM, toY, toM;
 
     if (preset === 'fy_current') {
+        // FY start → CURRENT WAGE MONTH (not Mar of next year, which is future)
         const fyStart = month >= 4 ? year : year - 1;
         fromY = fyStart; fromM = 4;
-        toY = fyStart + 1; toM = 3;
+        toY = wage.year; toM = wage.month;
+        // Guard: if wage month is before FY start, clamp
+        if (toY < fromY || (toY === fromY && toM < fromM)) {
+            toY = fromY; toM = fromM;
+        }
     } else if (preset === 'fy_previous') {
         const fyStart = month >= 4 ? year - 1 : year - 2;
         fromY = fyStart; fromM = 4;
@@ -326,10 +344,15 @@ function setRange(preset) {
     } else if (preset === 'q_current') {
         const qStart = Math.floor((month - 1) / 3) * 3 + 1;
         fromY = year; fromM = qStart;
-        toY = year; toM = qStart + 2;
+        // Quarter end → current wage month (don't include running month)
+        toY = wage.year; toM = wage.month;
+        if (toY < fromY || (toY === fromY && toM < fromM)) {
+            toY = fromY; toM = fromM;
+        }
     } else if (preset === 'last_6') {
-        toY = year; toM = month;
-        const d = new Date(year, month - 7, 1);
+        // End at wage month, go back 6 months
+        toY = wage.year; toM = wage.month;
+        const d = new Date(toY, toM - 6, 1);  // toM - 6 gives 6 months inclusive
         fromY = d.getFullYear(); fromM = d.getMonth() + 1;
     }
     const pad = (n) => n.toString().padStart(2, '0');

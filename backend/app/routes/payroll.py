@@ -11,6 +11,7 @@ import math
 from app.user_context import (current_user_id, is_admin, user_establishments,
                                verify_est_ownership, get_user_est_ids, log_activity,
                                capture_est_from_url)
+from app.utils.date_helpers import current_wage_month
 
 payroll_bp = Blueprint('payroll', __name__)
 
@@ -1360,10 +1361,13 @@ def payroll_create():
             previous_payrolls = MonthlyPayroll.query.filter_by(
                 establishment_id=est.id
             ).order_by(MonthlyPayroll.year.desc(), MonthlyPayroll.month.desc()).all()
+            # Default to WAGE MONTH (previous calendar month) — you can't
+            # process contributions for a running month in advance.
+            wage_year, wage_month = current_wage_month()
             return render_template('payroll/create.html',
                                    establishment=est,
-                                   current_month=now.month,
-                                   current_year=now.year,
+                                   current_month=wage_month,
+                                   current_year=wage_year,
                                    previous_payrolls=previous_payrolls)
 
     # No establishment selected — redirect to establishment list

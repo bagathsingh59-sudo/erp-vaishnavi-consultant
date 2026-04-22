@@ -6,6 +6,7 @@ from app.models.payroll import (PayrollConfig, SalaryHead, EmployeeSalary,
 from app.models.establishment import Establishment
 from app.models.employee import Employee
 from app.user_context import verify_est_ownership, capture_est_from_url
+from app.utils.date_helpers import current_wage_month
 from datetime import datetime
 import calendar
 import io
@@ -153,11 +154,14 @@ def quick_reports():
     for key, label, endpoint, category in QUICK_REPORT_TYPES:
         grouped.setdefault(category, []).append((key, label))
 
+    # Default to WAGE MONTH (previous calendar month) — reports are for
+    # completed wage periods, not the running month.
+    wage_year, wage_month = current_wage_month()
     return render_template('reports/quick_reports.html',
                            est=est,
                            year_range=year_range,
-                           current_month=now.month,
-                           current_year=current_year,
+                           current_month=wage_month,
+                           current_year=wage_year,
                            existing_set=existing_set,
                            payrolls=payrolls,
                            grouped_reports=grouped)

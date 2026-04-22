@@ -646,15 +646,26 @@ def filing_matrix():
     from app.models.payroll import MonthlyPayroll
     from app.models.accounts import Voucher, VoucherEntry, AccountHead
 
+    from app.utils.date_helpers import current_wage_month
+
     # ── Parse date range (month-level, YYYY-MM format) ──
     from_str = request.args.get('from', '')
     to_str = request.args.get('to', '')
     today = date.today()
 
-    # Default: current Financial Year (Apr YYYY to Mar YYYY+1)
+    # Default range: start of current FY (Apr YYYY) → current WAGE month.
+    # Rationale: contributions for the running calendar month can't be paid
+    # yet, so the matrix should NOT include future / current-uncompleted
+    # months. The last meaningful wage month is the previous calendar month.
     current_fy_start = today.year if today.month >= 4 else today.year - 1
+    wage_y, wage_m = current_wage_month(today)
     default_from = date(current_fy_start, 4, 1)
-    default_to = date(current_fy_start + 1, 3, 1)
+    default_to = date(wage_y, wage_m, 1)
+
+    # Safety: if wage month is before FY start (e.g., today is exactly Apr 1),
+    # clamp "to" to match "from" so the range is at least 1 month.
+    if default_to < default_from:
+        default_to = default_from
 
     try:
         if from_str:
