@@ -104,47 +104,96 @@ body {
     flex: 1;
 }
 
+/* =============================================
+   SIDEBAR NAVIGATION — Professional dark theme
+   Idle:   soft slate text, muted icons
+   Hover:  subtle indigo wash + left accent + bright text
+   Active: rich indigo gradient + glow + bold white text
+   ============================================= */
+
 .sidebar-section-title {
-    font-size: 0.65rem;
-    font-weight: 600;
-    color: rgba(255,255,255,0.3);
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #64748b;                              /* slate-500 — visible but secondary */
     text-transform: uppercase;
-    letter-spacing: 0.12em;
-    padding: 20px 16px 8px;
+    letter-spacing: 0.14em;
+    padding: 22px 16px 10px 20px;
 }
 
 .sidebar-link {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 16px;
-    color: #fff !important;               /* Primary text color — pure white (overrides inline category colors) */
+    padding: 9px 14px 9px 16px;
+    color: #cbd5e1;                              /* slate-300 — easy on eyes, professional */
     text-decoration: none;
-    border-radius: var(--radius-sm);
-    font-size: 0.875rem;
+    border-radius: 8px;
+    font-size: 0.82rem;
     font-weight: 500;
-    transition: var(--transition);
+    letter-spacing: 0.01em;
+    transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
     margin-bottom: 2px;
     position: relative;
+    border-left: 3px solid transparent;          /* reserves space for active accent */
+    overflow: hidden;
 }
 
+/* Hover: gentle indigo wash, brighten text, slight rightward slide */
 .sidebar-link:hover {
-    background: rgba(255,255,255,0.1);
-    color: #fff !important;
+    background: linear-gradient(90deg,
+        rgba(99, 102, 241, 0.14) 0%,
+        rgba(99, 102, 241, 0.06) 100%);
+    color: #f1f5f9 !important;                   /* slate-100 */
+    border-left-color: rgba(165, 180, 252, 0.5); /* indigo-300 soft */
+    transform: translateX(2px);
 }
 
+.sidebar-link:hover i {
+    color: #e0e7ff !important;                   /* indigo-100 icons on hover */
+    transform: scale(1.05);
+}
+
+/* ACTIVE: Rich indigo gradient, bold white, prominent accent + glow */
 .sidebar-link.active {
-    background: #fff !important;          /* Selected background — white */
-    color: #000 !important;                /* Selected text — black */
-    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 60%, #818cf8 100%) !important;
+    color: #ffffff !important;
     font-weight: 600;
+    border-left: 3px solid #fbbf24 !important;   /* warm gold accent — "you are here" */
+    box-shadow:
+        0 4px 14px rgba(79, 70, 229, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+    transform: translateX(0);
+    letter-spacing: 0.015em;
 }
 
+/* Active link icon: white + slightly brighter */
+.sidebar-link.active i {
+    color: #ffffff !important;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
+    transform: scale(1.05);
+}
+
+/* Subtle chevron indicator on active (right side) */
+.sidebar-link.active::after {
+    content: '';
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    width: 6px;
+    height: 6px;
+    border-top: 2px solid rgba(255, 255, 255, 0.85);
+    border-right: 2px solid rgba(255, 255, 255, 0.85);
+    transform: translateY(-50%) rotate(45deg);
+}
+
+/* Icons default: follow text color smoothly, inline colors still work for categories */
 .sidebar-link i {
-    font-size: 1.1rem;
+    font-size: 1.05rem;
     width: 22px;
     text-align: center;
-    color: inherit !important;             /* Icon follows text color (white default, black when active) */
+    transition: color 0.22s ease, transform 0.22s ease;
+    opacity: 0.92;
 }
 
 .sidebar-link.disabled-link {
