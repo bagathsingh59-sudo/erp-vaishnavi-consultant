@@ -118,7 +118,7 @@ body {
     align-items: center;
     gap: 12px;
     padding: 10px 16px;
-    color: rgba(255,255,255,0.65);
+    color: #fff !important;               /* Primary text color — pure white (overrides inline category colors) */
     text-decoration: none;
     border-radius: var(--radius-sm);
     font-size: 0.875rem;
@@ -129,20 +129,22 @@ body {
 }
 
 .sidebar-link:hover {
-    background: var(--sidebar-hover);
-    color: #fff;
+    background: rgba(255,255,255,0.1);
+    color: #fff !important;
 }
 
 .sidebar-link.active {
-    background: var(--sidebar-active);
-    color: #fff;
-    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.4);
+    background: #fff !important;          /* Selected background — white */
+    color: #000 !important;                /* Selected text — black */
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    font-weight: 600;
 }
 
 .sidebar-link i {
     font-size: 1.1rem;
     width: 22px;
     text-align: center;
+    color: inherit !important;             /* Icon follows text color (white default, black when active) */
 }
 
 .sidebar-link.disabled-link {
