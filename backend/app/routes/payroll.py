@@ -1221,8 +1221,16 @@ def payroll_list():
 @payroll_bp.route('/payroll/create', methods=['GET', 'POST'])
 def payroll_create():
     """Create a new monthly payroll.
-    Establishment enforcement done by blueprint before_request guard."""
+    Establishment is taken from session; URL param and form field serve as
+    fallbacks when session is lost (same logic for admin and user)."""
     selected_est_id = session.get('selected_est_id')
+
+    # Explicit fallback — URL query param or form field (role-agnostic)
+    if not selected_est_id:
+        url_est = request.args.get('establishment') or request.form.get('establishment_id')
+        if url_est and str(url_est).isdigit():
+            selected_est_id = int(url_est)
+            session['selected_est_id'] = selected_est_id
 
     if request.method == 'POST':
         est_id = int(request.form.get('establishment_id') or selected_est_id or 0)

@@ -122,7 +122,7 @@
             <div class="alert alert-info py-2 mb-0" style="font-size:0.85rem;">
                 <i class="bi bi-info-circle me-1"></i>
                 No payroll batches exist for this establishment yet.
-                <a href="{{ url_for('payroll.payroll_create') }}" class="fw-bold">Create one now →</a>
+                <a href="{{ url_for('payroll.payroll_create', establishment=est.id) }}" class="fw-bold">Create one now →</a>
             </div>
         {% endif %}
     </div>

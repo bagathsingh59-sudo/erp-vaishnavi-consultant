@@ -44,7 +44,7 @@
                     </span>
 
                     {% if active_tab == 'payroll' %}
-                    <a href="{{ url_for('payroll.payroll_create') }}" class="btn btn-primary btn-sm">
+                    <a href="{{ url_for('payroll.payroll_create', establishment=selected_est_filter) }}" class="btn btn-primary btn-sm">
                         <i class="bi bi-plus-lg me-1"></i>New Payroll
                     </a>
                     {% endif %}
@@ -489,11 +489,11 @@
             {% endif %}
         </p>
         {% if active_tab == 'payroll' %}
-        <a href="{{ url_for('payroll.payroll_create') }}" class="btn btn-primary">
+        <a href="{{ url_for('payroll.payroll_create', establishment=selected_est_filter) }}" class="btn btn-primary">
             <i class="bi bi-plus-lg me-2"></i>Create Payroll
         </a>
         {% else %}
-        <a href="{{ url_for('payroll.payroll_list') }}" class="btn btn-outline-primary">
+        <a href="{{ url_for('payroll.payroll_list', establishment=selected_est_filter) }}" class="btn btn-outline-primary">
             <i class="bi bi-arrow-left me-2"></i>Go to Salary Processing
         </a>
         {% endif %}
