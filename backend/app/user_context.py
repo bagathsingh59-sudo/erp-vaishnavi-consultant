@@ -118,15 +118,22 @@ def verify_est_ownership(establishment):
     """
     Verify that the current user can access the given establishment.
     Admin: always True.
-    User: checks owner_id match.
+    User: access allowed if they CREATED it (owner_id) OR admin assigned it to them (assigned_to_id).
     """
     if is_admin():
         return True
 
     uid = current_user_id()
-    if not uid or establishment.owner_id != uid:
+    if not uid:
         abort(403)
-    return True
+
+    # User is allowed if they are the creator OR the current handler
+    if establishment.owner_id == uid:
+        return True
+    if getattr(establishment, 'assigned_to_id', None) == uid:
+        return True
+
+    abort(403)
 
 
 def verify_voucher_ownership(voucher):
@@ -148,16 +155,25 @@ def get_user_est_ids():
     """
     Get list of establishment IDs accessible to the current user.
     Admin: return ALL establishment IDs.
-    User: return only owned ones.
+    User: return those they CREATED or that are currently ASSIGNED to them.
+
+    This is used to scope Employees, Payrolls, Vouchers, etc. — anything
+    that has an establishment_id foreign key. Including assigned_to_id
+    here means staff members can work on clients transferred to them.
     """
     from app.models.establishment import Establishment
+    from sqlalchemy import or_
 
     if is_admin():
         return [e.id for e in Establishment.query.with_entities(Establishment.id).all()]
 
     uid = current_user_id()
     if uid:
-        return [e.id for e in Establishment.query.filter_by(owner_id=uid).with_entities(Establishment.id).all()]
+        rows = Establishment.query.filter(or_(
+            Establishment.owner_id == uid,
+            Establishment.assigned_to_id == uid,
+        )).with_entities(Establishment.id).all()
+        return [e.id for e in rows]
     return []
 
 
