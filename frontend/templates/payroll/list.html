@@ -80,7 +80,10 @@
                         {% for p in payrolls %}
                         <tr>
                             <td class="text-muted">{{ loop.index }}</td>
-                            <td class="fw-semibold">{{ p.period_display }}</td>
+                            <td class="fw-semibold">
+                                {{ p.period_display }}
+                                {% if p.is_nil %}<span style="background:#fef3c7; color:#92400e; padding:1px 6px; border-radius:6px; font-size:0.58rem; font-weight:700; margin-left:4px;">NIL</span>{% endif %}
+                            </td>
                             <td style="font-size: 0.8rem; color: #64748b;">{{ p.establishment.company_name }}</td>
                             <td class="text-center"><span class="badge bg-primary bg-opacity-10 text-primary">{{ p.total_employees }}</span></td>
                             <td class="text-end fw-semibold">{{ "₹{:,.0f}".format(p.total_gross) }}</td>
@@ -442,7 +445,10 @@
                             {% if p.status in ['processing', 'finalized'] %}
                             <tr>
                                 <td><input type="checkbox" name="payroll_ids" value="{{ p.id }}" class="month-check" onchange="updateMultiTotal()"></td>
-                                <td class="fw-semibold">{{ p.period_display }}</td>
+                                <td class="fw-semibold">
+                                {{ p.period_display }}
+                                {% if p.is_nil %}<span style="background:#fef3c7; color:#92400e; padding:1px 6px; border-radius:6px; font-size:0.58rem; font-weight:700; margin-left:4px;">NIL</span>{% endif %}
+                            </td>
                                 <td class="text-center">{{ p.total_employees }}</td>
                                 <td class="text-end">{{ "₹{:,.0f}".format(p.total_epf_employer) }}</td>
                                 <td class="text-end">{{ "₹{:,.0f}".format(p.total_esic_employer) }}</td>

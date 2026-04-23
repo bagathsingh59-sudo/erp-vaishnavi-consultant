@@ -2169,7 +2169,15 @@ def epf_ecr_view(payroll_id):
 
 @reports_bp.route('/payroll/<int:payroll_id>/report/epf-ecr-text')
 def epf_ecr_text(payroll_id):
-    """Download EPF ECR as pipe-delimited text file (for EPFO portal upload)"""
+    """Download EPF ECR as pipe-delimited text file (for EPFO portal upload).
+    NOT applicable for NIL payrolls — file nil return manually on EPFO portal."""
+    # Block for NIL payrolls — EPF nil return is filed manually on portal
+    _p = MonthlyPayroll.query.get_or_404(payroll_id)
+    if getattr(_p, 'is_nil', False):
+        flash('EPF ECR file is NOT generated for NIL returns. Please file the '
+              'nil return manually on the EPFO portal (no ECR upload needed).', 'info')
+        return redirect(url_for('payroll.payroll_process', payroll_id=payroll_id))
+
     payroll, est, config, entries, rows, skipped = _build_ecr_data(payroll_id)
 
     lines = []
@@ -2202,7 +2210,12 @@ def epf_ecr_text(payroll_id):
 
 @reports_bp.route('/payroll/<int:payroll_id>/report/epf-ecr-csv')
 def epf_ecr_csv(payroll_id):
-    """Download EPF ECR as CSV file"""
+    """Download EPF ECR as CSV file. NOT applicable for NIL payrolls."""
+    _p = MonthlyPayroll.query.get_or_404(payroll_id)
+    if getattr(_p, 'is_nil', False):
+        flash('EPF ECR is NOT generated for NIL returns. File manually on EPFO portal.', 'info')
+        return redirect(url_for('payroll.payroll_process', payroll_id=payroll_id))
+
     payroll, est, config, entries, rows, skipped = _build_ecr_data(payroll_id)
 
     import csv
@@ -2630,11 +2643,39 @@ def payslip_elegant(payroll_id):
 # =============================================
 
 def _build_reimbursement_data(payroll_id):
-    """Build reimbursement letter data from payroll"""
+    """Build reimbursement letter data from payroll.
+    For NIL payrolls: returns just admin charge + fee (no employees)."""
     payroll = MonthlyPayroll.query.get_or_404(payroll_id)
     est = payroll.establishment
     verify_est_ownership(est)
     config = PayrollConfig.query.filter_by(establishment_id=est.id).first()
+
+    # ── NIL payroll: short-circuit with just admin charge + fee ──
+    if getattr(payroll, 'is_nil', False):
+        nil_admin = payroll.nil_epf_admin or 0
+        nil_fee = payroll.nil_fee_amount or 0
+        data = {
+            'is_nil': True,
+            'epf_count': 0,
+            'esic_count': 0,
+            'total_epf_wages': 0,
+            'total_esic_wages': 0,
+            'total_epf_gross': 0,
+            'total_esic_gross': 0,
+            'total_epf_ac01': 0,
+            'total_epf_edli': 0,
+            'epf_367_05': 0,
+            'total_epf_eps': 0,
+            'total_epf_admin': nil_admin,   # only admin charge applies
+            'epf_employer_refund': nil_admin,
+            'total_esic_employer': 0,
+            'esic_employer_refund': 0,
+            'nil_fee_amount': nil_fee,
+            'total_refund': nil_admin,       # for reimbursement (EPF admin) only
+            'total_billable': nil_admin + nil_fee,  # what to invoice client
+        }
+        return payroll, est, config, data
+
     entries = PayrollEntry.query.filter_by(monthly_payroll_id=payroll_id)\
         .join(Employee).order_by(Employee.name).all()
 
@@ -2688,6 +2729,7 @@ def _build_reimbursement_data(payroll_id):
             total_esic_gross += entry.earned_gross
 
     data = {
+        'is_nil': False,
         'epf_count': epf_count,
         'esic_count': esic_count,
         'total_epf_wages': total_epf_wages,

@@ -1375,6 +1375,77 @@ def payroll_create():
     return redirect(url_for('establishment.establishment_list'))
 
 
+# ═════════════════════════════════════════════════════════════════
+#  CREATE NIL PAYROLL — for months with no work / no employees
+# ═════════════════════════════════════════════════════════════════
+@payroll_bp.route('/payroll/create-nil', methods=['POST'])
+def payroll_create_nil():
+    """Create a NIL return payroll — no employees processed.
+    Records only: EPF admin charge + consultant fee for that month."""
+    try:
+        est_id = int(request.form.get('establishment_id'))
+        month = int(request.form.get('month'))
+        year = int(request.form.get('year'))
+        nil_fee = float(request.form.get('nil_fee_amount') or 0)
+        nil_admin = float(request.form.get('nil_epf_admin') or 0)
+    except (ValueError, TypeError):
+        flash('Invalid input for NIL payroll. Please check the values.', 'danger')
+        return redirect(url_for('payroll.payroll_create'))
+
+    est = Establishment.query.get_or_404(est_id)
+    verify_est_ownership(est)
+
+    # Require fee to be entered (per user decision Q2)
+    if nil_fee <= 0:
+        flash('Please enter the NIL filing fee before creating the payroll.', 'warning')
+        return redirect(url_for('payroll.payroll_create'))
+
+    # Prevent duplicate payroll
+    existing = MonthlyPayroll.query.filter_by(
+        establishment_id=est_id, month=month, year=year).first()
+    if existing:
+        flash(f'A payroll already exists for {calendar.month_name[month]} {year}. '
+              f'Delete it first if you want to create a NIL return for this month.', 'warning')
+        return redirect(url_for('payroll.payroll_process', payroll_id=existing.id))
+
+    # Create NIL payroll — skip attendance flow entirely
+    payroll = MonthlyPayroll(
+        establishment_id=est_id,
+        month=month,
+        year=year,
+        working_days=calendar.monthrange(year, month)[1],
+        status='draft',
+        is_nil=True,
+        nil_epf_admin=nil_admin,
+        nil_fee_amount=nil_fee,
+        # Zero out all totals (NIL means no employees, no wages)
+        total_gross=0,
+        total_employees=0,
+        total_epf_employee=0,
+        total_epf_employer=0,
+        total_epf_ac01=0,
+        total_epf_eps=0,
+        total_epf_edli=0,
+        total_epf_admin=nil_admin,  # Only admin charge applies
+        total_esic_employee=0,
+        total_esic_employer=0,
+        total_pt=0,
+        total_net_pay=0,
+    )
+    db.session.add(payroll)
+    db.session.commit()
+
+    log_activity('created', 'nil_payroll', entity_id=payroll.id,
+                 entity_name=f'{calendar.month_name[month]} {year}',
+                 details=f'NIL return — Admin ₹{nil_admin:,.0f} + Fee ₹{nil_fee:,.0f}',
+                 establishment_id=est_id)
+
+    flash(f'✓ NIL payroll created for {calendar.month_name[month]} {year}. '
+          f'Admin charge ₹{nil_admin:,.0f} + Fee ₹{nil_fee:,.0f}. '
+          f'Click Finalize to complete.', 'success')
+    return redirect(url_for('payroll.payroll_process', payroll_id=payroll.id))
+
+
 @payroll_bp.route('/payroll/<int:payroll_id>')
 def payroll_process(payroll_id):
     """Process payroll — attendance entry and calculations"""

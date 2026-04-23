@@ -338,7 +338,17 @@
         </div>
 
         <!-- Letter Title -->
-        <div class="letter-title">Application for Reimbursement of Statutory Contributions</div>
+        <div class="letter-title">
+            {% if data.is_nil %}NIL Return — Admin Charge &amp; Fee Reimbursement{% else %}Application for Reimbursement of Statutory Contributions{% endif %}
+        </div>
+
+        {% if data.is_nil %}
+        <div style="background:#fef3c7; border-left:4px solid #f59e0b; padding:8px 12px; border-radius:4px; margin:8px 0; font-size:11px; color:#92400e;">
+            <strong>📢 NIL Return Period:</strong> No employees worked during {{ payroll.month_name }} {{ payroll.year }}.
+            Only EPF administrative charge (₹{{ "{:,.0f}".format(data.total_epf_admin) }}) and consultant fee
+            (₹{{ "{:,.0f}".format(data.nil_fee_amount or 0) }}) are applicable.
+        </div>
+        {% endif %}
 
         <!-- Ref & Date Row -->
         <div class="ref-row">

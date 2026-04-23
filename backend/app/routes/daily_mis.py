@@ -716,9 +716,10 @@ def filing_matrix():
     ).all()
 
     # Index finalized payrolls by (est_id, year, month)
+    # Store tuple: (is_filed, is_nil) — NIL months still count as filed but shown distinctly
     finalized_index = {}
     for p in all_finalized:
-        finalized_index[(p.establishment_id, p.year, p.month)] = True
+        finalized_index[(p.establishment_id, p.year, p.month)] = (True, bool(p.is_nil))
 
     # ── Build matrix ──
     matrix = []
@@ -737,7 +738,8 @@ def filing_matrix():
 
         for idx, wm in enumerate(wage_months):
             # Payroll finalized for this (est, year, month)?
-            is_finalized = finalized_index.get((est.id, wm.year, wm.month), False)
+            fn_info = finalized_index.get((est.id, wm.year, wm.month), (False, False))
+            is_finalized, is_nil = fn_info
 
             # When payroll is finalized, both EPF and ESIC are considered filed
             # for whichever codes the establishment has.
@@ -768,6 +770,7 @@ def filing_matrix():
                 'has_pf': has_pf,
                 'has_esic': has_esic,
                 'finalized': is_finalized,
+                'is_nil': is_nil,           # NIL filings count as filed but shown with 'N' label
             })
 
             month_totals[idx][status] += 1

@@ -327,18 +327,35 @@ def pending_months_api():
 
     months_data = []
     for p in payrolls:
-        if is_fee_only:
+        # ── NIL payroll handling ──
+        # For NIL months, the amounts are stored on the payroll itself
+        # (nil_epf_admin + nil_fee_amount). ESIC is always 0 for nil.
+        if getattr(p, 'is_nil', False):
+            epf_payable = round(p.nil_epf_admin or 0)
+            esic_payable = 0
+            this_fee = round(p.nil_fee_amount or 0)
+            other_charges = 0
+            other_desc = ''
+            period_is_nil = True
+        elif is_fee_only:
             # Client pays EPF/ESIC directly — only fee comes to us
             epf_payable = 0
             esic_payable = 0
+            this_fee = fee_amount
+            other_charges = round(p.other_charges_amount or 0)
+            other_desc = p.other_charges_description or ''
+            period_is_nil = False
         else:
             epf_payable = round((p.total_epf_employee or 0) + (p.total_epf_employer or 0)) \
                 if config and config.epf_applicable else 0
             esic_payable = round((p.total_esic_employee or 0) + (p.total_esic_employer or 0)) \
                 if config and config.esic_applicable else 0
-        other_charges = round(p.other_charges_amount or 0)
-        other_desc = p.other_charges_description or ''
-        total_due = epf_payable + esic_payable + fee_amount + other_charges
+            this_fee = fee_amount
+            other_charges = round(p.other_charges_amount or 0)
+            other_desc = p.other_charges_description or ''
+            period_is_nil = False
+
+        total_due = epf_payable + esic_payable + this_fee + other_charges
         is_paid = (p.year, p.month) in paid_periods
 
         months_data.append({
@@ -348,11 +365,12 @@ def pending_months_api():
             'label': f"{p.month_name} {p.year}",
             'epf': epf_payable,
             'esic': esic_payable,
-            'fee': fee_amount,
+            'fee': this_fee,
             'other': other_charges,
             'other_desc': other_desc,
             'total': total_due,
             'is_paid': is_paid,
+            'is_nil': period_is_nil,
         })
 
     # Opening balance and excess

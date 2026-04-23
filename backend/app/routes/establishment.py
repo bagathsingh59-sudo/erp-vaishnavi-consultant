@@ -480,6 +480,18 @@ def _save_establishment_form(est, is_new=False):
     mode = request.form.get('compliance_payment_mode', 'through_us') or 'through_us'
     est.compliance_payment_mode = 'client_direct' if mode == 'client_direct' else 'through_us'
 
+    # NIL filing settings
+    try:
+        nf = request.form.get('nil_filing_fee', '').strip()
+        est.nil_filing_fee = float(nf) if nf else None
+    except ValueError:
+        est.nil_filing_fee = None
+    try:
+        na = request.form.get('nil_epf_admin_charge', '').strip()
+        est.nil_epf_admin_charge = float(na) if na else None
+    except ValueError:
+        est.nil_epf_admin_charge = None
+
     if is_new:
         est.owner_id = current_user_id()
         # Auto-assign to creator — admin can reassign later from staff dashboard

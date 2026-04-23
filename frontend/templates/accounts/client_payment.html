@@ -371,7 +371,10 @@ function renderMonthsTable() {
 
         html += `<tr class="${rowClass}" data-key="${key}">`;
         html += `<td>${checkbox}</td>`;
-        html += `<td>${m.label}${m.is_paid ? '' : ''}</td>`;
+        const nilBadge = m.is_nil
+            ? ' <span style="background:#d1fae5; color:#065f46; padding:1px 6px; border-radius:6px; font-size:0.55rem; font-weight:700; margin-left:4px;">NIL</span>'
+            : '';
+        html += `<td>${m.label}${nilBadge}</td>`;
         html += `<td><input type="number" class="cp-mini-input" data-key="${key}" data-field="epf" value="${m.epf||0}" ${m.is_paid?'disabled':''} oninput="onMonthEdit(this)"></td>`;
         html += `<td><input type="number" class="cp-mini-input" data-key="${key}" data-field="esic" value="${m.esic||0}" ${m.is_paid?'disabled':''} oninput="onMonthEdit(this)"></td>`;
         html += `<td><input type="number" class="cp-mini-input" data-key="${key}" data-field="fee" value="${m.fee||0}" ${m.is_paid?'disabled':''} oninput="onMonthEdit(this)"></td>`;

@@ -83,8 +83,9 @@
 .fm-table tbody tr:hover td.sticky-col { background:#eef2ff; }
 
 /* Cell Colors */
-.fm-cell { width:38px; height:32px; display:inline-flex; align-items:center; justify-content:center; border-radius:4px; font-weight:700; }
+.fm-cell { width:38px; height:32px; display:inline-flex; align-items:center; justify-content:center; border-radius:4px; font-weight:700; font-size:0.78rem; }
 .fm-cell.full { background:#dcfce7; color:#166534; border:1px solid #86efac; }
+.fm-cell.full.nil-filed { background:#d1fae5; color:#065f46; border:1px solid #34d399; }  /* NIL filed — slightly different green */
 .fm-cell.partial { background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
 .fm-cell.none { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
 .fm-cell.na { background:#f1f5f9; color:#94a3b8; border:1px solid #e2e8f0; }
@@ -194,6 +195,7 @@
     <!-- Legend -->
     <div class="fm-legend">
         <span class="fm-legend-item"><span class="fm-legend-dot" style="background:#dcfce7; border:1px solid #86efac;"></span>Fully Filed (EPF+ESIC both)</span>
+        <span class="fm-legend-item"><span class="fm-legend-dot" style="background:#d1fae5; border:1px solid #34d399;"></span><strong>N</strong>&nbsp;— NIL Return Filed (no work)</span>
         <span class="fm-legend-item"><span class="fm-legend-dot" style="background:#fef3c7; border:1px solid #fcd34d;"></span>Partial (only EPF or only ESIC)</span>
         <span class="fm-legend-item"><span class="fm-legend-dot" style="background:#fee2e2; border:1px solid #fca5a5;"></span>Not Filed (pending)</span>
         <span class="fm-legend-item"><span class="fm-legend-dot" style="background:#f1f5f9; border:1px solid #e2e8f0;"></span>Not Applicable (no EPF/ESIC code)</span>
@@ -228,9 +230,10 @@
                     </td>
                     {% for c in row.cells %}
                     <td>
-                        <span class="fm-cell {{ c.status }}"
-                              title="{{ c.wage_month.strftime('%B %Y') }} — {% if c.status == 'full' %}Both EPF+ESIC Filed ✓{% elif c.status == 'partial' %}Partial ({% if c.epf %}EPF ✓{% else %}EPF ✗{% endif %}, {% if c.esic %}ESIC ✓{% else %}ESIC ✗{% endif %}){% elif c.status == 'none' %}Not Filed{% else %}Not Applicable{% endif %}">
-                            {% if c.status == 'full' %}✓
+                        <span class="fm-cell {{ c.status }}{% if c.is_nil %} nil-filed{% endif %}"
+                              title="{{ c.wage_month.strftime('%B %Y') }} — {% if c.is_nil %}NIL Return Filed (no work){% elif c.status == 'full' %}Both EPF+ESIC Filed ✓{% elif c.status == 'partial' %}Partial ({% if c.epf %}EPF ✓{% else %}EPF ✗{% endif %}, {% if c.esic %}ESIC ✓{% else %}ESIC ✗{% endif %}){% elif c.status == 'none' %}Not Filed{% else %}Not Applicable{% endif %}">
+                            {% if c.is_nil %}N
+                            {% elif c.status == 'full' %}✓
                             {% elif c.status == 'partial' %}{% if c.epf %}E{% endif %}{% if c.esic %}I{% endif %}{% if not c.epf %}·I{% endif %}{% if not c.esic %}E·{% endif %}
                             {% elif c.status == 'none' %}✗
                             {% else %}—{% endif %}

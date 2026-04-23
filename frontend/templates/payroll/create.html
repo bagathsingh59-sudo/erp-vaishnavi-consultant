@@ -26,15 +26,61 @@
     </div>
 </div>
 
-<form method="POST" autocomplete="off">
+<style>
+.nil-section {
+    background: #fef3c7 !important;
+    border-left: 4px solid #f59e0b;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-top: 12px;
+}
+.type-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: #fff;
+}
+.type-pill.active-regular { border-color: #059669; background: #ecfdf5; color: #065f46; }
+.type-pill.active-nil { border-color: #f59e0b; background: #fef3c7; color: #92400e; }
+.type-pill input { display: none; }
+</style>
+
+<!-- Single form that handles BOTH regular and NIL — action set via JS -->
+<form method="POST" autocomplete="off" id="payrollForm"
+      action="{{ url_for('payroll.payroll_create') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="establishment_id" value="{{ establishment.id }}">
 
     <div class="form-card">
+        <!-- Payroll Type Selector -->
         <div class="form-section">
-            <div class="form-section-title"><i class="bi bi-calendar-plus"></i> New Monthly Payroll</div>
-            <div class="form-section-desc">Select the month and year to create a payroll batch for <strong>{{ establishment.company_name }}</strong></div>
+            <div class="form-section-title"><i class="bi bi-ui-checks"></i> Payroll Type</div>
+            <div class="form-section-desc">Choose: regular payroll (with employees) or NIL return (no work for this month)</div>
 
+            <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                <label class="type-pill active-regular" id="pillRegular" onclick="setType('regular')">
+                    <input type="radio" name="payroll_type" value="regular" checked>
+                    <i class="bi bi-calculator"></i>
+                    <span>Regular Payroll (with employees)</span>
+                </label>
+                <label class="type-pill" id="pillNil" onclick="setType('nil')">
+                    <input type="radio" name="payroll_type" value="nil">
+                    <i class="bi bi-moon-stars"></i>
+                    <span>NIL Return (no work / no employees)</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Month / Year Selector (both types use these) -->
+        <div class="form-section">
+            <div class="form-section-title"><i class="bi bi-calendar-plus"></i> Select Period</div>
             <div class="row g-3">
                 <div class="col-md-4">
                     <label class="form-label">Month <span class="text-danger">*</span></label>
@@ -56,31 +102,68 @@
                 </div>
             </div>
 
-            {% if previous_payrolls %}
-            <div class="row g-3 mt-1">
-                <div class="col-md-8">
-                    <label class="form-label">
-                        Copy Data from Previous Month <span class="text-muted" style="font-weight:400;">(optional)</span>
-                    </label>
-                    <select name="copy_from_payroll_id" class="form-select">
-                        <option value="">— Start fresh (no copy) —</option>
-                        {% for p in previous_payrolls %}
-                            <option value="{{ p.id }}">
-                                {{ p.period_display }}
-                                ({{ p.total_employees or 0 }} employees, {{ p.status|title }})
-                            </option>
-                        {% endfor %}
-                    </select>
-                    <div class="form-text" style="font-size:0.78rem;">
-                        <i class="bi bi-info-circle me-1"></i>
-                        Selecting a month will copy attendance (days worked, paid holidays, OT hours) and rate overrides for all matching employees. Perfect for clients with the same data every month.
+            <!-- Regular-only: Copy from previous month -->
+            <div id="regularExtras">
+                {% if previous_payrolls %}
+                <div class="row g-3 mt-1">
+                    <div class="col-md-8">
+                        <label class="form-label">
+                            Copy Data from Previous Month <span class="text-muted" style="font-weight:400;">(optional)</span>
+                        </label>
+                        <select name="copy_from_payroll_id" class="form-select">
+                            <option value="">— Start fresh (no copy) —</option>
+                            {% for p in previous_payrolls %}
+                                <option value="{{ p.id }}">
+                                    {{ p.period_display }}
+                                    ({{ p.total_employees or 0 }} employees, {{ p.status|title }})
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text" style="font-size:0.78rem;">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Selecting a month will copy attendance and rate overrides for matching employees.
+                        </div>
                     </div>
                 </div>
+                {% endif %}
             </div>
-            {% endif %}
+
+            <!-- NIL-only: admin charge + fee -->
+            <div id="nilExtras" class="nil-section" style="display:none;">
+                <div style="font-weight:700; color:#92400e; margin-bottom:10px;">
+                    <i class="bi bi-moon-stars me-1"></i>NIL Return Details
+                    <small style="font-weight:400; font-size:0.72rem; display:block; color:#78350f; margin-top:3px;">
+                        This establishment has no employees working this month. Enter the applicable amounts.
+                    </small>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">NIL Filing Fee (₹) <span class="text-danger">*</span></label>
+                        <input type="number" name="nil_fee_amount" step="0.01" min="0"
+                               class="form-control" placeholder="e.g. 500"
+                               value="{{ establishment.nil_filing_fee|int if establishment.nil_filing_fee else '' }}">
+                        <small class="text-muted">Consultant fee you charge for this NIL month</small>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">EPF Admin Charge (₹)</label>
+                        <input type="number" name="nil_epf_admin" step="0.01" min="0"
+                               class="form-control" placeholder="e.g. 75 or 500"
+                               value="{{ establishment.nil_epf_admin_charge|int if establishment.nil_epf_admin_charge else '' }}">
+                        <small class="text-muted">EPF office admin charge (₹0 if not applicable)</small>
+                    </div>
+                </div>
+                <div style="margin-top:10px; font-size:0.7rem; color:#78350f; line-height:1.45; background:#fffbeb; padding:8px 10px; border-radius:6px;">
+                    <strong>What happens for NIL month:</strong><br>
+                    • No employees will be processed<br>
+                    • EPF ECR will NOT be generated (file manually on EPFO portal)<br>
+                    • ESIC contribution = ₹0 (file manually on ESIC portal)<br>
+                    • Only the amounts above will be tracked in accounts
+                </div>
+            </div>
         </div>
 
-        <div class="form-section" style="background:#eff6ff; border-bottom:none;">
+        <!-- Regular Info -->
+        <div class="form-section" id="regularInfo" style="background:#eff6ff; border-bottom:none;">
             <div style="font-size:0.85rem; color:#1e40af;">
                 <i class="bi bi-info-circle me-1"></i>
                 <strong>What happens next:</strong>
@@ -99,11 +182,51 @@
                 <a href="{{ url_for('establishment.establishment_view', id=establishment.id) }}" class="btn btn-light px-4">
                     <i class="bi bi-arrow-left me-1"></i> Back to Establishment
                 </a>
-                <button type="submit" class="btn btn-primary px-4">
+                <button type="submit" class="btn btn-primary px-4" id="submitBtn">
                     <i class="bi bi-plus-lg me-1"></i> Create Payroll
                 </button>
             </div>
         </div>
     </div>
 </form>
+
+<script>
+const REGULAR_ACTION = '{{ url_for("payroll.payroll_create") }}';
+const NIL_ACTION = '{{ url_for("payroll.payroll_create_nil") }}';
+
+function setType(type) {
+    const form = document.getElementById('payrollForm');
+    const pillR = document.getElementById('pillRegular');
+    const pillN = document.getElementById('pillNil');
+    const regE = document.getElementById('regularExtras');
+    const nilE = document.getElementById('nilExtras');
+    const regInfo = document.getElementById('regularInfo');
+    const submitBtn = document.getElementById('submitBtn');
+    const radios = document.querySelectorAll('input[name="payroll_type"]');
+
+    if (type === 'nil') {
+        form.action = NIL_ACTION;
+        pillR.classList.remove('active-regular');
+        pillN.classList.add('active-nil');
+        regE.style.display = 'none';
+        nilE.style.display = 'block';
+        regInfo.style.display = 'none';
+        submitBtn.innerHTML = '<i class="bi bi-moon-stars me-1"></i> Create NIL Payroll';
+        submitBtn.classList.remove('btn-primary');
+        submitBtn.classList.add('btn-warning');
+        radios.forEach(r => r.checked = (r.value === 'nil'));
+    } else {
+        form.action = REGULAR_ACTION;
+        pillR.classList.add('active-regular');
+        pillN.classList.remove('active-nil');
+        regE.style.display = 'block';
+        nilE.style.display = 'none';
+        regInfo.style.display = 'block';
+        submitBtn.innerHTML = '<i class="bi bi-plus-lg me-1"></i> Create Payroll';
+        submitBtn.classList.remove('btn-warning');
+        submitBtn.classList.add('btn-primary');
+        radios.forEach(r => r.checked = (r.value === 'regular'));
+    }
+}
+</script>
 {% endblock %}

@@ -52,6 +52,14 @@ class Establishment(db.Model):
     #                     only Fee comes to us. Accounts only records Fee income.
     compliance_payment_mode = db.Column(db.String(15), nullable=False, default='through_us')
 
+    # ── NIL FILING SETTINGS (for months with no work / no employees) ──
+    # nil_filing_fee: Consultant fee charged for nil months (usually lower than regular)
+    #                 If blank, user will be asked to enter at payroll creation time.
+    nil_filing_fee = db.Column(db.Float, nullable=True)
+    # nil_epf_admin_charge: EPF admin charge applicable for nil months
+    #                       Usually ₹75 (old rule) or ₹500 (newer rule) — per-client manual entry
+    nil_epf_admin_charge = db.Column(db.Float, nullable=True)
+
     @property
     def opening_balance(self):
         """Read opening balance from the linked Sundry Debtor AccountHead."""

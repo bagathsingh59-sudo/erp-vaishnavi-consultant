@@ -391,6 +391,12 @@ def _auto_migrate_columns(db):
         ('voucher_entries', 'period_month', 'INTEGER'),
         # Compliance payment mode — fee-only vs through-us
         ('establishments', 'compliance_payment_mode', "VARCHAR(15) DEFAULT 'through_us'"),
+        # NIL filing support
+        ('establishments', 'nil_filing_fee', 'FLOAT'),
+        ('establishments', 'nil_epf_admin_charge', 'FLOAT'),
+        ('monthly_payrolls', 'is_nil', 'BOOLEAN DEFAULT FALSE'),
+        ('monthly_payrolls', 'nil_epf_admin', 'FLOAT DEFAULT 0'),
+        ('monthly_payrolls', 'nil_fee_amount', 'FLOAT DEFAULT 0'),
     ]
     for table, column, col_def in migrations:
         try:

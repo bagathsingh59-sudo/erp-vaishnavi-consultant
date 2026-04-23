@@ -339,6 +339,16 @@ class MonthlyPayroll(db.Model):
     # Status: 'draft', 'processing', 'finalized'
     status = db.Column(db.String(15), nullable=False, default='draft')
 
+    # ── NIL FILING SUPPORT ──
+    # is_nil: True if this is a NIL-return month (no employees worked)
+    #         When True: no attendance processed, no ECR generated,
+    #         only EPF admin charge + consultant fee recorded.
+    is_nil = db.Column(db.Boolean, default=False, index=True)
+    # nil_epf_admin: Admin charge for this nil month (usually ₹75 or ₹500)
+    nil_epf_admin = db.Column(db.Float, default=0)
+    # nil_fee_amount: Consultant fee charged for this nil month
+    nil_fee_amount = db.Column(db.Float, default=0)
+
     # Summary totals (auto-calculated)
     total_gross = db.Column(db.Float, default=0)
     total_epf_employee = db.Column(db.Float, default=0)
