@@ -197,6 +197,35 @@
                     {% endif %}
                 </div>
             </div>
+            <div class="info-item">
+                <div class="label">Compliance Payment Mode</div>
+                <div class="value">
+                    {% if (est.compliance_payment_mode or 'through_us') == 'client_direct' %}
+                        <span class="badge" style="background:#fef3c7; color:#92400e; font-size:0.78rem; padding:4px 12px; border-radius:12px;">
+                            <i class="bi bi-arrow-right-circle me-1"></i>Client Pays Direct — Only Fee to Us
+                        </span>
+                    {% else %}
+                        <span class="badge" style="background:#d1fae5; color:#065f46; font-size:0.78rem; padding:4px 12px; border-radius:12px;">
+                            <i class="bi bi-check-circle me-1"></i>Through Us — We Remit EPF/ESIC
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="info-item">
+                <div class="label">Opening Balance</div>
+                <div class="value">
+                    {% if est.opening_balance and est.opening_balance > 0 %}
+                        <span style="font-weight:700; color:{% if est.opening_balance_type == 'Dr' %}#dc2626{% else %}#059669{% endif %};">
+                            ₹{{ "{:,.0f}".format(est.opening_balance) }} {{ est.opening_balance_type }}
+                        </span>
+                        <small style="color:#94a3b8; display:block;">
+                            {% if est.opening_balance_type == 'Dr' %}Client owes from previous FY{% else %}Excess — adjustable against new dues{% endif %}
+                        </small>
+                    {% else %}
+                        <span style="color:#94a3b8;">No carry-forward</span>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
 

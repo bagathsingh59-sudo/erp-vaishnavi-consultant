@@ -24,11 +24,14 @@ TEMPLATE_COLUMNS = [
     'Fee Type (Monthly/Quarterly/Yearly)',
     'Fee Amount',
     'Service Type (With Records/Only Returns)',
-    'Status (Active/Inactive)'
+    'Status (Active/Inactive)',
+    'Compliance Payment Mode (Through Us/Client Direct)',
+    'Opening Balance',
+    'Opening Balance Type (Dr/Cr)',
 ]
 
 # Column widths for better readability
-COLUMN_WIDTHS = [35, 22, 28, 45, 25, 18, 30, 25, 25, 15, 20, 32, 14, 35, 22]
+COLUMN_WIDTHS = [35, 22, 28, 45, 25, 18, 30, 25, 25, 15, 20, 32, 14, 35, 22, 35, 18, 25]
 
 # Sample data row for reference
 SAMPLE_ROW = [
@@ -46,7 +49,10 @@ SAMPLE_ROW = [
     'Monthly',
     '2000',
     'With Records',
-    'Active'
+    'Active',
+    'Through Us',
+    '0',
+    'Dr',
 ]
 
 
@@ -72,8 +78,17 @@ def download_template():
         bottom=Side(style='thin', color='D0D0D0')
     )
 
+    # Compute end column letter based on template columns
+    def _col_letter(n):
+        s = ''
+        while n > 0:
+            n, rem = divmod(n - 1, 26)
+            s = chr(65 + rem) + s
+        return s
+    end_col_letter = _col_letter(len(TEMPLATE_COLUMNS))
+
     # Title row
-    ws.merge_cells('A1:O1')
+    ws.merge_cells(f'A1:{end_col_letter}1')
     title_cell = ws['A1']
     title_cell.value = 'Vaishnavi Consultant ERP - Establishment Import Template'
     title_cell.font = Font(name='Calibri', bold=True, size=14, color='4F46E5')
@@ -81,12 +96,15 @@ def download_template():
     ws.row_dimensions[1].height = 35
 
     # Instructions row
-    ws.merge_cells('A2:O2')
+    ws.merge_cells(f'A2:{end_col_letter}2')
     inst_cell = ws['A2']
-    inst_cell.value = 'Instructions: Fill data from Row 4 onwards. Row 3 is a sample (delete it before uploading). Fields marked with * are required.'
+    inst_cell.value = ('Instructions: Fill data from Row 4 onwards. Row 3 is a sample '
+                       '(delete it before uploading). Fields marked with * are required. '
+                       'For "Compliance Payment Mode" enter "Through Us" or "Client Direct". '
+                       'For "Opening Balance Type" enter Dr (client owes us) or Cr (excess).')
     inst_cell.font = Font(name='Calibri', size=10, color='E53E3E', italic=True)
-    inst_cell.alignment = Alignment(horizontal='left', vertical='center')
-    ws.row_dimensions[2].height = 22
+    inst_cell.alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+    ws.row_dimensions[2].height = 36
 
     # Header row (Row 3 visually, but we use row 3 for headers)
     header_row = 3
@@ -98,13 +116,9 @@ def download_template():
         cell.alignment = header_align
         cell.border = thin_border
 
-    # Set column widths
-    for col_idx, width in enumerate(COLUMN_WIDTHS, 1):
-        ws.column_dimensions[chr(64 + col_idx) if col_idx <= 26 else 'A'].width = width
-    # Fix for columns beyond Z
-    col_letters = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O']
-    for i, letter in enumerate(col_letters):
-        ws.column_dimensions[letter].width = COLUMN_WIDTHS[i]
+    # Set column widths (handles columns A-Z and AA-AZ correctly)
+    for i, width in enumerate(COLUMN_WIDTHS, 1):
+        ws.column_dimensions[_col_letter(i)].width = width
 
     # Sample data row (Row 4)
     sample_row = 4
@@ -177,10 +191,11 @@ def export_establishments():
         'Sr No', 'Company Name', 'Type of Industry', 'Date of Registration',
         'Address', 'Contact Person', 'Contact Phone', 'Contact Email',
         'PF Code Number', 'ESIC Code Number', 'PAN Number', 'GST Number',
-        'Fee Type', 'Fee Amount', 'Service Type', 'Status'
+        'Fee Type', 'Fee Amount', 'Service Type', 'Status',
+        'Compliance Payment Mode', 'Opening Balance', 'Opening Balance Type',
     ]
 
-    col_widths = [8, 35, 22, 18, 45, 25, 18, 30, 25, 25, 15, 20, 14, 14, 18, 12]
+    col_widths = [8, 35, 22, 18, 45, 25, 18, 30, 25, 25, 15, 20, 14, 14, 18, 12, 22, 18, 15]
 
     # Title
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(export_columns))
@@ -222,6 +237,16 @@ def export_establishments():
     data_font = Font(name='Calibri', size=10)
 
     for row_idx, est in enumerate(establishments, 4):
+        # Compliance mode display
+        _mode = (est.compliance_payment_mode or 'through_us')
+        mode_label = 'Client Direct' if _mode == 'client_direct' else 'Through Us'
+        # Opening balance display (from linked Sundry Debtor)
+        try:
+            ob_amt = est.opening_balance or 0
+            ob_type = est.opening_balance_type or 'Dr'
+        except Exception:
+            ob_amt, ob_type = 0, 'Dr'
+
         row_data = [
             row_idx - 3,
             est.company_name,
@@ -238,7 +263,10 @@ def export_establishments():
             est.fee_type or '',
             est.fee_amount or '',
             est.service_type or '',
-            'Active' if est.is_active else 'Inactive'
+            'Active' if est.is_active else 'Inactive',
+            mode_label,
+            ob_amt if ob_amt else '',
+            ob_type if ob_amt else '',
         ]
 
         for col_idx, value in enumerate(row_data, 1):
@@ -374,6 +402,26 @@ def _parse_fee_type(value):
     return None
 
 
+def _parse_compliance_mode(value):
+    """Parse compliance payment mode. Accepts 'through us' / 'client direct' / 'direct' variants."""
+    if not value:
+        return 'through_us'  # default
+    v = str(value).strip().lower().replace('_', ' ').replace('-', ' ')
+    if 'direct' in v or 'client pay' in v or 'self' in v:
+        return 'client_direct'
+    return 'through_us'
+
+
+def _parse_ob_type(value):
+    """Parse opening balance type. Returns 'Dr' or 'Cr'."""
+    if not value:
+        return 'Dr'
+    v = str(value).strip().upper()
+    if v.startswith('CR') or v == 'C' or v == 'CREDIT':
+        return 'Cr'
+    return 'Dr'
+
+
 def _process_xlsx(file):
     """Process .xlsx file"""
     from openpyxl import load_workbook
@@ -469,6 +517,10 @@ def _import_rows(rows, headers):
         'fee_amount': _map_column(headers, ['fee amount', 'feeamount', 'professional fees', 'professionalfees']),
         'service_type': _map_column(headers, ['service type', 'servicetype', 'service provide', 'serviceprovide']),
         'status': _map_column(headers, ['status', 'active']),
+        # NEW: Compliance Payment Mode + Opening Balance columns
+        'compliance_payment_mode': _map_column(headers, ['compliance payment mode', 'compliance mode', 'payment mode', 'compliancepaymentmode']),
+        'opening_balance': _map_column(headers, ['opening balance', 'openingbalance', 'opening bal']),
+        'opening_balance_type': _map_column(headers, ['opening balance type', 'ob type', 'openingbalancetype', 'balance type']),
     }
 
     if col_map['company_name'] is None:
@@ -507,6 +559,11 @@ def _import_rows(rows, headers):
                     return val if val and val != '0' and val != '0.0' else None
                 return None
 
+            # NEW fields: compliance mode + opening balance
+            mode = _parse_compliance_mode(get_val('compliance_payment_mode'))
+            ob_amount = _parse_fee(row[col_map['opening_balance']] if col_map['opening_balance'] is not None and col_map['opening_balance'] < len(row) else None) or 0
+            ob_type = _parse_ob_type(get_val('opening_balance_type'))
+
             est = Establishment(
                 company_name=company_name,
                 type_of_industry=get_val('type_of_industry'),
@@ -523,10 +580,29 @@ def _import_rows(rows, headers):
                 fee_amount=_parse_fee(row[col_map['fee_amount']] if col_map['fee_amount'] is not None and col_map['fee_amount'] < len(row) else None),
                 service_type=_parse_service_type(get_val('service_type')),
                 is_active=_parse_status(get_val('status')),
+                compliance_payment_mode=mode,
                 owner_id=current_user_id(),
+                assigned_to_id=current_user_id(),  # auto-assign to importer
             )
 
             db.session.add(est)
+            db.session.flush()  # Get est.id for debtor creation
+
+            # Create linked Sundry Debtor account with opening balance
+            if ob_amount > 0:
+                from app.models.accounts import AccountHead, AccountGroup
+                debtor_group = AccountGroup.query.filter_by(name='Sundry Debtors').first()
+                if debtor_group:
+                    debtor = AccountHead(
+                        name=est.display_name,
+                        group_id=debtor_group.id,
+                        establishment_id=est.id,
+                        is_system=False,
+                        opening_balance=ob_amount,
+                        opening_balance_type=ob_type,
+                    )
+                    db.session.add(debtor)
+
             imported += 1
 
         except Exception as e:
