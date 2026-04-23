@@ -386,6 +386,9 @@ def _auto_migrate_columns(db):
         ('establishments', 'bonus_min_wage', 'FLOAT'),
         ('establishments', 'assigned_to_id', 'VARCHAR(100)'),
         ('loan_accounts', 'staff_user_id', 'VARCHAR(100)'),
+        # Multi-month client payment — tag each entry with its payroll period
+        ('voucher_entries', 'period_year', 'INTEGER'),
+        ('voucher_entries', 'period_month', 'INTEGER'),
     ]
     for table, column, col_def in migrations:
         try:

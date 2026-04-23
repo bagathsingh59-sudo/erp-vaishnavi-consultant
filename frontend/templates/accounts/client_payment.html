@@ -3,310 +3,430 @@
 {% block page_header %}{% if edit_mode is defined and edit_mode %}Edit Client Payment — {{ voucher.voucher_number }}{% else %}Client Payment Entry{% endif %}{% endblock %}
 
 {% block content %}
-<div style="max-width:800px; margin:0 auto;">
+<style>
+.cp-wrap { max-width: 1050px; margin: 0 auto; }
+.cp-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.04); }
+.cp-header { background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: #fff; padding: 18px 24px; }
+.cp-header h5 { font-weight: 800; margin: 0; font-size: 1rem; }
+.cp-header p { opacity: 0.9; font-size: 0.72rem; margin: 4px 0 0; }
 
-<nav aria-label="breadcrumb" class="mb-3">
-    <ol class="breadcrumb" style="font-size:0.78rem;">
-        <li class="breadcrumb-item"><a href="{{ url_for('accounts.accounts_home') }}" class="text-decoration-none">Accounts</a></li>
-        <li class="breadcrumb-item active">Client Payment Entry</li>
-    </ol>
-</nav>
+.cp-body { padding: 20px 24px; }
+.cp-section { margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px dashed #e2e8f0; }
+.cp-section:last-child { border-bottom: none; padding-bottom: 0; }
+.cp-section-title {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.5px; color: #059669; margin-bottom: 10px;
+}
+.cp-label { font-size: 0.7rem; font-weight: 600; color: #475569; margin-bottom: 3px; display: block; }
+.cp-input, .cp-select { width: 100%; padding: 7px 10px; font-size: 0.78rem; border: 1px solid #e2e8f0; border-radius: 6px; }
+.cp-input:focus, .cp-select:focus { outline: none; border-color: #10b981; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12); }
+.cp-row { display: grid; gap: 12px; margin-bottom: 12px; }
+.cp-row.cols-2 { grid-template-columns: 1fr 1fr; }
+.cp-row.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+.cp-row.cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
 
-<div class="table-container">
-    <div class="table-header" style="background:linear-gradient(135deg,#059669,#10b981);">
-        <div class="table-title" style="color:#fff;"><i class="bi bi-cash-stack"></i> Receipt — Client Payment (Combined Receipt + Journal)</div>
-    </div>
-    <form method="POST" id="paymentForm" action="{% if edit_mode is defined and edit_mode %}{{ url_for('accounts.edit_voucher', voucher_id=voucher.id) }}{% endif %}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="payroll_id" id="payroll_id" value="{% if edit_mode is defined and edit_mode %}{{ voucher.payroll_id or '' }}{% endif %}">
-        <div style="padding:16px 20px;">
+.cp-amount-big {
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+    border: 2px solid #059669; border-radius: 10px;
+    padding: 14px 18px; margin: 4px 0 6px;
+}
+.cp-amount-big input {
+    font-size: 1.5rem; font-weight: 800; color: #064e3b;
+    background: transparent; border: none; text-align: right;
+    font-family: 'Consolas', monospace;
+}
+.cp-amount-big label { color: #064e3b; font-weight: 700; }
 
-            <!-- Row 1: Client + Date -->
-            <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">Client (Establishment)</label>
-                    <select name="establishment_id" id="est_select" class="form-select form-select-sm" required onchange="onClientChange()">
-                        <option value="">— Select Client —</option>
-                        {% for est in establishments %}
-                        <option value="{{ est.id }}" {% if ed is defined and ed.est_id == est.id %}selected{% endif %}>{{ est.display_name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">Date</label>
-                    <input type="date" name="voucher_date" class="form-control form-control-sm" value="{{ today.strftime('%Y-%m-%d') }}" required>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">Received In</label>
-                    <select name="bank_account_id" class="form-select form-select-sm" required>
-                        {% for bank in bank_accounts %}
-                        <option value="{{ bank.id }}">{{ bank.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
+/* Pending months table */
+.cp-months-wrap {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    overflow: hidden; margin-top: 8px;
+}
+.cp-months-header {
+    padding: 10px 14px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0;
+    font-size: 0.7rem; color: #475569; font-weight: 600;
+    display: flex; justify-content: space-between; align-items: center;
+}
+.cp-months-table { width: 100%; border-collapse: collapse; font-size: 0.76rem; }
+.cp-months-table thead th {
+    background: #ecfdf5; color: #047857; font-size: 0.6rem;
+    font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
+    padding: 8px 10px; border-bottom: 1px solid #a7f3d0; text-align: center;
+}
+.cp-months-table thead th:first-child { text-align: center; width: 50px; }
+.cp-months-table thead th:nth-child(2) { text-align: left; padding-left: 14px; width: 120px; }
+.cp-months-table thead th:last-child { text-align: right; padding-right: 14px; }
+.cp-months-table tbody td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; text-align: right; }
+.cp-months-table tbody td:first-child { text-align: center; }
+.cp-months-table tbody td:nth-child(2) { text-align: left; padding-left: 14px; font-weight: 600; color: #1e293b; }
+.cp-months-table tbody tr.selected { background: #ecfdf5; }
+.cp-months-table tbody tr:hover { background: #f0fdf4; }
+.cp-months-table tbody tr.paid { background: #f8fafc; opacity: 0.65; }
+.cp-months-table tbody tr.paid td { color: #94a3b8; }
 
-            <!-- Row 2: Payroll Month Selector (for auto-suggest) -->
-            <div class="row g-3 mb-3">
-                <div class="col-md-3">
-                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">Payroll Month</label>
-                    <select id="suggest_month" class="form-select form-select-sm" onchange="fetchSuggestion()">
-                        <option value="">—</option>
-                        {% for m in range(1,13) %}
-                        <option value="{{ m }}">{{ ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m] }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">Year</label>
-                    <input type="number" id="suggest_year" class="form-control form-control-sm" value="2026" min="2024" max="2030" onchange="fetchSuggestion()">
-                </div>
-                <div class="col-md-6 d-flex align-items-end">
-                    <div id="suggest_status" style="font-size:0.68rem; color:#94a3b8; padding-bottom:6px;">
-                        <i class="bi bi-info-circle me-1"></i>Select client + month to auto-fill from payroll
+.cp-row-amt { font-family: 'Consolas', monospace; }
+.cp-paid-badge { background: #dcfce7; color: #166534; padding: 1px 6px; border-radius: 8px; font-size: 0.58rem; font-weight: 700; }
+
+.cp-totals-row { background: #064e3b; color: #fff; font-weight: 700; }
+.cp-totals-row td { color: #fff !important; border-bottom: none !important; }
+
+.cp-status-bar {
+    padding: 12px 16px; margin-top: 12px; border-radius: 8px;
+    font-size: 0.78rem; font-weight: 600; display: flex; align-items: center; justify-content: space-between;
+}
+.cp-status-balanced { background: #d1fae5; color: #064e3b; border: 1px solid #6ee7b7; }
+.cp-status-diff { background: #fef3c7; color: #92400e; border: 1px solid #fbbf24; }
+.cp-status-error { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+
+.cp-actions { padding: 16px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; gap: 8px; justify-content: flex-end; }
+.cp-empty { padding: 30px; text-align: center; color: #94a3b8; font-size: 0.78rem; }
+
+.cp-mini-input {
+    width: 100%; padding: 4px 6px; font-size: 0.72rem; font-family: 'Consolas', monospace;
+    border: 1px solid transparent; border-radius: 4px; text-align: right;
+    background: transparent;
+}
+.cp-mini-input:focus { outline: none; background: #fff; border-color: #10b981; }
+.cp-mini-input:hover:not(:focus) { background: #fff; border-color: #d1d5db; }
+</style>
+
+<div class="cp-wrap">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb" style="font-size:0.78rem;">
+            <li class="breadcrumb-item"><a href="{{ url_for('accounts.accounts_home') }}" class="text-decoration-none">Accounts</a></li>
+            <li class="breadcrumb-item active">Client Payment Entry</li>
+        </ol>
+    </nav>
+
+    <div class="cp-card">
+        <div class="cp-header">
+            <h5><i class="bi bi-cash-stack me-2"></i>Receipt — Client Payment (Multi-Month Allocation)</h5>
+            <p>Select client → tick pending months → enter amount received → save (one voucher covers all selected months)</p>
+        </div>
+
+        <form method="POST" id="paymentForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="multi_month" value="1">
+            <input type="hidden" name="months_json" id="monthsJson" value="[]">
+
+            <div class="cp-body">
+
+                <!-- Client / Date / Bank -->
+                <div class="cp-section">
+                    <div class="cp-section-title"><i class="bi bi-building"></i> Client &amp; Receipt Details</div>
+                    <div class="cp-row cols-3">
+                        <div>
+                            <label class="cp-label">Client (Establishment) <span class="text-danger">*</span></label>
+                            <select name="establishment_id" id="est_select" class="cp-select" required onchange="onClientChange()">
+                                <option value="">— Select Client —</option>
+                                {% for est in establishments %}
+                                <option value="{{ est.id }}">{{ est.display_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="cp-label">Date <span class="text-danger">*</span></label>
+                            <input type="date" name="voucher_date" class="cp-input" value="{{ today.strftime('%Y-%m-%d') }}" required>
+                        </div>
+                        <div>
+                            <label class="cp-label">Received In <span class="text-danger">*</span></label>
+                            <select name="bank_account_id" class="cp-select" required>
+                                {% for b in bank_accounts %}
+                                <option value="{{ b.id }}">{{ b.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Excess Balance Banner -->
-            <div id="excess_banner" style="display:none; background:#fefce8; border:1px solid #fde68a; border-radius:6px; padding:8px 14px; margin-bottom:12px; font-size:0.72rem;">
-                <i class="bi bi-wallet2 me-1 text-warning"></i>
-                <strong>Previous Excess Balance:</strong> <span id="excess_display">0</span>
-                <span style="color:#92400e; margin-left:8px;">This will be adjusted from the current entry.</span>
-            </div>
-
-            <hr style="margin:8px 0 14px;">
-
-            <!-- Total Received -->
-            <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                    <label class="form-label" style="font-size:0.72rem; font-weight:700; color:#059669;">Total Amount Received in Bank (₹)</label>
-                    <input type="number" name="total_received" id="total_received" class="form-control" required min="0" step="1" placeholder="0" style="font-size:1.1rem; font-weight:700;" oninput="calcBalance()">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">UTR / Reference</label>
-                    <input type="text" name="reference" class="form-control form-control-sm" placeholder="UTR number">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label" style="font-size:0.72rem; font-weight:600;">TDS Deducted (₹)</label>
-                    <input type="number" name="tds_amount" id="tds_amount" class="form-control form-control-sm" value="0" min="0" step="1" style="font-weight:600;" oninput="calcBalance()">
-                    <div id="tds_hint" style="font-size:0.55rem; color:#94a3b8;">Default 0. Enter only if client deducted TDS.</div>
-                </div>
-            </div>
-
-            <!-- Breakup Section -->
-            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px; margin-bottom:14px;">
-                <div style="font-size:0.72rem; font-weight:700; color:#1e293b; margin-bottom:10px;">
-                    <i class="bi bi-diagram-3 me-1"></i> Breakup (Allocate the Received Amount)
-                </div>
-                <div class="row g-2">
-                    <div class="col-md-6">
-                        <label class="form-label" style="font-size:0.68rem; font-weight:600; color:#475569;">EPF Payable (₹)</label>
-                        <input type="number" name="epf_amount" id="epf_amount" class="form-control form-control-sm breakup-input" value="0" min="0" step="1" oninput="calcBalance()">
+                <!-- Amount Received -->
+                <div class="cp-section">
+                    <div class="cp-section-title"><i class="bi bi-bank"></i> Amount Received</div>
+                    <div class="cp-amount-big">
+                        <label class="cp-label">Total Amount Received in Bank (₹) <span class="text-danger">*</span></label>
+                        <input type="number" name="total_received" id="totalReceived" step="0.01" min="0"
+                               placeholder="0" required oninput="recalcTotals()">
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label" style="font-size:0.68rem; font-weight:600; color:#475569;">ESIC Payable (₹)</label>
-                        <input type="number" name="esic_amount" id="esic_amount" class="form-control form-control-sm breakup-input" value="0" min="0" step="1" oninput="calcBalance()">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label" style="font-size:0.68rem; font-weight:600; color:#475569;">Professional Fee (₹)</label>
-                        <input type="number" name="fee_amount" id="fee_amount" class="form-control form-control-sm breakup-input" value="0" min="0" step="1" oninput="calcBalance()">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label" style="font-size:0.68rem; font-weight:600; color:#475569;">Other Charges (₹)</label>
-                        <input type="number" name="other_amount" id="other_amount" class="form-control form-control-sm breakup-input" value="0" min="0" step="1" oninput="calcBalance()">
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label" style="font-size:0.68rem; font-weight:600; color:#475569;">Other Charges Description</label>
-                        <input type="text" name="other_desc" id="other_desc" class="form-control form-control-sm" placeholder="e.g., Annual Return Filing">
+                    <div class="cp-row cols-3">
+                        <div>
+                            <label class="cp-label">UTR / Reference</label>
+                            <input type="text" name="reference" class="cp-input" placeholder="Bank UTR or Cheque number">
+                        </div>
+                        <div>
+                            <label class="cp-label">TDS Deducted (₹) <span id="tdsNote" style="font-size:0.6rem; color:#94a3b8; font-weight:normal;"></span></label>
+                            <input type="number" name="tds_amount" id="tdsAmount" class="cp-input" step="0.01" min="0" value="0" oninput="recalcTotals()">
+                        </div>
+                        <div>
+                            <label class="cp-label">Adjust from Excess (₹) <span id="excessNote" style="font-size:0.6rem; color:#94a3b8; font-weight:normal;"></span></label>
+                            <input type="number" name="excess_adjust" id="excessAdjust" class="cp-input" step="0.01" min="0" value="0" oninput="recalcTotals()">
+                        </div>
                     </div>
                 </div>
-                <input type="hidden" name="excess_adjust" id="excess_adjust" value="0">
-            </div>
 
-            <!-- Balance Check -->
-            <div id="balance_check" style="border-radius:8px; padding:10px 14px; margin-bottom:14px; font-size:0.78rem; background:#f0fdf4; border:1px solid #bbf7d0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
-                <div>
-                    <span style="color:#64748b;">Breakup Total:</span> <strong id="breakup_total">0</strong>
-                    <span style="color:#64748b; margin-left:12px;">Source (Bank+TDS+Excess):</span> <strong id="source_total">0</strong>
+                <!-- Pending Months (Multi-Select) -->
+                <div class="cp-section">
+                    <div class="cp-section-title"><i class="bi bi-calendar-check"></i> Pending Payroll Months for Selected Client</div>
+
+                    <div class="cp-months-wrap" id="monthsWrap">
+                        <div class="cp-months-header">
+                            <span id="monthsHint"><i class="bi bi-arrow-up me-1"></i>Select a client above to see pending months</span>
+                            <span id="monthsCount" style="font-size:0.7rem; color:#059669; font-weight:700;"></span>
+                        </div>
+                        <div id="monthsBody">
+                            <div class="cp-empty">
+                                <i class="bi bi-inbox" style="font-size:1.5rem; color:#cbd5e1;"></i><br>
+                                No client selected yet.
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div id="balance_status" style="font-weight:700; color:#16a34a;">
-                    <i class="bi bi-check-circle-fill me-1"></i>Balanced
+
+                <!-- Narration -->
+                <div class="cp-section">
+                    <div class="cp-section-title"><i class="bi bi-journal-text"></i> Narration (Optional)</div>
+                    <input type="text" name="narration" class="cp-input"
+                           placeholder="e.g., Oct-2025 to Mar-2026 Compliance Payment">
+                </div>
+
+                <!-- Balance Status -->
+                <div id="balanceStatus" class="cp-status-bar cp-status-balanced">
+                    <span><i class="bi bi-check-circle me-1"></i><strong>Status:</strong> Ready — select client + months</span>
+                    <span>Allocated: ₹0 &nbsp; | &nbsp; Source: ₹0</span>
                 </div>
             </div>
 
-            <!-- Narration -->
-            <div class="mb-3">
-                <label class="form-label" style="font-size:0.72rem; font-weight:600;">Narration</label>
-                <input type="text" name="narration" id="narration_field" class="form-control form-control-sm" placeholder="e.g., Feb 2026 Compliance Payment of EPF/ESIC">
-            </div>
-
-            <div class="d-flex justify-content-between">
-                <a href="{{ url_for('accounts.accounts_home') }}" class="btn btn-outline-secondary btn-sm">
+            <div class="cp-actions">
+                <a href="{{ url_for('accounts.accounts_home') }}" class="btn btn-outline-secondary btn-sm" style="font-size:0.75rem;">
                     <i class="bi bi-arrow-left me-1"></i>Back
                 </a>
-                {% if edit_mode is defined and edit_mode %}
-                <button type="submit" class="btn btn-warning">
-                    <i class="bi bi-pencil-square me-1"></i> Update Entry
+                <button type="submit" class="btn btn-success btn-sm" id="saveBtn" style="font-size:0.75rem; font-weight:700;" disabled>
+                    <i class="bi bi-check-circle me-1"></i>Save Entry
                 </button>
-                {% else %}
-                <button type="submit" class="btn btn-success">
-                    <i class="bi bi-check-lg me-1"></i> Save Entry
-                </button>
-                {% endif %}
             </div>
-        </div>
-    </form>
+        </form>
+    </div>
 </div>
-</div>
-{% endblock %}
 
-{% block scripts %}
 <script>
-var monthNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+// Current loaded months data
+let loadedMonths = [];
+let selectedMonthIds = new Set();   // "year-month" string keys
+let clientInfo = { tds_applicable: false, tds_rate: 0, excess_balance: 0 };
 
-// TDS info per establishment (embedded from server)
-var estTdsMap = {
-    {% for est in establishments %}
-    '{{ est.id }}': { applicable: {{ 'true' if est.tds_applicable else 'false' }}, rate: {{ est.tds_rate or 10 }}, fee: {{ est.fee_amount or 0 }} },
-    {% endfor %}
-};
+function fmt(n) { return '₹ ' + (Number(n)||0).toLocaleString('en-IN', {maximumFractionDigits: 2}); }
 
-function onClientChange(){
-    // Auto-fill TDS when client changes
-    var estId = document.getElementById('est_select').value;
-    var tdsInfo = estTdsMap[estId];
-    if(tdsInfo && tdsInfo.applicable && tdsInfo.fee > 0){
-        var tdsAmt = Math.round(tdsInfo.fee * tdsInfo.rate / 100);
-        document.getElementById('tds_amount').value = tdsAmt;
-        document.getElementById('tds_hint').textContent = 'Auto: ' + tdsInfo.rate + '% TDS on fee of \u20B9' + tdsInfo.fee.toLocaleString('en-IN');
-        document.getElementById('tds_hint').style.color = '#059669';
+function onClientChange() {
+    const estId = document.getElementById('est_select').value;
+    const body = document.getElementById('monthsBody');
+    const hint = document.getElementById('monthsHint');
+    const count = document.getElementById('monthsCount');
+    loadedMonths = [];
+    selectedMonthIds.clear();
+    count.textContent = '';
+
+    if (!estId) {
+        body.innerHTML = '<div class="cp-empty"><i class="bi bi-inbox" style="font-size:1.5rem; color:#cbd5e1;"></i><br>No client selected yet.</div>';
+        hint.innerHTML = '<i class="bi bi-arrow-up me-1"></i>Select a client above to see pending months';
+        updateNotes();
+        updateMonthsJson();
+        return;
+    }
+
+    body.innerHTML = '<div class="cp-empty"><i class="bi bi-hourglass-split" style="font-size:1.4rem; color:#94a3b8;"></i><br>Loading pending months...</div>';
+    hint.innerHTML = '<i class="bi bi-hourglass me-1"></i>Loading...';
+
+    fetch('{{ url_for("accounts.pending_months_api") }}?est_id=' + encodeURIComponent(estId))
+        .then(r => r.json())
+        .then(data => {
+            loadedMonths = data.months || [];
+            clientInfo.tds_applicable = data.tds_applicable;
+            clientInfo.tds_rate = data.tds_rate;
+            clientInfo.excess_balance = data.excess_balance || 0;
+            updateNotes();
+            renderMonthsTable();
+        })
+        .catch(e => {
+            body.innerHTML = '<div class="cp-empty" style="color:#dc2626;">Failed to load: ' + e + '</div>';
+        });
+}
+
+function updateNotes() {
+    const tdsNote = document.getElementById('tdsNote');
+    const excessNote = document.getElementById('excessNote');
+    tdsNote.textContent = clientInfo.tds_applicable
+        ? `— TDS applicable @ ${clientInfo.tds_rate}%`
+        : '— Not applicable for this client';
+    excessNote.textContent = clientInfo.excess_balance > 0
+        ? `— ₹${clientInfo.excess_balance.toLocaleString('en-IN')} available`
+        : '— No excess balance';
+}
+
+function renderMonthsTable() {
+    const body = document.getElementById('monthsBody');
+    const hint = document.getElementById('monthsHint');
+    const count = document.getElementById('monthsCount');
+
+    if (loadedMonths.length === 0) {
+        body.innerHTML = '<div class="cp-empty"><i class="bi bi-calendar-x" style="font-size:1.5rem; color:#cbd5e1;"></i><br>No finalized payroll months for this client yet.<br><small>Process &amp; finalize monthly payroll first, then payments can be recorded here.</small></div>';
+        hint.innerHTML = 'No pending months';
+        return;
+    }
+
+    hint.innerHTML = `<i class="bi bi-check-square me-1"></i>Tick the months this payment covers — all amounts pre-filled from payroll`;
+
+    let html = '<table class="cp-months-table">';
+    html += '<thead><tr>';
+    html += '<th>Pay?</th><th>Month</th><th>EPF (₹)</th><th>ESIC (₹)</th><th>Fee (₹)</th><th>Other (₹)</th><th>Month Total (₹)</th>';
+    html += '</tr></thead><tbody>';
+
+    for (const m of loadedMonths) {
+        const key = `${m.year}-${m.month}`;
+        const isSelected = selectedMonthIds.has(key);
+        const rowClass = m.is_paid ? 'paid' : (isSelected ? 'selected' : '');
+        const checkbox = m.is_paid
+            ? '<span class="cp-paid-badge">PAID</span>'
+            : `<input type="checkbox" class="month-check" data-key="${key}" ${isSelected ? 'checked' : ''} onchange="toggleMonth(this)">`;
+
+        html += `<tr class="${rowClass}" data-key="${key}">`;
+        html += `<td>${checkbox}</td>`;
+        html += `<td>${m.label}${m.is_paid ? '' : ''}</td>`;
+        html += `<td><input type="number" class="cp-mini-input" data-key="${key}" data-field="epf" value="${m.epf||0}" ${m.is_paid?'disabled':''} oninput="onMonthEdit(this)"></td>`;
+        html += `<td><input type="number" class="cp-mini-input" data-key="${key}" data-field="esic" value="${m.esic||0}" ${m.is_paid?'disabled':''} oninput="onMonthEdit(this)"></td>`;
+        html += `<td><input type="number" class="cp-mini-input" data-key="${key}" data-field="fee" value="${m.fee||0}" ${m.is_paid?'disabled':''} oninput="onMonthEdit(this)"></td>`;
+        html += `<td><input type="number" class="cp-mini-input" data-key="${key}" data-field="other" value="${m.other||0}" ${m.is_paid?'disabled':''} oninput="onMonthEdit(this)"></td>`;
+        html += `<td class="cp-row-amt" style="font-weight:700; color:#064e3b;" data-key="${key}" data-field="total">${(m.total||0).toLocaleString('en-IN')}</td>`;
+        html += `</tr>`;
+    }
+
+    // Totals row
+    html += '<tr class="cp-totals-row"><td colspan="2" style="text-align:right; padding-right:10px;">SELECTED TOTAL →</td>';
+    html += '<td id="sumEpf" class="cp-row-amt">0</td>';
+    html += '<td id="sumEsic" class="cp-row-amt">0</td>';
+    html += '<td id="sumFee" class="cp-row-amt">0</td>';
+    html += '<td id="sumOther" class="cp-row-amt">0</td>';
+    html += '<td id="sumTotal" class="cp-row-amt">0</td>';
+    html += '</tr>';
+
+    html += '</tbody></table>';
+    body.innerHTML = html;
+
+    recalcTotals();
+}
+
+function toggleMonth(checkbox) {
+    const key = checkbox.dataset.key;
+    if (checkbox.checked) {
+        selectedMonthIds.add(key);
     } else {
-        document.getElementById('tds_amount').value = 0;
-        document.getElementById('tds_hint').textContent = tdsInfo && !tdsInfo.applicable ? 'TDS not applicable for this client' : 'Default 0. Enter only if client deducted TDS.';
-        document.getElementById('tds_hint').style.color = '#94a3b8';
+        selectedMonthIds.delete(key);
     }
-    calcBalance();
-    fetchSuggestion();
-    updateNarration();
+    // Update row class
+    const row = document.querySelector(`tr[data-key="${key}"]`);
+    if (row && !row.classList.contains('paid')) {
+        row.classList.toggle('selected', checkbox.checked);
+    }
+    recalcTotals();
 }
 
-function updateNarration(){
-    var month = document.getElementById('suggest_month').value;
-    var year = document.getElementById('suggest_year').value;
-    var estSel = document.getElementById('est_select');
-    var clientName = estSel.options[estSel.selectedIndex] ? estSel.options[estSel.selectedIndex].text : '';
-    if(month && year && clientName && clientName !== '— Select Client —'){
-        document.getElementById('narration_field').value = monthNames[parseInt(month)] + '-' + year + ' Compliance Payment of EPF/ESIC - ' + clientName;
-    }
+function onMonthEdit(input) {
+    const key = input.dataset.key;
+    const field = input.dataset.field;
+    const m = loadedMonths.find(x => `${x.year}-${x.month}` === key);
+    if (!m) return;
+    m[field] = parseFloat(input.value) || 0;
+    m.total = (m.epf||0) + (m.esic||0) + (m.fee||0) + (m.other||0);
+
+    // Update row total cell
+    const totalCell = document.querySelector(`td[data-key="${key}"][data-field="total"]`);
+    if (totalCell) totalCell.textContent = m.total.toLocaleString('en-IN');
+
+    recalcTotals();
 }
 
-function fetchSuggestion(){
-    var estId = document.getElementById('est_select').value;
-    var month = document.getElementById('suggest_month').value;
-    var year = document.getElementById('suggest_year').value;
-    var status = document.getElementById('suggest_status');
-
-    updateNarration();
-
-    if(!estId || !month || !year){ return; }
-
-    status.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Loading...';
-
-    fetch('/accounts/client-payment/suggest?est_id='+estId+'&month='+month+'&year='+year)
-    .then(r => r.json())
-    .then(data => {
-        if(data.found){
-            document.getElementById('epf_amount').value = data.epf_payable || 0;
-            document.getElementById('esic_amount').value = data.esic_payable || 0;
-            document.getElementById('fee_amount').value = data.professional_fee || 0;
-            document.getElementById('other_amount').value = data.other_charges || 0;
-            document.getElementById('other_desc').value = data.other_charges_desc || '';
-            document.getElementById('payroll_id').value = data.payroll_id || '';
-
-            // TDS from payroll suggest (overrides initial auto-fill with actual fee)
-            if(data.tds_applicable && data.tds_on_fee > 0){
-                document.getElementById('tds_amount').value = data.tds_on_fee;
-                document.getElementById('tds_hint').textContent = 'Auto: ' + data.tds_rate + '% TDS on fee of \u20B9' + (data.professional_fee || 0).toLocaleString('en-IN');
-                document.getElementById('tds_hint').style.color = '#059669';
-            }
-
-            // Excess balance
-            if(data.excess_balance > 0){
-                document.getElementById('excess_banner').style.display = 'block';
-                document.getElementById('excess_display').textContent = '\u20B9' + data.excess_balance.toLocaleString('en-IN');
-                document.getElementById('excess_adjust').value = data.excess_balance;
-            } else {
-                document.getElementById('excess_banner').style.display = 'none';
-                document.getElementById('excess_adjust').value = 0;
-            }
-
-            calcBalance();
-            status.innerHTML = '<i class="bi bi-check-circle text-success me-1"></i>Auto-filled from payroll. <strong>You can edit all amounts.</strong>';
-        } else {
-            status.innerHTML = '<i class="bi bi-exclamation-circle text-warning me-1"></i>No payroll found for this month. Enter manually.';
+function recalcTotals() {
+    // Sum only SELECTED months
+    let sumEpf = 0, sumEsic = 0, sumFee = 0, sumOther = 0;
+    for (const m of loadedMonths) {
+        const key = `${m.year}-${m.month}`;
+        if (selectedMonthIds.has(key)) {
+            sumEpf  += (m.epf  || 0);
+            sumEsic += (m.esic || 0);
+            sumFee  += (m.fee  || 0);
+            sumOther+= (m.other|| 0);
         }
-    })
-    .catch(e => {
-        status.innerHTML = '<i class="bi bi-x-circle text-danger me-1"></i>Error fetching data.';
-    });
-}
-
-function calcBalance(){
-    var epf = parseFloat(document.getElementById('epf_amount').value) || 0;
-    var esic = parseFloat(document.getElementById('esic_amount').value) || 0;
-    var fee = parseFloat(document.getElementById('fee_amount').value) || 0;
-    var other = parseFloat(document.getElementById('other_amount').value) || 0;
-    var received = parseFloat(document.getElementById('total_received').value) || 0;
-    var tds = parseFloat(document.getElementById('tds_amount').value) || 0;
-    var excess = parseFloat(document.getElementById('excess_adjust').value) || 0;
-
-    var breakup = epf + esic + fee + other;
-    var source = received + tds + excess;
-
-    document.getElementById('breakup_total').textContent = '\u20B9' + Math.round(breakup).toLocaleString('en-IN');
-    document.getElementById('source_total').textContent = '\u20B9' + Math.round(source).toLocaleString('en-IN');
-
-    var diff = breakup - source;
-    var statusEl = document.getElementById('balance_status');
-    var checkDiv = document.getElementById('balance_check');
-
-    if(Math.abs(diff) < 1){
-        statusEl.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>Balanced';
-        statusEl.style.color = '#16a34a';
-        checkDiv.style.background = '#f0fdf4';
-        checkDiv.style.borderColor = '#bbf7d0';
-    } else if(diff > 0){
-        statusEl.innerHTML = '<i class="bi bi-info-circle me-1"></i>Part Payment — Balance Due \u20B9' + Math.round(diff).toLocaleString('en-IN') + ' (will remain on client ledger)';
-        statusEl.style.color = '#d97706';
-        checkDiv.style.background = '#fefce8';
-        checkDiv.style.borderColor = '#fde68a';
-    } else {
-        statusEl.innerHTML = '<i class="bi bi-info-circle me-1"></i>Excess \u20B9' + Math.round(Math.abs(diff)).toLocaleString('en-IN') + ' (will be saved as Excess Receipt)';
-        statusEl.style.color = '#d97706';
-        checkDiv.style.background = '#fefce8';
-        checkDiv.style.borderColor = '#fde68a';
     }
+    const allocTotal = sumEpf + sumEsic + sumFee + sumOther;
+
+    // Reflect in footer row
+    const fmt2 = v => Number(v).toLocaleString('en-IN', {maximumFractionDigits: 2});
+    const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = fmt2(v); };
+    setText('sumEpf', sumEpf); setText('sumEsic', sumEsic);
+    setText('sumFee', sumFee); setText('sumOther', sumOther);
+    setText('sumTotal', allocTotal);
+
+    // Update selected count
+    const count = document.getElementById('monthsCount');
+    if (count) count.textContent = selectedMonthIds.size > 0 ? `${selectedMonthIds.size} month(s) selected` : '';
+
+    // Compare with source
+    const received = parseFloat(document.getElementById('totalReceived').value) || 0;
+    const tds = parseFloat(document.getElementById('tdsAmount').value) || 0;
+    const excess = parseFloat(document.getElementById('excessAdjust').value) || 0;
+    const source = received + tds + excess;
+    const diff = allocTotal - source;
+
+    const statusBar = document.getElementById('balanceStatus');
+    const saveBtn = document.getElementById('saveBtn');
+
+    let msg = '', cls = '', enabled = false;
+    if (selectedMonthIds.size === 0) {
+        msg = '<i class="bi bi-info-circle me-1"></i><strong>Pending:</strong> Select months to allocate the received amount';
+        cls = 'cp-status-diff';
+    } else if (received <= 0) {
+        msg = '<i class="bi bi-exclamation-circle me-1"></i><strong>Missing:</strong> Enter Total Amount Received';
+        cls = 'cp-status-diff';
+    } else if (Math.abs(diff) < 0.5) {
+        msg = '<i class="bi bi-check-circle me-1"></i><strong>Balanced ✓</strong> — Ready to save';
+        cls = 'cp-status-balanced';
+        enabled = true;
+    } else if (diff > 0) {
+        msg = `<i class="bi bi-exclamation-triangle me-1"></i><strong>Short by ₹${fmt2(diff)}</strong> — Allocation exceeds received amount`;
+        cls = 'cp-status-error';
+    } else {
+        msg = `<i class="bi bi-info-circle me-1"></i><strong>Excess ₹${fmt2(Math.abs(diff))}</strong> — Will be posted as client advance`;
+        cls = 'cp-status-diff';
+        enabled = true;  // Excess is OK, saved as advance
+    }
+
+    statusBar.innerHTML = `<span>${msg}</span><span>Allocated: ${fmt(allocTotal)} | Source: ${fmt(source)}</span>`;
+    statusBar.className = 'cp-status-bar ' + cls;
+    saveBtn.disabled = !enabled;
+
+    // Update hidden field (JSON of selected months)
+    updateMonthsJson();
 }
 
-{% if edit_mode is defined and edit_mode %}
-// Pre-fill fields in edit mode
-document.addEventListener('DOMContentLoaded', function(){
-    document.getElementById('total_received').value = {{ ed.total_received|int }};
-    document.getElementById('tds_amount').value = {{ ed.tds_amount|int }};
-    document.getElementById('epf_amount').value = {{ ed.epf_amount|int }};
-    document.getElementById('esic_amount').value = {{ ed.esic_amount|int }};
-    document.getElementById('fee_amount').value = {{ ed.fee_amount|int }};
-    document.getElementById('other_amount').value = {{ ed.other_amount|int }};
-    document.getElementById('other_desc').value = '{{ ed.other_desc }}';
-    document.getElementById('excess_adjust').value = {{ ed.excess_adjust|int }};
-    document.getElementById('narration_field').value = '{{ ed.narration|e }}';
-    document.querySelector('[name="reference"]').value = '{{ ed.reference|e }}';
-    {% if ed.bank_id %}
-    document.querySelector('[name="bank_account_id"]').value = {{ ed.bank_id }};
-    {% endif %}
-    calcBalance();
-});
-{% endif %}
+function updateMonthsJson() {
+    const selected = [];
+    for (const m of loadedMonths) {
+        const key = `${m.year}-${m.month}`;
+        if (selectedMonthIds.has(key)) {
+            selected.push({
+                payroll_id: m.payroll_id,
+                year: m.year,
+                month: m.month,
+                epf: m.epf || 0,
+                esic: m.esic || 0,
+                fee: m.fee || 0,
+                other: m.other || 0,
+                other_desc: m.other_desc || '',
+            });
+        }
+    }
+    document.getElementById('monthsJson').value = JSON.stringify(selected);
+}
+
+// Initial status update
+recalcTotals();
 </script>
 {% endblock %}

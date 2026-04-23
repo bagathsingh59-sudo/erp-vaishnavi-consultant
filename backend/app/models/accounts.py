@@ -106,8 +106,27 @@ class VoucherEntry(db.Model):
     # Optional: description for this line
     particulars = db.Column(db.String(300), nullable=True)
 
+    # Period tagging — which payroll month does this entry belong to?
+    # Used for multi-month client payment entries to show clean month-wise
+    # breakup in client ledger / annual statement.
+    # Example: lump sum of ₹13,626 covering Oct-2025 to Mar-2026 creates
+    # 12 VoucherEntry rows (6 months × 2 accounts), each tagged with year+month.
+    period_year = db.Column(db.Integer, nullable=True, index=True)
+    period_month = db.Column(db.Integer, nullable=True, index=True)
+
     # Relationships
     account = db.relationship('AccountHead', backref=db.backref('entries', lazy=True))
+
+    @property
+    def period_label(self):
+        """Display label like 'Oct 2025' or empty string if no period."""
+        if not self.period_year or not self.period_month:
+            return ''
+        try:
+            import calendar
+            return f"{calendar.month_abbr[self.period_month]} {self.period_year}"
+        except (IndexError, ValueError):
+            return ''
 
     def __repr__(self):
         return f'<VoucherEntry {self.entry_type} {self.amount} → {self.account.name if self.account else "?"}>'

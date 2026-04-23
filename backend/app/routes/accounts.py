@@ -254,12 +254,19 @@ def _fy_account_movement(account_id, fy_start, fy_end):
         return total_debit - total_credit
 
 
-# ─────────────────────────────────────────────
-# CLIENT PAYMENT ENTRY (Combined Receipt + Journal)
-# ─────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════
+# CLIENT PAYMENT ENTRY — Multi-Month capable
+#   • One lump sum can be allocated across multiple payroll months
+#   • Each month's breakup (EPF, ESIC, Fee, Other) tracked separately
+#   • Generates ONE voucher with period-tagged entries for clean ledger
+# ═════════════════════════════════════════════════════════════════════
 @accounts_bp.route('/accounts/client-payment', methods=['GET', 'POST'])
 def client_payment():
     if request.method == 'POST':
+        # Check for multi-month payload (new flow)
+        if request.form.get('multi_month') == '1':
+            return _save_client_payment_multi()
+        # Legacy single-month path still supported for backward compat
         return _save_client_payment()
 
     establishments = user_establishments().filter_by(is_active=True).order_by(Establishment.company_name).all()
@@ -270,6 +277,301 @@ def client_payment():
                            establishments=establishments,
                            bank_accounts=bank_accounts,
                            today=date.today())
+
+
+# ───────────────────────────────────────────────
+# Pending months API — list months with outstanding dues for a client
+# ───────────────────────────────────────────────
+@accounts_bp.route('/accounts/client-payment/pending-months')
+def pending_months_api():
+    """AJAX endpoint: returns list of finalized payroll months for the client
+    with expected breakup (EPF, ESIC, Fee, Other) — so the multi-month
+    selector can show checkbox list."""
+    est_id = request.args.get('est_id', type=int)
+    if not est_id:
+        return jsonify({'months': []})
+
+    est = Establishment.query.get(est_id)
+    if not est:
+        return jsonify({'months': []})
+    verify_est_ownership(est)
+
+    config = PayrollConfig.query.filter_by(establishment_id=est_id).first()
+    fee_amount = round(est.fee_amount or 0)
+    tds_applicable = bool(est.tds_applicable)
+    tds_rate = est.tds_rate or 10.0
+
+    # Get all finalized payrolls for this establishment, most recent first
+    from app.models.payroll import MonthlyPayroll
+    payrolls = MonthlyPayroll.query.filter(
+        MonthlyPayroll.establishment_id == est_id,
+        MonthlyPayroll.status == 'finalized',
+    ).order_by(MonthlyPayroll.year.desc(), MonthlyPayroll.month.desc()).all()
+
+    # Figure out which months are already fully paid — exclude them
+    # A month is "paid" if there's a receipt voucher with entries tagged
+    # to that period for the client's fee/EPF/ESIC accounts.
+    paid_periods = set()
+    client_vouchers = Voucher.query.filter(
+        Voucher.establishment_id == est_id,
+        Voucher.voucher_type == 'receipt',
+    ).all()
+    for v in client_vouchers:
+        for e in v.entries:
+            if e.period_year and e.period_month and e.entry_type == 'credit':
+                paid_periods.add((e.period_year, e.period_month))
+
+    months_data = []
+    for p in payrolls:
+        epf_payable = round((p.total_epf_employee or 0) + (p.total_epf_employer or 0)) \
+            if config and config.epf_applicable else 0
+        esic_payable = round((p.total_esic_employee or 0) + (p.total_esic_employer or 0)) \
+            if config and config.esic_applicable else 0
+        other_charges = round(p.other_charges_amount or 0)
+        other_desc = p.other_charges_description or ''
+        total_due = epf_payable + esic_payable + fee_amount + other_charges
+
+        is_paid = (p.year, p.month) in paid_periods
+
+        months_data.append({
+            'payroll_id': p.id,
+            'year': p.year,
+            'month': p.month,
+            'label': f"{p.month_name} {p.year}",
+            'epf': epf_payable,
+            'esic': esic_payable,
+            'fee': fee_amount,
+            'other': other_charges,
+            'other_desc': other_desc,
+            'total': total_due,
+            'is_paid': is_paid,
+        })
+
+    # Previous excess for this client
+    fy_start, fy_end, _ = _get_fy()
+    excess_balance = round(_get_client_excess(est_id, fy_start, fy_end))
+
+    return jsonify({
+        'months': months_data,
+        'tds_applicable': tds_applicable,
+        'tds_rate': tds_rate,
+        'excess_balance': excess_balance,
+        'client_name': est.display_name,
+    })
+
+
+# ───────────────────────────────────────────────
+# Save multi-month client payment
+# ───────────────────────────────────────────────
+def _save_client_payment_multi():
+    """Save a lump-sum client payment allocated across multiple payroll months.
+    Creates ONE voucher with multiple period-tagged VoucherEntry rows."""
+    try:
+        est_id = int(request.form.get('establishment_id'))
+        voucher_date = datetime.strptime(request.form.get('voucher_date'), '%Y-%m-%d').date()
+        bank_id = int(request.form.get('bank_account_id'))
+        total_received = round(float(request.form.get('total_received', 0)))
+        reference = request.form.get('reference', '').strip()
+        narration = request.form.get('narration', '').strip()
+        tds_amount = round(float(request.form.get('tds_amount', 0) or 0))
+        excess_adjust = round(float(request.form.get('excess_adjust', 0) or 0))
+
+        # months_json holds an array of selected month allocations
+        import json
+        months_raw = request.form.get('months_json', '[]')
+        month_allocations = json.loads(months_raw)
+    except (ValueError, TypeError) as e:
+        flash(f'Invalid input: {e}', 'danger')
+        return redirect(url_for('accounts.client_payment'))
+
+    if not month_allocations:
+        flash('Please select at least one month to allocate the payment.', 'danger')
+        return redirect(url_for('accounts.client_payment'))
+
+    # Sum all month allocations
+    total_epf = sum(round(m.get('epf', 0) or 0) for m in month_allocations)
+    total_esic = sum(round(m.get('esic', 0) or 0) for m in month_allocations)
+    total_fee = sum(round(m.get('fee', 0) or 0) for m in month_allocations)
+    total_other = sum(round(m.get('other', 0) or 0) for m in month_allocations)
+
+    breakup_total = total_epf + total_esic + total_fee + total_other
+    source_total = total_received + tds_amount + excess_adjust
+    diff = breakup_total - source_total
+
+    # Get accounts
+    est = Establishment.query.get(est_id)
+    verify_est_ownership(est)
+    debtor_acct = _get_or_create_debtor(est)
+    bank_acct = AccountHead.query.get(bank_id)
+    epf_acct = AccountHead.query.filter_by(name='EPF Payable').first()
+    esic_acct = AccountHead.query.filter_by(name='ESIC Payable').first()
+    fee_acct = AccountHead.query.filter_by(name='Professional Fees').first()
+    other_acct = AccountHead.query.filter_by(name='Other Income').first()
+    tds_acct = AccountHead.query.filter_by(name='TDS Receivable').first()
+    excess_acct = AccountHead.query.filter_by(name='Excess Client Receipts').first()
+
+    fy_start, fy_end, _ = _get_fy()
+
+    if voucher_date < fy_start or voucher_date > fy_end:
+        flash(f'Voucher date {voucher_date.strftime("%d-%m-%Y")} is outside the current Financial Year '
+              f'({fy_start.strftime("%d-%m-%Y")} to {fy_end.strftime("%d-%m-%Y")}).', 'danger')
+        return redirect(url_for('accounts.client_payment'))
+
+    v_num = _next_voucher_number('receipt', fy_start, fy_end)
+    client_name = est.display_name
+
+    # Period summary for narration (e.g., "Oct-2025 to Mar-2026")
+    sorted_months = sorted(month_allocations, key=lambda m: (m['year'], m['month']))
+    if len(sorted_months) == 1:
+        period_summary = f"{calendar.month_abbr[sorted_months[0]['month']]}-{sorted_months[0]['year']}"
+    else:
+        first = sorted_months[0]
+        last = sorted_months[-1]
+        period_summary = (f"{calendar.month_abbr[first['month']]}-{first['year']} "
+                          f"to {calendar.month_abbr[last['month']]}-{last['year']}")
+
+    voucher = Voucher(
+        voucher_type='receipt',
+        voucher_number=v_num,
+        voucher_date=voucher_date,
+        establishment_id=est_id,
+        payroll_id=sorted_months[0].get('payroll_id') if sorted_months else None,
+        reference=reference,
+        narration=narration or f'Payment from {client_name} — {period_summary}',
+        total_amount=total_received + tds_amount,
+        owner_id=current_user_id()
+    )
+    db.session.add(voucher)
+    db.session.flush()
+
+    # ── Create ONE entry per month per account type ──
+    # This creates a clean month-wise ledger view.
+    for alloc in sorted_months:
+        y = int(alloc['year'])
+        m = int(alloc['month'])
+        month_label = f"{calendar.month_abbr[m]}-{y}"
+        epf = round(alloc.get('epf', 0) or 0)
+        esic = round(alloc.get('esic', 0) or 0)
+        fee = round(alloc.get('fee', 0) or 0)
+        other = round(alloc.get('other', 0) or 0)
+        other_desc = (alloc.get('other_desc') or '').strip()
+
+        # Sundry Debtor side — debit each component (what client owes, now cleared)
+        if epf > 0:
+            db.session.add(VoucherEntry(
+                voucher_id=voucher.id, account_id=debtor_acct.id,
+                entry_type='debit', amount=epf,
+                particulars=f'{month_label} — EPF Payable',
+                period_year=y, period_month=m))
+        if esic > 0:
+            db.session.add(VoucherEntry(
+                voucher_id=voucher.id, account_id=debtor_acct.id,
+                entry_type='debit', amount=esic,
+                particulars=f'{month_label} — ESIC Payable',
+                period_year=y, period_month=m))
+        if fee > 0:
+            db.session.add(VoucherEntry(
+                voucher_id=voucher.id, account_id=debtor_acct.id,
+                entry_type='debit', amount=fee,
+                particulars=f'{month_label} — Professional Fee',
+                period_year=y, period_month=m))
+        if other > 0:
+            db.session.add(VoucherEntry(
+                voucher_id=voucher.id, account_id=debtor_acct.id,
+                entry_type='debit', amount=other,
+                particulars=f'{month_label} — {other_desc or "Other Charges"}',
+                period_year=y, period_month=m))
+
+        # Credit to liability / income accounts — tagged with period
+        if epf > 0 and epf_acct:
+            db.session.add(VoucherEntry(
+                voucher_id=voucher.id, account_id=epf_acct.id,
+                entry_type='credit', amount=epf,
+                particulars=f'{client_name} — {month_label} EPF',
+                period_year=y, period_month=m))
+        if esic > 0 and esic_acct:
+            db.session.add(VoucherEntry(
+                voucher_id=voucher.id, account_id=esic_acct.id,
+                entry_type='credit', amount=esic,
+                particulars=f'{client_name} — {month_label} ESIC',
+                period_year=y, period_month=m))
+        if fee > 0 and fee_acct:
+            db.session.add(VoucherEntry(
+                voucher_id=voucher.id, account_id=fee_acct.id,
+                entry_type='credit', amount=fee,
+                particulars=f'{client_name} — {month_label} Professional Fee',
+                period_year=y, period_month=m))
+        if other > 0 and other_acct:
+            db.session.add(VoucherEntry(
+                voucher_id=voucher.id, account_id=other_acct.id,
+                entry_type='credit', amount=other,
+                particulars=f'{client_name} — {month_label} {other_desc or "Other Charges"}',
+                period_year=y, period_month=m))
+
+    # ── Single credit on Sundry Debtor for total received (clears outstanding) ──
+    paid_total = total_received + tds_amount
+    if paid_total > 0:
+        tds_note = f' + TDS {"{:,.0f}".format(tds_amount)}' if tds_amount else ''
+        db.session.add(VoucherEntry(
+            voucher_id=voucher.id, account_id=debtor_acct.id,
+            entry_type='credit', amount=paid_total,
+            particulars=f'{period_summary} — Received ₹{"{:,.0f}".format(total_received)}{tds_note}'))
+
+    # Bank receives money
+    if total_received > 0:
+        db.session.add(VoucherEntry(
+            voucher_id=voucher.id, account_id=bank_acct.id,
+            entry_type='debit', amount=total_received,
+            particulars=f'Received from {client_name} — {period_summary}'))
+    # TDS Receivable
+    if tds_amount > 0 and tds_acct:
+        db.session.add(VoucherEntry(
+            voucher_id=voucher.id, account_id=tds_acct.id,
+            entry_type='debit', amount=tds_amount,
+            particulars=f'TDS by {client_name} — {period_summary}'))
+
+    # Excess / advance handling
+    if diff < 0:
+        # Client paid MORE than allocated → excess advance
+        excess_amt = abs(diff)
+        if debtor_acct:
+            db.session.add(VoucherEntry(
+                voucher_id=voucher.id, account_id=debtor_acct.id,
+                entry_type='debit', amount=excess_amt,
+                particulars=f'Advance / Excess Receipt'))
+        if excess_acct:
+            db.session.add(VoucherEntry(
+                voucher_id=voucher.id, account_id=excess_acct.id,
+                entry_type='credit', amount=excess_amt,
+                particulars=f'{client_name} — Excess Receipt'))
+
+    # Adjust from previous excess (DR on Excess = reduce liability)
+    if excess_adjust > 0 and excess_acct:
+        db.session.add(VoucherEntry(
+            voucher_id=voucher.id, account_id=excess_acct.id,
+            entry_type='debit', amount=excess_adjust,
+            particulars=f'Adjusted from previous excess'))
+
+    # ── Balance check ──
+    db.session.flush()
+    final_entries = VoucherEntry.query.filter_by(voucher_id=voucher.id).all()
+    final_dr = round(sum(e.amount for e in final_entries if e.entry_type == 'debit'))
+    final_cr = round(sum(e.amount for e in final_entries if e.entry_type == 'credit'))
+    if final_dr != final_cr:
+        db.session.rollback()
+        flash(f'Voucher rejected — Debit (₹{final_dr:,.0f}) ≠ Credit (₹{final_cr:,.0f}). '
+              f'Difference: ₹{abs(final_dr - final_cr):,.0f}.', 'danger')
+        return redirect(url_for('accounts.client_payment'))
+
+    log_activity('created', 'voucher', entity_id=voucher.id,
+                 entity_name=f'{v_num} — {client_name}',
+                 details=f'Multi-month receipt ₹{total_received:,.0f} for {len(sorted_months)} month(s): {period_summary}',
+                 establishment_id=est_id)
+
+    db.session.commit()
+    flash(f'Client payment {v_num} recorded — ₹{total_received:,.0f} allocated across '
+          f'{len(sorted_months)} month(s) ({period_summary}) ✓', 'success')
+    return redirect(url_for('accounts.accounts_home'))
 
 
 @accounts_bp.route('/accounts/client-payment/suggest')
@@ -908,48 +1210,144 @@ def client_statement(account_id):
         Voucher.voucher_date <= period_end
     ).order_by(Voucher.voucher_date, Voucher.id).all()
 
-    # Build month-wise breakup from voucher entries
+    # Build month-wise breakup from voucher entries.
+    # NEW: A single voucher may be TAGGED across multiple payroll periods
+    # (via VoucherEntry.period_year + period_month). In that case, we emit
+    # ONE row per period, so the client ledger shows clean month-wise data.
+    # Legacy vouchers without period tags still produce a single row (old behavior).
     statement_rows = []
     running_balance = 0
 
     for v in vouchers:
-        row = {
-            'date': v.voucher_date,
-            'voucher': v.voucher_number,
-            'narration': v.narration,
-            'reference': v.reference,
-            'epf': 0, 'esic': 0, 'fee': 0, 'other': 0, 'other_desc': '',
-            'tds': 0, 'excess': 0, 'excess_adj': 0,
-            'total_due': 0, 'total_received': 0, 'balance': 0
-        }
+        # Pass 1: Build period-tagged breakup on the credit side
+        period_map = {}  # (year, month) → {'epf', 'esic', 'fee', 'other', 'other_desc'}
+        has_period_data = False
 
         for entry in v.entries:
+            if entry.entry_type != 'credit':
+                continue
+            if not (entry.period_year and entry.period_month):
+                continue
+            if not entry.account:
+                continue
+
             acct_name = entry.account.name
-            if entry.entry_type == 'credit':
-                if acct_name == 'EPF Payable':
-                    row['epf'] = entry.amount
-                elif acct_name == 'ESIC Payable':
-                    row['esic'] = entry.amount
-                elif acct_name == 'Professional Fees':
-                    row['fee'] = entry.amount
-                elif acct_name in ('Other Income', 'IP & UAN Charges'):
-                    row['other'] += entry.amount
-                    row['other_desc'] = entry.particulars.split('—')[-1].strip() if '—' in (entry.particulars or '') else ''
-                elif acct_name == 'Excess Client Receipts':
-                    row['excess'] = entry.amount
-            elif entry.entry_type == 'debit':
-                if acct_name == 'SBI Current Account' or entry.account.group.name == 'Bank Accounts':
-                    row['total_received'] += entry.amount
+            key = (entry.period_year, entry.period_month)
+            if key not in period_map:
+                period_map[key] = {'epf': 0, 'esic': 0, 'fee': 0, 'other': 0, 'other_desc': ''}
+
+            if acct_name == 'EPF Payable':
+                period_map[key]['epf'] += entry.amount
+                has_period_data = True
+            elif acct_name == 'ESIC Payable':
+                period_map[key]['esic'] += entry.amount
+                has_period_data = True
+            elif acct_name == 'Professional Fees':
+                period_map[key]['fee'] += entry.amount
+                has_period_data = True
+            elif acct_name in ('Other Income', 'IP & UAN Charges'):
+                period_map[key]['other'] += entry.amount
+                if entry.particulars and '—' in entry.particulars:
+                    period_map[key]['other_desc'] = entry.particulars.split('—')[-1].strip()
+                has_period_data = True
+
+        # Pass 2: Compute voucher-level totals (bank, TDS, excess)
+        v_total_received = 0
+        v_total_tds = 0
+        v_total_excess = 0
+        v_total_excess_adj = 0
+        for entry in v.entries:
+            if not entry.account:
+                continue
+            acct_name = entry.account.name
+            group_name = entry.account.group.name if entry.account.group else ''
+            if entry.entry_type == 'debit':
+                if group_name == 'Bank Accounts':
+                    v_total_received += entry.amount
                 elif acct_name == 'TDS Receivable':
-                    row['tds'] = entry.amount
+                    v_total_tds += entry.amount
                 elif acct_name == 'Excess Client Receipts':
-                    row['excess_adj'] = entry.amount
+                    v_total_excess_adj += entry.amount
+            elif entry.entry_type == 'credit':
+                if acct_name == 'Excess Client Receipts':
+                    v_total_excess += entry.amount
 
-        row['total_due'] = row['epf'] + row['esic'] + row['fee'] + row['other']
-        running_balance += row['total_due'] - (row['total_received'] + row['tds'])
-        row['balance'] = running_balance
+        if has_period_data:
+            # ── MULTI-MONTH: emit ONE row per period ──
+            sorted_keys = sorted(period_map.keys())
+            for idx, key in enumerate(sorted_keys):
+                y, m = key
+                data = period_map[key]
+                period_total = data['epf'] + data['esic'] + data['fee'] + data['other']
 
-        statement_rows.append(row)
+                row = {
+                    'date': v.voucher_date,
+                    'voucher': v.voucher_number,
+                    'narration': v.narration,
+                    'reference': v.reference,
+                    'period_label': f"{calendar.month_abbr[m]} {y}",
+                    'epf': data['epf'],
+                    'esic': data['esic'],
+                    'fee': data['fee'],
+                    'other': data['other'],
+                    'other_desc': data['other_desc'],
+                    # Each period is fully settled by the allocation, so
+                    # Received = Due for display purposes per row.
+                    'total_due': period_total,
+                    'total_received': period_total,
+                    'tds': v_total_tds if idx == 0 else 0,
+                    'excess': v_total_excess if idx == 0 else 0,
+                    'excess_adj': v_total_excess_adj if idx == 0 else 0,
+                    'is_multi_month_row': True,
+                    'balance': 0,
+                }
+                # Balance math: receipt fully offsets the due → net zero per row
+                running_balance += row['total_due'] - (row['total_received'] + row['tds'])
+                row['balance'] = running_balance
+                statement_rows.append(row)
+        else:
+            # ── LEGACY / SINGLE-MONTH: original single-row behaviour ──
+            row = {
+                'date': v.voucher_date,
+                'voucher': v.voucher_number,
+                'narration': v.narration,
+                'reference': v.reference,
+                'period_label': '',
+                'epf': 0, 'esic': 0, 'fee': 0, 'other': 0, 'other_desc': '',
+                'tds': 0, 'excess': 0, 'excess_adj': 0,
+                'is_multi_month_row': False,
+                'total_due': 0, 'total_received': 0, 'balance': 0
+            }
+            for entry in v.entries:
+                if not entry.account:
+                    continue
+                acct_name = entry.account.name
+                group_name = entry.account.group.name if entry.account.group else ''
+                if entry.entry_type == 'credit':
+                    if acct_name == 'EPF Payable':
+                        row['epf'] = entry.amount
+                    elif acct_name == 'ESIC Payable':
+                        row['esic'] = entry.amount
+                    elif acct_name == 'Professional Fees':
+                        row['fee'] = entry.amount
+                    elif acct_name in ('Other Income', 'IP & UAN Charges'):
+                        row['other'] += entry.amount
+                        if entry.particulars and '—' in entry.particulars:
+                            row['other_desc'] = entry.particulars.split('—')[-1].strip()
+                    elif acct_name == 'Excess Client Receipts':
+                        row['excess'] = entry.amount
+                elif entry.entry_type == 'debit':
+                    if group_name == 'Bank Accounts':
+                        row['total_received'] += entry.amount
+                    elif acct_name == 'TDS Receivable':
+                        row['tds'] = entry.amount
+                    elif acct_name == 'Excess Client Receipts':
+                        row['excess_adj'] = entry.amount
+
+            row['total_due'] = row['epf'] + row['esic'] + row['fee'] + row['other']
+            running_balance += row['total_due'] - (row['total_received'] + row['tds'])
+            row['balance'] = running_balance
+            statement_rows.append(row)
 
     # Totals
     totals = {

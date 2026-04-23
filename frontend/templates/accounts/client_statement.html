@@ -236,6 +236,7 @@
                 <tr>
                     <th style="width:75px;">Date</th>
                     <th style="width:55px;">Voucher</th>
+                    <th style="width:85px;">Period</th>
                     <th>Narration / Reference</th>
                     <th style="text-align:right;">EPF</th>
                     <th style="text-align:right;">ESIC</th>
@@ -253,6 +254,15 @@
                     <td>{{ row.date.strftime('%d-%m-%Y') }}</td>
                     <td>
                         <span class="cs-tag" style="background:#e0e7ff; color:#4338ca;">{{ row.voucher }}</span>
+                    </td>
+                    <td>
+                        {% if row.period_label %}
+                        <span style="background:#ecfdf5; color:#047857; padding:2px 8px; border-radius:10px; font-size:0.62rem; font-weight:700;">
+                            {{ row.period_label }}
+                        </span>
+                        {% else %}
+                        <span style="font-size:0.6rem; color:#cbd5e1;">—</span>
+                        {% endif %}
                     </td>
                     <td>
                         <div style="font-weight:600; color:#1e293b;">{{ row.narration or '—' }}</div>
@@ -275,7 +285,7 @@
                 </tr>
                 {% endfor %}
                 {% if not statement_rows %}
-                <tr><td colspan="11" class="text-center text-muted py-4">
+                <tr><td colspan="12" class="text-center text-muted py-4">
                     <i class="bi bi-inbox" style="font-size:1.5rem; color:#cbd5e1;"></i><br>
                     No transactions recorded for this period.
                 </td></tr>
@@ -284,7 +294,7 @@
             {% if statement_rows %}
             <tfoot>
                 <tr class="cs-total-row">
-                    <td colspan="3" style="text-align:right; padding-right:10px;">TOTAL</td>
+                    <td colspan="4" style="text-align:right; padding-right:10px;">TOTAL</td>
                     <td class="cs-amt cs-epf">{{ "{:,.0f}".format(totals.epf) }}</td>
                     <td class="cs-amt cs-esic">{{ "{:,.0f}".format(totals.esic) }}</td>
                     <td class="cs-amt cs-fee">{{ "{:,.0f}".format(totals.fee) }}</td>
