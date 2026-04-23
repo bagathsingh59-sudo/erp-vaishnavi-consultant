@@ -147,6 +147,29 @@ body {
     min-width: 0;                                /* allow flex child to shrink */
 }
 
+/* Compact ADMIN tag — tight padding so it doesn't push text to wrap */
+.sidebar-link span.admin-tag {
+    flex: 0 0 auto;                              /* don't grow/shrink */
+    font-size: 0.5rem;
+    font-weight: 800;
+    padding: 1px 5px;
+    border-radius: 6px;
+    background: #fbbf24;
+    color: #78350f;
+    letter-spacing: 0.05em;
+    margin-left: 4px;
+    line-height: 1.4;
+    align-self: center;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+/* Active state: ADMIN tag adjusts to stay visible on indigo bg */
+.sidebar-link.active span.admin-tag {
+    background: rgba(251, 191, 36, 0.95);        /* bright gold stays visible */
+    color: #000;
+}
+
 /* Hover: gentle indigo wash, brighten text, slight rightward slide */
 .sidebar-link:hover {
     background: linear-gradient(90deg,

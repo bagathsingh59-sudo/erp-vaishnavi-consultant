@@ -182,16 +182,16 @@
             </a>
             <a href="{{ url_for('loan.loan_home') }}"
                class="sidebar-link {% if request.endpoint and request.endpoint.startswith('loan.') %}active{% endif %}"
-               style="color:#1e3a8a;">
-                <i class="bi bi-bank" style="color:#1e3a8a;"></i>
+               style="color:#93c5fd;">
+                <i class="bi bi-bank" style="color:#93c5fd;"></i>
                 <span>Loan Accounts</span>
             </a>
             <a href="{{ url_for('admin.staff_performance') }}"
                class="sidebar-link {% if request.endpoint in ('admin.staff_performance', 'admin.reassign_staff_clients') %}active{% endif %}"
-               style="color:#7c3aed;">
-                <i class="bi bi-speedometer2" style="color:#7c3aed;"></i>
-                <span>Staff Performance</span>
-                <span style="font-size:0.5rem; background:#fef3c7; color:#92400e; padding:1px 5px; border-radius:8px; margin-left:4px; font-weight:700;">ADMIN</span>
+               style="color:#a78bfa;">
+                <i class="bi bi-speedometer2" style="color:#a78bfa;"></i>
+                <span>Staff Metrics</span>
+                <span class="admin-tag">ADMIN</span>
             </a>
             {% endif %}
 
@@ -236,10 +236,10 @@
         {% if clerk_user and clerk_user.is_admin %}
         <a href="{{ url_for('daily_mis.filing_matrix') }}"
            class="sidebar-link {% if request.endpoint == 'daily_mis.filing_matrix' %}active{% endif %}"
-           style="color:#7c3aed;">
-            <i class="bi bi-grid-3x3-gap-fill" style="color:#7c3aed;"></i>
-            <span>Filing Status Matrix</span>
-            <span style="font-size:0.5rem; background:#fef3c7; color:#92400e; padding:1px 5px; border-radius:8px; margin-left:4px; font-weight:700;">ADMIN</span>
+           style="color:#a78bfa;">
+            <i class="bi bi-grid-3x3-gap-fill" style="color:#a78bfa;"></i>
+            <span>Filing Matrix</span>
+            <span class="admin-tag">ADMIN</span>
         </a>
         {% endif %}
 
