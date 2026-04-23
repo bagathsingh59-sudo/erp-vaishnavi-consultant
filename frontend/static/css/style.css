@@ -117,25 +117,34 @@ body {
     color: #64748b;                              /* slate-500 — visible but secondary */
     text-transform: uppercase;
     letter-spacing: 0.14em;
-    padding: 22px 16px 10px 20px;
+    padding: 18px 16px 8px 20px;                 /* balanced with new link spacing */
 }
 
 .sidebar-link {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 9px 14px 9px 16px;
+    padding: 11px 14px 11px 16px;                /* more vertical breathing room */
     color: #cbd5e1;                              /* slate-300 — easy on eyes, professional */
     text-decoration: none;
     border-radius: 8px;
     font-size: 0.82rem;
     font-weight: 500;
+    line-height: 1.35;                           /* proper line-height for wrapped text */
     letter-spacing: 0.01em;
     transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-    margin-bottom: 2px;
+    margin-bottom: 5px;                          /* clear gap between items (was 2px — too tight) */
+    min-height: 42px;                            /* consistent height for single + multi-line */
     position: relative;
     border-left: 3px solid transparent;          /* reserves space for active accent */
     overflow: hidden;
+}
+
+/* Link text span — allow wrapping but control spacing */
+.sidebar-link span {
+    flex: 1;                                     /* span takes available space */
+    word-break: break-word;                      /* gracefully wrap long text */
+    min-width: 0;                                /* allow flex child to shrink */
 }
 
 /* Hover: gentle indigo wash, brighten text, slight rightward slide */
@@ -174,18 +183,9 @@ body {
     transform: scale(1.05);
 }
 
-/* Subtle chevron indicator on active (right side) */
-.sidebar-link.active::after {
-    content: '';
-    position: absolute;
-    right: 14px;
-    top: 50%;
-    width: 6px;
-    height: 6px;
-    border-top: 2px solid rgba(255, 255, 255, 0.85);
-    border-right: 2px solid rgba(255, 255, 255, 0.85);
-    transform: translateY(-50%) rotate(45deg);
-}
+/* No chevron on active — the gold left-border + gradient already
+   indicate selection clearly, and the chevron competed with ADMIN badges.
+   Reserved class kept for future use if needed. */
 
 /* Icons default: follow text color smoothly, inline colors still work for categories */
 .sidebar-link i {
