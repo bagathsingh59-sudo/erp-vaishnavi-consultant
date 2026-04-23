@@ -389,6 +389,8 @@ def _auto_migrate_columns(db):
         # Multi-month client payment — tag each entry with its payroll period
         ('voucher_entries', 'period_year', 'INTEGER'),
         ('voucher_entries', 'period_month', 'INTEGER'),
+        # Compliance payment mode — fee-only vs through-us
+        ('establishments', 'compliance_payment_mode', "VARCHAR(15) DEFAULT 'through_us'"),
     ]
     for table, column, col_def in migrations:
         try:

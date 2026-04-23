@@ -46,6 +46,25 @@ class Establishment(db.Model):
     tds_applicable = db.Column(db.Boolean, default=False)     # Does this client deduct TDS?
     tds_rate = db.Column(db.Float, nullable=True)             # TDS rate %, default 10 (194J)
 
+    # Compliance Payment Mode — how does this client pay EPF/ESIC?
+    #   'through_us'    = Client pays EPF+ESIC+Fee to us, we remit to govt (default)
+    #   'client_direct' = Client pays EPF/ESIC directly from their account to govt;
+    #                     only Fee comes to us. Accounts only records Fee income.
+    compliance_payment_mode = db.Column(db.String(15), nullable=False, default='through_us')
+
+    @property
+    def opening_balance(self):
+        """Read opening balance from the linked Sundry Debtor AccountHead."""
+        from app.models.accounts import AccountHead
+        debtor = AccountHead.query.filter_by(establishment_id=self.id).first()
+        return debtor.opening_balance if debtor else 0
+
+    @property
+    def opening_balance_type(self):
+        from app.models.accounts import AccountHead
+        debtor = AccountHead.query.filter_by(establishment_id=self.id).first()
+        return (debtor.opening_balance_type if debtor else 'Dr') or 'Dr'
+
     # Bonus — Minimum Wage for this establishment's scheduled employment
     # Used as floor for bonus wage ceiling: max(₹7,000, min_wage)
     # Per Payment of Bonus Act Sec. 12. Leave blank if not applicable.

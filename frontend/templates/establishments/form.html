@@ -210,6 +210,52 @@
                     <small class="text-muted">Bonus wage ceiling floor. Blank = use ₹7,000.</small>
                 </div>
             </div>
+
+            <!-- Compliance Payment Mode + Opening Balance (accounting preferences) -->
+            <div class="row g-3 mt-2">
+                <div class="col-md-6">
+                    <label class="form-label">
+                        <i class="bi bi-cash-coin me-1" style="color:#059669;"></i>
+                        Compliance Payment Mode
+                    </label>
+                    <select name="compliance_payment_mode" class="form-select">
+                        <option value="through_us"
+                            {% if not est or (est.compliance_payment_mode or 'through_us') == 'through_us' %}selected{% endif %}>
+                            Through Us — Client pays EPF + ESIC + Fee to us; we remit to government
+                        </option>
+                        <option value="client_direct"
+                            {% if est and est.compliance_payment_mode == 'client_direct' %}selected{% endif %}>
+                            Client Pays Direct — Client pays EPF/ESIC themselves; only Fee comes to us
+                        </option>
+                    </select>
+                    <small class="text-muted">
+                        For "Client Pays Direct" mode, Client Payment Entry will pre-fill EPF &amp; ESIC as 0.
+                        Only the fee is recorded in our books.
+                    </small>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">
+                        <i class="bi bi-journal-arrow-up me-1" style="color:#dc2626;"></i>
+                        Opening Balance (₹)
+                    </label>
+                    <input type="number" name="opening_balance" class="form-control"
+                           placeholder="0" step="0.01" min="0"
+                           value="{% if est %}{{ est.opening_balance|int if est.opening_balance else '' }}{% endif %}">
+                    <small class="text-muted">From previous FY (blank if none)</small>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Opening Balance Type</label>
+                    <select name="opening_balance_type" class="form-select">
+                        <option value="Dr" {% if not est or (est.opening_balance_type or 'Dr') == 'Dr' %}selected{% endif %}>
+                            Dr (Client Owes Us)
+                        </option>
+                        <option value="Cr" {% if est and est.opening_balance_type == 'Cr' %}selected{% endif %}>
+                            Cr (We Owe Client — Excess)
+                        </option>
+                    </select>
+                    <small class="text-muted">Dr = due from client, Cr = excess paid</small>
+                </div>
+            </div>
         </div>
 
         <!-- ===== SECTION 5: Registration Expiry Alerts ===== -->

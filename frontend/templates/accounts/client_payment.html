@@ -139,6 +139,35 @@
                     </div>
                 </div>
 
+                <!-- Outstanding Summary (opens when client selected) -->
+                <div class="cp-section" id="outstandingSection" style="display:none;">
+                    <div class="cp-section-title">
+                        <i class="bi bi-journal-arrow-up"></i> Outstanding Summary
+                        <span id="feeOnlyBadge" style="display:none; margin-left:8px; background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:10px; font-size:0.58rem; font-weight:700;">
+                            FEE-ONLY CLIENT (Client Pays EPF/ESIC Directly)
+                        </span>
+                    </div>
+                    <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:14px 18px;">
+                        <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:16px;">
+                            <div>
+                                <div style="font-size:0.62rem; color:#065f46; text-transform:uppercase; letter-spacing:0.5px; font-weight:700;">Opening Balance</div>
+                                <div id="openingBalDisplay" style="font-size:1.05rem; font-weight:800; color:#064e3b; margin-top:2px;">₹ 0</div>
+                                <div style="font-size:0.6rem; color:#6b7280; margin-top:1px;" id="openingBalHint">No carry-forward from previous FY</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.62rem; color:#065f46; text-transform:uppercase; letter-spacing:0.5px; font-weight:700;">Current Pending Total</div>
+                                <div id="pendingTotalDisplay" style="font-size:1.05rem; font-weight:800; color:#064e3b; margin-top:2px;">₹ 0</div>
+                                <div style="font-size:0.6rem; color:#6b7280; margin-top:1px;" id="pendingTotalHint">Sum of all unpaid months</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.62rem; color:#065f46; text-transform:uppercase; letter-spacing:0.5px; font-weight:700;">Excess Balance</div>
+                                <div id="excessDisplay" style="font-size:1.05rem; font-weight:800; color:#064e3b; margin-top:2px;">₹ 0</div>
+                                <div style="font-size:0.6rem; color:#6b7280; margin-top:1px;">Previous overpayment — can be adjusted</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Amount Received -->
                 <div class="cp-section">
                     <div class="cp-section-title"><i class="bi bi-bank"></i> Amount Received</div>
@@ -227,6 +256,8 @@ function onClientChange() {
     if (!estId) {
         body.innerHTML = '<div class="cp-empty"><i class="bi bi-inbox" style="font-size:1.5rem; color:#cbd5e1;"></i><br>No client selected yet.</div>';
         hint.innerHTML = '<i class="bi bi-arrow-up me-1"></i>Select a client above to see pending months';
+        const section = document.getElementById('outstandingSection');
+        if (section) section.style.display = 'none';
         updateNotes();
         updateMonthsJson();
         return;
@@ -242,12 +273,63 @@ function onClientChange() {
             clientInfo.tds_applicable = data.tds_applicable;
             clientInfo.tds_rate = data.tds_rate;
             clientInfo.excess_balance = data.excess_balance || 0;
+            clientInfo.opening_balance = data.opening_balance || 0;
+            clientInfo.opening_balance_type = data.opening_balance_type || 'Dr';
+            clientInfo.is_fee_only = !!data.is_fee_only;
             updateNotes();
+            updateOutstandingPanel();
             renderMonthsTable();
         })
         .catch(e => {
             body.innerHTML = '<div class="cp-empty" style="color:#dc2626;">Failed to load: ' + e + '</div>';
         });
+}
+
+function updateOutstandingPanel() {
+    const section = document.getElementById('outstandingSection');
+    const feeOnlyBadge = document.getElementById('feeOnlyBadge');
+    if (!section) return;
+    section.style.display = 'block';
+    feeOnlyBadge.style.display = clientInfo.is_fee_only ? 'inline-block' : 'none';
+
+    // Opening balance display
+    const obDisplay = document.getElementById('openingBalDisplay');
+    const obHint = document.getElementById('openingBalHint');
+    if (clientInfo.opening_balance > 0) {
+        const ob = clientInfo.opening_balance;
+        const typ = clientInfo.opening_balance_type;
+        if (typ === 'Dr') {
+            obDisplay.textContent = '₹ ' + ob.toLocaleString('en-IN') + ' Dr';
+            obDisplay.style.color = '#991b1b';
+            obHint.textContent = 'Client owes from previous FY';
+        } else {
+            obDisplay.textContent = '₹ ' + ob.toLocaleString('en-IN') + ' Cr';
+            obDisplay.style.color = '#065f46';
+            obHint.textContent = 'Advance — can be adjusted against new dues';
+        }
+    } else {
+        obDisplay.textContent = '₹ 0';
+        obDisplay.style.color = '#064e3b';
+        obHint.textContent = 'No carry-forward from previous FY';
+    }
+
+    // Pending total = sum of all unpaid months
+    let pending = 0;
+    for (const m of loadedMonths) {
+        if (!m.is_paid) pending += (m.total || 0);
+    }
+    document.getElementById('pendingTotalDisplay').textContent = '₹ ' + pending.toLocaleString('en-IN');
+    document.getElementById('pendingTotalHint').textContent = loadedMonths.filter(m=>!m.is_paid).length + ' unpaid month(s)';
+
+    // Excess display
+    const excessEl = document.getElementById('excessDisplay');
+    if (clientInfo.excess_balance > 0) {
+        excessEl.textContent = '₹ ' + clientInfo.excess_balance.toLocaleString('en-IN');
+        excessEl.style.color = '#065f46';
+    } else {
+        excessEl.textContent = '₹ 0';
+        excessEl.style.color = '#94a3b8';
+    }
 }
 
 function updateNotes() {

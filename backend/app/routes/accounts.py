@@ -301,6 +301,12 @@ def pending_months_api():
     tds_applicable = bool(est.tds_applicable)
     tds_rate = est.tds_rate or 10.0
 
+    # NEW: Check compliance payment mode
+    # For "client_direct" clients (e.g., Bilgundi), client pays EPF/ESIC
+    # themselves. Our books only record the fee. Pre-fill EPF=0, ESIC=0.
+    payment_mode = getattr(est, 'compliance_payment_mode', 'through_us') or 'through_us'
+    is_fee_only = (payment_mode == 'client_direct')
+
     # Get all finalized payrolls for this establishment, most recent first
     from app.models.payroll import MonthlyPayroll
     payrolls = MonthlyPayroll.query.filter(
@@ -308,9 +314,7 @@ def pending_months_api():
         MonthlyPayroll.status == 'finalized',
     ).order_by(MonthlyPayroll.year.desc(), MonthlyPayroll.month.desc()).all()
 
-    # Figure out which months are already fully paid — exclude them
-    # A month is "paid" if there's a receipt voucher with entries tagged
-    # to that period for the client's fee/EPF/ESIC accounts.
+    # Figure out which months are already paid
     paid_periods = set()
     client_vouchers = Voucher.query.filter(
         Voucher.establishment_id == est_id,
@@ -323,14 +327,18 @@ def pending_months_api():
 
     months_data = []
     for p in payrolls:
-        epf_payable = round((p.total_epf_employee or 0) + (p.total_epf_employer or 0)) \
-            if config and config.epf_applicable else 0
-        esic_payable = round((p.total_esic_employee or 0) + (p.total_esic_employer or 0)) \
-            if config and config.esic_applicable else 0
+        if is_fee_only:
+            # Client pays EPF/ESIC directly — only fee comes to us
+            epf_payable = 0
+            esic_payable = 0
+        else:
+            epf_payable = round((p.total_epf_employee or 0) + (p.total_epf_employer or 0)) \
+                if config and config.epf_applicable else 0
+            esic_payable = round((p.total_esic_employee or 0) + (p.total_esic_employer or 0)) \
+                if config and config.esic_applicable else 0
         other_charges = round(p.other_charges_amount or 0)
         other_desc = p.other_charges_description or ''
         total_due = epf_payable + esic_payable + fee_amount + other_charges
-
         is_paid = (p.year, p.month) in paid_periods
 
         months_data.append({
@@ -347,15 +355,27 @@ def pending_months_api():
             'is_paid': is_paid,
         })
 
-    # Previous excess for this client
+    # Opening balance and excess
     fy_start, fy_end, _ = _get_fy()
     excess_balance = round(_get_client_excess(est_id, fy_start, fy_end))
+
+    # Get Sundry Debtor account for this establishment (opening balance)
+    debtor = AccountHead.query.filter_by(establishment_id=est_id).first()
+    opening_bal = 0
+    opening_bal_type = 'Dr'
+    if debtor:
+        opening_bal = round(debtor.opening_balance or 0)
+        opening_bal_type = debtor.opening_balance_type or 'Dr'
 
     return jsonify({
         'months': months_data,
         'tds_applicable': tds_applicable,
         'tds_rate': tds_rate,
         'excess_balance': excess_balance,
+        'opening_balance': opening_bal,
+        'opening_balance_type': opening_bal_type,
+        'compliance_payment_mode': payment_mode,
+        'is_fee_only': is_fee_only,
         'client_name': est.display_name,
     })
 

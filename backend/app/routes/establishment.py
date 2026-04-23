@@ -476,6 +476,10 @@ def _save_establishment_form(est, is_new=False):
     except ValueError:
         est.bonus_min_wage = None
 
+    # Compliance Payment Mode
+    mode = request.form.get('compliance_payment_mode', 'through_us') or 'through_us'
+    est.compliance_payment_mode = 'client_direct' if mode == 'client_direct' else 'through_us'
+
     if is_new:
         est.owner_id = current_user_id()
         # Auto-assign to creator — admin can reassign later from staff dashboard
@@ -483,6 +487,36 @@ def _save_establishment_form(est, is_new=False):
         est.is_active = True
         db.session.add(est)
         db.session.flush()  # Get est.id for related tables
+
+    # --- Opening Balance on Sundry Debtor account ---
+    # Create or update the linked AccountHead with the user-entered opening balance
+    try:
+        ob_str = request.form.get('opening_balance', '').strip()
+        ob_type = request.form.get('opening_balance_type', 'Dr').strip() or 'Dr'
+        if ob_type not in ('Dr', 'Cr'):
+            ob_type = 'Dr'
+        ob_amount = float(ob_str) if ob_str else 0
+
+        # Find or create debtor account for this establishment
+        from app.models.accounts import AccountHead, AccountGroup
+        debtor_group = AccountGroup.query.filter_by(name='Sundry Debtors').first()
+        debtor = AccountHead.query.filter_by(establishment_id=est.id).first()
+        if debtor_group:
+            if not debtor:
+                debtor = AccountHead(
+                    name=est.display_name,
+                    group_id=debtor_group.id,
+                    establishment_id=est.id,
+                    is_system=False,
+                )
+                db.session.add(debtor)
+                db.session.flush()
+            # Always update name & opening balance
+            debtor.name = est.display_name
+            debtor.opening_balance = ob_amount
+            debtor.opening_balance_type = ob_type
+    except (ValueError, TypeError):
+        pass  # If opening balance invalid, leave defaults
 
     # --- Section 5: License Expiries (dynamic) ---
     # Clear existing and re-add
