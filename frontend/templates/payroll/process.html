@@ -418,32 +418,9 @@
 {% endif %}
 
 {% if entries %}
-<!-- Holiday Dates Configuration -->
-<div class="table-container" style="margin-bottom:16px;">
-    <div class="table-header" style="background:#fefce8;">
-        <div class="table-title" style="font-size:0.85rem; color:#92400e;">
-            <i class="bi bi-calendar-heart"></i> National Paid Holidays (for Attendance Register)
-        </div>
-    </div>
-    <div style="padding:12px 20px;">
-        <form method="POST" action="{{ url_for('payroll.save_holidays', payroll_id=payroll.id) }}" class="d-flex gap-3 align-items-end">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div style="flex:1;">
-                <label class="form-label" style="font-size:0.78rem; font-weight:600;">Holiday Dates (comma-separated day numbers)</label>
-                <input type="text" name="holiday_dates" id="holidayDatesInput" class="form-control form-control-sm"
-                       value="{{ payroll.holiday_dates or '' }}"
-                       placeholder="e.g., 2,15,26 (for 2nd, 15th, 26th of the month)"
-                       {% if payroll.status == 'finalized' %}disabled{% endif %}>
-                <small class="text-muted">Enter day numbers when national paid holidays fall in {{ payroll.month_name }} {{ payroll.year }}</small>
-            </div>
-            {% if payroll.status != 'finalized' %}
-            <button type="submit" class="btn btn-outline-warning btn-sm">
-                <i class="bi bi-check-lg me-1"></i> Save Holidays
-            </button>
-            {% endif %}
-        </form>
-    </div>
-</div>
+{# National Paid Holidays section REMOVED — holidays now captured in the
+   Finalize modal (default 0). Removes redundancy and simplifies the
+   attendance entry flow.  #}
 
 <form method="POST" action="{{ url_for('payroll.save_attendance', payroll_id=payroll.id) }}" onsubmit="return validateBeforeSave()">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

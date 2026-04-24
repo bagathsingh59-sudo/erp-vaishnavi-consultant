@@ -530,7 +530,11 @@
 </div>
 {% endif %}
 
-<!-- ==================== ACCOUNTS SUMMARY ==================== -->
+<!-- ==================== ACCOUNTS SUMMARY (ADMIN-ONLY) ==================== -->
+{# Accounts Summary shows firm-level financials (income, profit, bank,
+   EPF/ESIC payables, TDS). Staff users don't need to see firm financials
+   — this is only relevant to the admin / business owner. #}
+{% if clerk_user and clerk_user.is_admin %}
 <div class="row g-3 mb-4">
     <div class="col-12">
         <div class="card border-0 dash-progress-card" style="border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,0.06); overflow:hidden;">
@@ -585,6 +589,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 
 <!-- ==================== CLIENT LIST (Compact — hero search is primary) ==================== -->
 <div class="card border-0 mb-4" style="border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06);">
