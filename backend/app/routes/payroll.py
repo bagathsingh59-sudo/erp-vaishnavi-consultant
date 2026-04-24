@@ -1907,26 +1907,40 @@ def save_attendance(payroll_id):
         entry.epf_wages = 0
 
         if config.epf_applicable:
-            # Higher deduction = EPF on full wages (no ceiling cap)
+            # ── STATUTORY EPF WAGE RULES ────────────────────────────────
+            # EPF (12%)      : base varies — full wages if 'higher' deduction,
+            #                  else capped at establishment's epf_wage_ceiling
+            # EPS (8.33%)    : ALWAYS capped at ₹15,000 (statutory EPS ceiling)
+            # EDLI (0.5%)    : ALWAYS capped at ₹15,000 (statutory EDLI ceiling)
+            # Admin (0.5%)   : Same base as EDLI (capped at ₹15,000)
+            # ────────────────────────────────────────────────────────────
+            EPF_STATUTORY_CEILING = 15000   # Hard limit for EPS + EDLI + Admin
+
+            # EPF base
             if config.epf_contribution_type == 'higher':
                 epf_wages = compliance_wages
             else:
                 epf_wages = min(compliance_wages, config.epf_wage_ceiling)
             entry.epf_wages = epf_wages
 
-            # Employee share: 12% (round to nearest rupee using round())
+            # EPS/EDLI base — always capped at ₹15,000 regardless of higher/regular
+            eps_edli_wages = min(epf_wages, EPF_STATUTORY_CEILING)
+
+            # Employee share: 12% of EPF wages (uses higher base if higher deduction)
             entry.epf_employee = round(epf_wages * config.epf_employee_rate / 100)
 
-            # Employer breakdown
-            # EPS first (8.33%), then A/c 01 = Employee 12% − EPS 8.33%
-            # This ensures 12% = 8.33% + 3.67% always balances (no rounding mismatch)
-            entry.epf_eps = round(epf_wages * config.epf_eps_rate / 100)     # 8.33%
-            entry.epf_ac01 = entry.epf_employee - entry.epf_eps              # 12% - 8.33% = 3.67%
-            entry.epf_edli = round(epf_wages * config.epf_edli_rate / 100)   # 0.5%
+            # Employer breakdown:
+            #   EPS (8.33% of capped wages) — MAX ₹1,250/employee
+            #   A/c 01 = Total employer 12% × epf_wages − EPS
+            #            (for higher deduction, A/c 01 absorbs the excess above ceiling)
+            #   EDLI (0.5% of capped wages) — MAX ₹75/employee
+            #   Admin (0.5% of capped wages)
+            entry.epf_eps = round(eps_edli_wages * config.epf_eps_rate / 100)      # 8.33% × min(wages, 15000)
+            entry.epf_ac01 = entry.epf_employee - entry.epf_eps                      # Balance: Employee 12% − EPS
+            entry.epf_edli = round(eps_edli_wages * config.epf_edli_rate / 100)    # 0.5% × min(wages, 15000)
 
-            # Admin charge: 0.5% but minimum ₹500 per establishment (spread across employees)
-            admin_calc = round(epf_wages * config.epf_admin_rate / 100)
-            entry.epf_admin = admin_calc  # Per-employee admin charge
+            # Admin charge: 0.5% of capped wages (same base as EDLI)
+            entry.epf_admin = round(eps_edli_wages * config.epf_admin_rate / 100)
 
             # Total employer contribution
             entry.epf_employer = entry.epf_ac01 + entry.epf_eps + entry.epf_admin + entry.epf_edli
@@ -2146,17 +2160,39 @@ def payroll_finalize(payroll_id):
             holiday_changed = True
 
     # EPF Payment Date (required — future dates allowed)
+    # Also computes 7Q Interest (12% p.a.) and 14B Damages (1% per month)
+    # if payment is late — so penalty reflects in summary + reimbursement letter.
     epf_date_str = (request.form.get('epf_payment_date') or '').strip()
     if epf_date_str:
         try:
+            import math
             payroll.epf_payment_date = datetime.strptime(epf_date_str, '%Y-%m-%d').date()
-            # Calculate delay days against EPF due date (15th of month following wage month)
+            # Due date = 15th of calendar month FOLLOWING the wage month
             if payroll.month == 12:
                 due_date = date(payroll.year + 1, 1, 15)
             else:
                 due_date = date(payroll.year, payroll.month + 1, 15)
-            delay = (payroll.epf_payment_date - due_date).days
-            payroll.epf_delay_days = max(0, delay)
+            delay_days = max(0, (payroll.epf_payment_date - due_date).days)
+            payroll.epf_delay_days = delay_days
+
+            if delay_days > 0:
+                # Total EPF remittance = Employee 12% + Employer 13% (all accounts)
+                epf_total = (payroll.total_epf_employee or 0) + (payroll.total_epf_employer or 0)
+                # Interest u/s 7Q: 12% per annum, daily basis
+                #   interest = (epf_total × 12% × delay_days) / 365
+                interest_7q = round((epf_total * 12 * delay_days) / (100 * 365))
+                # Damages u/s 14B: 1% per month — partial month counts as full month
+                delay_months = math.ceil(delay_days / 30)
+                damages_14b = round(epf_total * 1 * delay_months / 100)
+                # NOTE: DB column names kept for historical compatibility but
+                # semantic mapping matches EPFO terminology:
+                #   epf_interest_14b ← Interest u/s 7Q (was mis-named previously)
+                #   epf_damages_7q   ← Damages u/s 14B
+                payroll.epf_interest_14b = interest_7q
+                payroll.epf_damages_7q = damages_14b
+            else:
+                payroll.epf_interest_14b = 0
+                payroll.epf_damages_7q = 0
         except ValueError:
             pass
 

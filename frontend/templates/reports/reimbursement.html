@@ -467,10 +467,36 @@
             </div>
         </div>
 
+        {% if data.has_late_charges %}
+        <!-- Late Payment Charges (EPF paid after 15th due date) -->
+        <div style="border: 1.5px solid #dc2626; padding: 8px 12px; background: #fef2f2; margin: 6px 0 8px; border-radius: 4px;">
+            <div style="font-size: 10.5px; color: #991b1b; font-weight: bold; margin-bottom: 4px;">
+                ⚠ Late Payment Charges (EPF paid {{ data.epf_delay_days }} day{{ 's' if data.epf_delay_days != 1 }} after due date{% if data.epf_payment_date %} — paid on {{ data.epf_payment_date.strftime('%d-%b-%Y') }}{% endif %})
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; font-size: 10.5px;">
+                <div>
+                    <span style="color: #7f1d1d;">Interest u/s 7Q (12% p.a.):</span><br>
+                    <strong style="font-family: Consolas, monospace; font-size: 12px;">₹ {{ "{:,.0f}".format(data.epf_interest_7q) }}</strong>
+                </div>
+                <div>
+                    <span style="color: #7f1d1d;">Damages u/s 14B (1% p.m.):</span><br>
+                    <strong style="font-family: Consolas, monospace; font-size: 12px;">₹ {{ "{:,.0f}".format(data.epf_damages_14b) }}</strong>
+                </div>
+                <div>
+                    <span style="color: #7f1d1d;">Total Late Charges:</span><br>
+                    <strong style="font-family: Consolas, monospace; font-size: 13px; color: #dc2626;">₹ {{ "{:,.0f}".format(data.epf_late_total) }}</strong>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Grand Total -->
         <div class="grand-total">
             <div class="grand-total-box">
-                <div class="grand-total-label">Total Reimbursement Claimed</div>
+                <div class="grand-total-label">
+                    Total Reimbursement Claimed
+                    {% if data.has_late_charges %}<span style="font-size:9.5px; font-weight:400; color:#991b1b;">(incl. late charges ₹{{ "{:,.0f}".format(data.epf_late_total) }})</span>{% endif %}
+                </div>
                 <div class="grand-total-amount">₹ {{ "{:,.2f}".format(data.total_refund) }}</div>
             </div>
         </div>

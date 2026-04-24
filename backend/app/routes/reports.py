@@ -2102,9 +2102,12 @@ def _build_ecr_data(payroll_id):
 
         gross_wages = int(round(entry.earned_gross))
         epf_wages = int(round(entry.epf_wages)) if entry.epf_wages else gross_wages
-        # EPS wages = same as EPF wages (capped at 15000 by system)
-        eps_wages = epf_wages
-        edli_wages = epf_wages
+        # EPS + EDLI wages: ALWAYS capped at ₹15,000 per EPFO statutory rules.
+        # This applies even for establishments with "higher deduction" where
+        # EPF wages exceed the ceiling — EPS/EDLI bases remain capped.
+        EPF_STATUTORY_CEILING = 15000
+        eps_wages = min(epf_wages, EPF_STATUTORY_CEILING)
+        edli_wages = min(epf_wages, EPF_STATUTORY_CEILING)
         epf_ee = int(round(entry.epf_employee))          # Employee 12%
         eps_contribution = int(round(entry.epf_eps))      # EPS 8.33%
         # A/c 01 = 12% − 8.33% (ensures perfect balance, no rounding mismatch)
@@ -2716,8 +2719,15 @@ def _build_reimbursement_data(payroll_id):
     # ESIC Employer Refund = ESIC 3.25%
     esic_employer_refund = total_esic_employer
 
-    # Total Refund
-    total_refund = epf_employer_refund + esic_employer_refund
+    # Late-payment charges (client is liable as per EPF Act)
+    # epf_interest_14b column = 7Q interest  |  epf_damages_7q column = 14B damages
+    epf_interest_7q = int(round(payroll.epf_interest_14b or 0))
+    epf_damages_14b = int(round(payroll.epf_damages_7q or 0))
+    epf_late_total = epf_interest_7q + epf_damages_14b
+    has_late_charges = epf_late_total > 0
+
+    # Total Refund (now includes late charges if applicable)
+    total_refund = epf_employer_refund + esic_employer_refund + epf_late_total
 
     # For the gross wages for ESIC — use earned_gross of ESIC-applicable employees
     total_esic_gross = 0
@@ -2745,6 +2755,13 @@ def _build_reimbursement_data(payroll_id):
         'total_esic_employer': total_esic_employer,
         'esic_employer_refund': esic_employer_refund,
         'total_refund': total_refund,
+        # NEW: Late payment charges for display in letter (if any)
+        'epf_interest_7q': epf_interest_7q,
+        'epf_damages_14b': epf_damages_14b,
+        'epf_late_total': epf_late_total,
+        'has_late_charges': has_late_charges,
+        'epf_delay_days': int(payroll.epf_delay_days or 0),
+        'epf_payment_date': payroll.epf_payment_date,
     }
 
     return payroll, est, config, data
