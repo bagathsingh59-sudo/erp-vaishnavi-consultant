@@ -259,13 +259,10 @@
     </div>
     <div class="d-flex gap-2 align-items-center">
         {% if payroll.status == 'processing' %}
-            <form method="POST" action="{{ url_for('payroll.payroll_finalize', payroll_id=payroll.id) }}" style="display:inline;">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-success"
-                        onclick="return confirm('Finalize this payroll? It will be locked from further editing.')">
-                    <i class="bi bi-check-circle me-1"></i> Finalize Payroll
-                </button>
-            </form>
+            <!-- Finalize button opens a modal to capture Holiday dates + EPF Payment Date before locking -->
+            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#finalizeModal">
+                <i class="bi bi-check-circle me-1"></i> Finalize Payroll
+            </button>
         {% elif payroll.status == 'finalized' %}
             <form method="POST" action="{{ url_for('payroll.payroll_reopen', payroll_id=payroll.id) }}" style="display:inline;">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -1002,6 +999,73 @@ function calcEpfPenalty() {
     </div>
 </div>
 {% endif %}
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     FINALIZE MODAL — captures Holiday dates + EPF Payment Date
+     Shown when user clicks "Finalize Payroll" button (processing status).
+     Holiday default is empty (= 0 holidays). User enters manually if needed.
+     EPF Payment Date is required; future dates allowed.
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="finalizeModal" tabindex="-1" aria-labelledby="finalizeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 12px; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.15);">
+            <form method="POST" action="{{ url_for('payroll.payroll_finalize', payroll_id=payroll.id) }}" id="finalizeForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header" style="background: linear-gradient(135deg, #059669, #10b981); color: #fff; border-radius: 12px 12px 0 0;">
+                    <h5 class="modal-title" id="finalizeModalLabel">
+                        <i class="bi bi-check-circle me-2"></i>Finalize Payroll — {{ payroll.period_display }}
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" style="padding: 24px 28px;">
+                    <div class="alert alert-info" style="font-size: 0.82rem; border-radius: 8px; margin-bottom: 18px;">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Please confirm the <strong>holiday dates</strong> and enter the <strong>EPF payment date</strong>.
+                        Then click Confirm to lock this payroll.
+                    </div>
+
+                    <!-- Holiday Dates -->
+                    <div class="mb-3">
+                        <label for="fin_holiday_dates" class="form-label fw-semibold" style="font-size: 0.82rem;">
+                            <i class="bi bi-calendar-event text-warning me-1"></i>
+                            Holiday Dates (day numbers, comma-separated)
+                        </label>
+                        <input type="text" class="form-control" id="fin_holiday_dates" name="holiday_dates"
+                               value="{{ payroll.holiday_dates or '' }}"
+                               placeholder="e.g., 15,26 (leave blank for no holidays)">
+                        <small class="form-text text-muted" style="font-size: 0.7rem;">
+                            Default is empty (0 holidays). Enter day numbers only if there were paid holidays this month.
+                            If you change this, the system will recalculate automatically.
+                        </small>
+                    </div>
+
+                    <!-- EPF Payment Date -->
+                    <div class="mb-2">
+                        <label for="fin_epf_payment_date" class="form-label fw-semibold" style="font-size: 0.82rem;">
+                            <i class="bi bi-cash-coin text-success me-1"></i>
+                            EPF Payment Date <span class="text-danger">*</span>
+                        </label>
+                        <input type="date" class="form-control" id="fin_epf_payment_date" name="epf_payment_date"
+                               value="{{ payroll.epf_payment_date.strftime('%Y-%m-%d') if payroll.epf_payment_date else '' }}"
+                               required>
+                        <small class="form-text text-muted" style="font-size: 0.7rem;">
+                            Date when EPF was paid (or is planned to be paid). Future dates are allowed.
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-radius: 0 0 12px 12px; padding: 14px 22px;">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-1"></i>Cancel
+                    </button>
+                    <button type="submit" class="btn btn-success" style="font-weight: 600;">
+                        <i class="bi bi-check2-circle me-1"></i>Confirm & Finalize
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% endif %}{# End of {% if payroll.is_nil %} ... {% else %} ... #}
 {% endblock %}
 
@@ -1023,27 +1087,9 @@ function autoCalcAbsent(inputEl, empId) {
 }
 
 // Validation before Save & Calculate
+// Note: Holiday Dates are NOT required here — empty = 0 holidays silently.
+// User can optionally enter holidays now, or later in the Finalize modal.
 function validateBeforeSave() {
-    var holidayInput = document.getElementById('holidayDatesInput');
-    if (holidayInput) {
-        var val = (holidayInput.value || '').trim();
-        if (!val) {
-            var proceed = confirm(
-                '⚠️ Holiday Dates are empty!\n\n' +
-                'You have not entered any National Paid Holiday dates for this month.\n' +
-                'This will result in 0 paid holidays in the calculation.\n\n' +
-                'Click OK to continue without holidays, or Cancel to go back and enter holiday dates.'
-            );
-            if (!proceed) {
-                holidayInput.focus();
-                holidayInput.style.border = '2px solid #dc2626';
-                holidayInput.style.background = '#fef2f2';
-                // Scroll to holiday section
-                holidayInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                return false;
-            }
-        }
-    }
     return true;
 }
 </script>

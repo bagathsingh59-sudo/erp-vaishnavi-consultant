@@ -838,9 +838,12 @@ def filing_matrix():
             AccountHead.name.in_(['Professional Fees', 'IP & UAN Charges', 'Other Income'])
         ).all()
         fee_account_ids = [a.id for a in fee_accounts]
-        if fee_account_ids and est_ids:
+        if fee_account_ids:
             # Admin: sees ALL fees (no filter)
-            # Staff: sees fees only for their accessible establishments
+            # Staff: sees fees for vouchers linked to their establishments
+            #        OR vouchers they created themselves (broader OR filter
+            #        catches both admin-posted and staff-posted vouchers)
+            from sqlalchemy import or_
             entries_q = db.session.query(db.func.sum(VoucherEntry.amount))\
                 .join(Voucher, VoucherEntry.voucher_id == Voucher.id)\
                 .filter(
@@ -850,8 +853,18 @@ def filing_matrix():
                     Voucher.voucher_date <= period_end,
                 )
             if not is_admin():
-                # Scope fees to establishments visible to this staff member
-                entries_q = entries_q.filter(Voucher.establishment_id.in_(est_ids))
+                uid = current_user_id()
+                # Match: voucher's establishment is in user's list OR voucher belongs to user
+                scope_filters = []
+                if est_ids:
+                    scope_filters.append(Voucher.establishment_id.in_(est_ids))
+                if uid:
+                    scope_filters.append(Voucher.owner_id == uid)
+                if scope_filters:
+                    entries_q = entries_q.filter(or_(*scope_filters))
+                else:
+                    # No accessible data — force zero
+                    entries_q = entries_q.filter(Voucher.id == -1)
             total_fees_collected = entries_q.scalar() or 0
     except Exception:
         total_fees_collected = 0

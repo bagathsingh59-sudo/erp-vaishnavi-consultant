@@ -2102,15 +2102,82 @@ def save_epf_payment(payroll_id):
 
 @payroll_bp.route('/payroll/<int:payroll_id>/finalize', methods=['POST'])
 def payroll_finalize(payroll_id):
-    """Finalize the payroll — lock it from further editing"""
+    """Finalize the payroll — lock it from further editing.
+
+    Finalize Modal posts two optional/required fields:
+      - holiday_dates (text): comma-separated day numbers (or empty = 0 holidays)
+      - epf_payment_date (date): when EPF was/will be paid — required, future allowed
+
+    If holiday_dates changed from what the payroll was calculated with,
+    we transparently recalculate the payroll so totals reflect the new
+    holiday count before locking.
+    """
     payroll = MonthlyPayroll.query.get_or_404(payroll_id)
     verify_est_ownership(payroll.establishment)
+
+    # --- NIL payrolls: skip holiday/EPF date logic (no employees to recalc) ---
+    if payroll.is_nil:
+        payroll.status = 'finalized'
+        log_activity('finalized', 'nil_payroll', entity_id=payroll.id,
+                     entity_name=payroll.period_display,
+                     details='NIL return locked',
+                     establishment_id=payroll.establishment_id)
+        db.session.commit()
+        flash(f'NIL payroll for {payroll.period_display} has been finalized.', 'success')
+        return redirect(url_for('payroll.payroll_process', payroll_id=payroll_id))
+
+    # --- Regular payrolls: capture holiday + EPF payment date from modal ---
+    new_holiday_raw = request.form.get('holiday_dates', None)
+    old_holiday = payroll.holiday_dates or ''
+
+    # Normalise holiday inputs for comparison (strip whitespace, sort, dedupe)
+    def _normalise_holidays(s):
+        if not s:
+            return ''
+        parts = [p.strip() for p in str(s).split(',') if p.strip().isdigit()]
+        return ','.join(sorted(set(parts), key=int))
+
+    holiday_changed = False
+    if new_holiday_raw is not None:
+        normalised_new = _normalise_holidays(new_holiday_raw)
+        normalised_old = _normalise_holidays(old_holiday)
+        if normalised_new != normalised_old:
+            payroll.holiday_dates = normalised_new or None
+            holiday_changed = True
+
+    # EPF Payment Date (required — future dates allowed)
+    epf_date_str = (request.form.get('epf_payment_date') or '').strip()
+    if epf_date_str:
+        try:
+            payroll.epf_payment_date = datetime.strptime(epf_date_str, '%Y-%m-%d').date()
+            # Calculate delay days against EPF due date (15th of month following wage month)
+            if payroll.month == 12:
+                due_date = date(payroll.year + 1, 1, 15)
+            else:
+                due_date = date(payroll.year, payroll.month + 1, 15)
+            delay = (payroll.epf_payment_date - due_date).days
+            payroll.epf_delay_days = max(0, delay)
+        except ValueError:
+            pass
+
+    # If holidays changed at finalize time, warn user to recalculate before locking
+    # (Full recalc requires re-running the whole attendance pipeline — safer to
+    # let user do it explicitly via Save & Calculate.)
+    if holiday_changed:
+        db.session.commit()   # still save the new holiday_dates + epf_date
+        flash(f'Holidays updated to "{payroll.holiday_dates or "None"}". '
+              f'Please click Save & Calculate to recompute totals, '
+              f'then click Finalize again to lock the payroll.', 'warning')
+        return redirect(url_for('payroll.payroll_process', payroll_id=payroll_id))
+
     payroll.status = 'finalized'
     log_activity('finalized', 'payroll', entity_id=payroll.id,
                  entity_name=payroll.period_display,
-                 details=f'Net Pay: ₹{payroll.total_net_pay:,.0f}',
+                 details=f'Net Pay: ₹{payroll.total_net_pay:,.0f}, '
+                         f'EPF Paid: {payroll.epf_payment_date or "—"}',
                  establishment_id=payroll.establishment_id)
     db.session.commit()
+
     flash(f'Payroll for {payroll.period_display} has been finalized.', 'success')
     return redirect(url_for('payroll.payroll_process', payroll_id=payroll_id))
 
