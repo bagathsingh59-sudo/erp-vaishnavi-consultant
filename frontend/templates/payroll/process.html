@@ -1002,6 +1002,7 @@ function calcEpfPenalty() {
     </div>
 </div>
 {% endif %}
+{% endif %}{# End of {% if payroll.is_nil %} ... {% else %} ... #}
 {% endblock %}
 
 {% block scripts %}
@@ -1046,6 +1047,4 @@ function validateBeforeSave() {
     return true;
 }
 </script>
-
-{% endif %}{# End of {% if payroll.is_nil %} ... {% else %} ... #}
 {% endblock %}
