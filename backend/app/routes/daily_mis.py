@@ -631,17 +631,17 @@ def mis_compliance():
 @daily_mis_bp.route('/daily-mis/filing-matrix')
 @login_required
 def filing_matrix():
-    """Filing Status Matrix — ADMIN-ONLY strategic view.
-    Shows all establishments vs all wage months in selected range.
-    Data source: MonthlyPayroll.status == 'finalized' (i.e., when admin
-    finalizes payroll for a client-month, that month is considered filed).
+    """Filing Status Matrix — strategic view for both admin AND staff.
+
+    Scope depends on role:
+      - ADMIN: sees ALL active establishments
+      - STAFF: sees ONLY establishments they created OR were assigned to
+               (via Establishment.owner_id or assigned_to_id)
+
+    Shows establishments vs wage months in selected range.
+    Data source: MonthlyPayroll.status == 'finalized'.
     Each cell shows EPF and ESIC filing status (Full / Partial / None / N/A).
     """
-    # ── ADMIN-ONLY access ──
-    if not is_admin():
-        flash('This report is available only to Admin users.', 'warning')
-        return redirect(url_for('daily_mis.mis_home'))
-
     from app.models.establishment import Establishment
     from app.models.payroll import MonthlyPayroll
     from app.models.accounts import Voucher, VoucherEntry, AccountHead
@@ -696,24 +696,34 @@ def filing_matrix():
         else:
             cur = date(cur.year, cur.month + 1, 1)
 
-    # ── Get ALL active establishments (admin sees everything) ──
-    establishments = Establishment.query.filter_by(is_active=True)\
-        .order_by(Establishment.company_name).all()
+    # ── Get active establishments, SCOPED BY ROLE ──
+    # Admin: all active establishments
+    # Staff: only their owned OR assigned establishments
+    # (user_establishments() already handles this correctly)
+    establishments = user_establishments(
+        Establishment.query.filter_by(is_active=True)
+    ).order_by(Establishment.company_name).all()
 
-    # ── Pre-fetch ALL finalized payrolls within the wage-month range ──
+    # Collect accessible establishment IDs — used to scope payroll lookups too
+    est_ids = [e.id for e in establishments]
+
+    # ── Pre-fetch finalized payrolls within the wage-month range (scoped) ──
     if wage_months:
-        year_month_pairs = [(wm.year, wm.month) for wm in wage_months]
         min_year = min(wm.year for wm in wage_months)
         max_year = max(wm.year for wm in wage_months)
     else:
         min_year = today.year
         max_year = today.year
 
-    all_finalized = MonthlyPayroll.query.filter(
-        MonthlyPayroll.status == 'finalized',
-        MonthlyPayroll.year >= min_year,
-        MonthlyPayroll.year <= max_year
-    ).all()
+    if est_ids:
+        all_finalized = MonthlyPayroll.query.filter(
+            MonthlyPayroll.status == 'finalized',
+            MonthlyPayroll.year >= min_year,
+            MonthlyPayroll.year <= max_year,
+            MonthlyPayroll.establishment_id.in_(est_ids),
+        ).all()
+    else:
+        all_finalized = []
 
     # Index finalized payrolls by (est_id, year, month)
     # Store tuple: (is_filed, is_nil) — NIL months still count as filed but shown distinctly
@@ -828,16 +838,20 @@ def filing_matrix():
             AccountHead.name.in_(['Professional Fees', 'IP & UAN Charges', 'Other Income'])
         ).all()
         fee_account_ids = [a.id for a in fee_accounts]
-        if fee_account_ids:
-            # Admin sees ALL fees collected (no owner_id filter)
+        if fee_account_ids and est_ids:
+            # Admin: sees ALL fees (no filter)
+            # Staff: sees fees only for their accessible establishments
             entries_q = db.session.query(db.func.sum(VoucherEntry.amount))\
                 .join(Voucher, VoucherEntry.voucher_id == Voucher.id)\
                 .filter(
                     VoucherEntry.account_id.in_(fee_account_ids),
                     VoucherEntry.entry_type == 'credit',
                     Voucher.voucher_date >= from_month,
-                    Voucher.voucher_date <= period_end
+                    Voucher.voucher_date <= period_end,
                 )
+            if not is_admin():
+                # Scope fees to establishments visible to this staff member
+                entries_q = entries_q.filter(Voucher.establishment_id.in_(est_ids))
             total_fees_collected = entries_q.scalar() or 0
     except Exception:
         total_fees_collected = 0
