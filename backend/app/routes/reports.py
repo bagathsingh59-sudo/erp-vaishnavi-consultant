@@ -2357,7 +2357,17 @@ def _build_esic_rows(entries, payroll, round_up=False):
             continue
 
         total_days = math.ceil(entry.total_payable_days or 0) if round_up else int(round(entry.total_payable_days or 0))
-        total_wages = int(round(entry.earned_gross or 0))
+
+        # ESIC MC Template — wages column must match what ESIC contribution was
+        # actually calculated on. That's entry.esic_wages (which INCLUDES OT
+        # when config.include_ot_in_esic is True, and excludes non-ESIC heads
+        # like Wash Allowance). Falling back to earned_gross only if ESIC
+        # wasn't calculated (employee exempt / crossed ceiling / no work),
+        # because in that case the downstream logic zeros it out anyway.
+        if entry.esic_wages and entry.esic_wages > 0:
+            total_wages = int(round(entry.esic_wages))
+        else:
+            total_wages = int(round(entry.earned_gross or 0))
 
         reason_code = ''
         last_working_day = ''
