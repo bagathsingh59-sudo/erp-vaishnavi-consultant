@@ -183,7 +183,7 @@
             <tr>
                 <th class="ded-header">PF</th>
                 <th class="ded-header">ESIC</th>
-                <th class="ded-header">Society</th>
+                <th class="ded-header">PT</th>
                 <th class="ded-header">Income<br>Tax</th>
                 <th class="ded-header">Insurance</th>
                 <th class="ded-header">LWF</th>
@@ -194,7 +194,7 @@
             {% set ns = namespace(
                 t_days=0, t_ph=0, t_ot=0,
                 t_basic=0, t_spl=0, t_da=0, t_ot_amt=0, t_hra=0, t_others=0, t_nph=0,
-                t_gross=0, t_pf=0, t_esic=0, t_soc=0, t_it=0, t_ins=0, t_lwf=0, t_rec=0,
+                t_gross=0, t_pf=0, t_esic=0, t_pt=0, t_it=0, t_ins=0, t_lwf=0, t_rec=0,
                 t_total_ded=0, t_net=0
             ) %}
 
@@ -217,7 +217,7 @@
                 <td class="text-right gross-col">{{ "{:,.0f}".format(row.gross) }}</td>
                 <td class="text-right">{{ row.pf|int }}</td>
                 <td class="text-right">{{ row.esic|int }}</td>
-                <td class="text-right">{{ row.society|int }}</td>
+                <td class="text-right">{{ row.pt|int }}</td>
                 <td class="text-right">{{ row.income_tax|int }}</td>
                 <td class="text-right">{{ row.insurance|int }}</td>
                 <td class="text-right">{{ row.lwf|int }}</td>
@@ -241,6 +241,7 @@
             {% set ns.t_gross = ns.t_gross + row.gross %}
             {% set ns.t_pf = ns.t_pf + row.pf %}
             {% set ns.t_esic = ns.t_esic + row.esic %}
+            {% set ns.t_pt = ns.t_pt + row.pt %}
             {% set ns.t_rec = ns.t_rec + row.recoveries %}
             {% set ns.t_total_ded = ns.t_total_ded + row.total_ded %}
             {% set ns.t_net = ns.t_net + row.net_pay %}
@@ -265,7 +266,7 @@
                 <td class="text-right gross-col">{{ "{:,.0f}".format(ns.t_gross) }}</td>
                 <td class="text-right">{{ ns.t_pf|int }}</td>
                 <td class="text-right">{{ ns.t_esic|int }}</td>
-                <td class="text-right">0</td>
+                <td class="text-right">{{ ns.t_pt|int }}</td>
                 <td class="text-right">0</td>
                 <td class="text-right">0</td>
                 <td class="text-right">0</td>

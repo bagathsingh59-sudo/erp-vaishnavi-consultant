@@ -1612,7 +1612,7 @@ def _build_form_b_rows(entries, heads, head_map, config, payroll):
             'gross': entry.total_earnings,
             'pf': entry.epf_employee,
             'esic': entry.esic_employee,
-            'society': 0,
+            'pt': getattr(entry, 'professional_tax', 0) or 0,
             'income_tax': 0,
             'insurance': 0,
             'lwf': 0,
@@ -1794,7 +1794,7 @@ def _generate_form_b_excel(payroll, est, config, entries, rows, head_map):
 
     # Deduction sub-headers (row 12)
     ded_headers = [
-        ('P', 'PF'), ('Q', 'ESIC'), ('R', 'Society'),
+        ('P', 'PF'), ('Q', 'ESIC'), ('R', 'PT'),
         ('S', 'Income\nTax'), ('T', 'Insur.'), ('U', 'LWF'), ('V', 'Recov.')
     ]
     for col, text in ded_headers:
@@ -1855,7 +1855,7 @@ def _generate_form_b_excel(payroll, est, config, entries, rows, head_map):
         'days_worked': 0, 'ph_days': 0, 'ot_days': 0,
         'basic': 0, 'spl_basic': 0, 'da': 0, 'ot_amount': 0,
         'hra': 0, 'others': 0, 'nph': 0, 'gross': 0,
-        'pf': 0, 'esic': 0, 'society': 0, 'income_tax': 0,
+        'pf': 0, 'esic': 0, 'pt': 0, 'income_tax': 0,
         'insurance': 0, 'lwf': 0, 'recoveries': 0,
         'total_ded': 0, 'net_pay': 0
     }
@@ -1885,7 +1885,7 @@ def _generate_form_b_excel(payroll, est, config, entries, rows, head_map):
             ('O', round(row_data['gross']), right_align, gross_font, gross_fill),
             ('P', round(row_data['pf']), right_align, data_font, None),
             ('Q', round(row_data['esic']), right_align, data_font, None),
-            ('R', round(row_data['society']), right_align, data_font, None),
+            ('R', round(row_data.get('pt', 0)), right_align, data_font, None),
             ('S', round(row_data['income_tax']), right_align, data_font, None),
             ('T', round(row_data['insurance']), right_align, data_font, None),
             ('U', round(row_data['lwf']), right_align, data_font, None),
@@ -1937,7 +1937,7 @@ def _generate_form_b_excel(payroll, est, config, entries, rows, head_map):
         ('O', round(totals['gross']), right_align),
         ('P', round(totals['pf']), right_align),
         ('Q', round(totals['esic']), right_align),
-        ('R', round(totals['society']), right_align),
+        ('R', round(totals['pt']), right_align),
         ('S', round(totals['income_tax']), right_align),
         ('T', round(totals['insurance']), right_align),
         ('U', round(totals['lwf']), right_align),

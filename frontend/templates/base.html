@@ -1239,13 +1239,18 @@
 
         function showBackupReminder(message) {
             if (document.getElementById('globalBackupReminder')) return;
+            // Respect 2-hour dismiss: if user closed within last 2 hours, stay silent
+            try {
+                var dismissed = localStorage.getItem('backupReminderDismissedAt');
+                if (dismissed && (Date.now() - parseInt(dismissed, 10)) < 7200000) return;
+            } catch(e) {}
             const banner = document.createElement('div');
             banner.id = 'globalBackupReminder';
             banner.innerHTML = '<div style="display:flex; align-items:center; gap:10px;">' +
                 '<i class="bi bi-bell-fill" style="font-size:1rem; color:#d97706;"></i>' +
                 '<span style="font-size:0.75rem; color:#78350f; font-weight:600;">' + message + '</span>' +
                 '<a href="/backup" style="font-size:0.7rem; color:#1d4ed8; font-weight:700; text-decoration:underline;">Go to Backup →</a>' +
-                '<button onclick="this.parentElement.parentElement.remove()" style="margin-left:auto; background:transparent; border:none; color:#78350f; cursor:pointer; font-size:1rem;">&times;</button>' +
+                '<button onclick="try{localStorage.setItem(\'backupReminderDismissedAt\',String(Date.now()));}catch(e){} this.parentElement.parentElement.remove();" style="margin-left:auto; background:transparent; border:none; color:#78350f; cursor:pointer; font-size:1rem;">&times;</button>' +
                 '</div>';
             banner.style.cssText = 'position:fixed; bottom:16px; right:16px; background:#fef3c7; border-left:4px solid #f59e0b; border-radius:8px; padding:10px 14px; box-shadow:0 4px 15px rgba(0,0,0,0.1); z-index:9999; max-width:420px;';
             document.body.appendChild(banner);
