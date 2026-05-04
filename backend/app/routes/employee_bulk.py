@@ -1,10 +1,12 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, session, jsonify
 from app import db
-from app.models.employee import Employee
+from app.models.employee import Employee, Nominee, TransferHistory
 from app.models.establishment import Establishment
 from app.models.payroll import (SalaryTemplate, SalaryTemplateHead, SalaryHead,
-                                 PayrollConfig, EmployeeSalary, EmployeeSalaryHead)
-from app.user_context import get_user_est_ids, user_establishments, verify_est_ownership, current_user_id, log_activity
+                                 PayrollConfig, EmployeeSalary, EmployeeSalaryHead,
+                                 PayrollEntry)
+from app.user_context import (get_user_est_ids, user_establishments, verify_est_ownership,
+                               current_user_id, log_activity, is_admin)
 from datetime import datetime, date
 import io
 import csv
@@ -1218,6 +1220,361 @@ def reject_name_mismatch(emp_id):
     db.session.commit()
     flash(f'Name mismatch flagged for {emp.name}.', 'warning')
     return redirect(request.referrer or url_for('employee.employee_view', id=emp_id))
+
+
+# =============================================
+# BULK DELETE
+# =============================================
+
+@employee_bulk_bp.route('/employees/bulk-delete', methods=['POST'])
+def employee_bulk_delete():
+    """Bulk delete employees — skips any with existing payroll records."""
+    ids_raw = request.form.get('ids', '').strip()
+    if not ids_raw:
+        flash('No employees selected.', 'warning')
+        return redirect(url_for('employee.employee_list'))
+
+    try:
+        ids = [int(i) for i in ids_raw.split(',') if i.strip().isdigit()]
+    except Exception:
+        ids = []
+
+    if not ids:
+        flash('No valid employee IDs provided.', 'warning')
+        return redirect(url_for('employee.employee_list'))
+
+    allowed_est_ids = set(get_user_est_ids())
+    deleted = 0
+    skipped = 0
+    skipped_names = []
+
+    for emp_id in ids:
+        employee = Employee.query.get(emp_id)
+        if not employee:
+            continue
+
+        # Security: only allow deletion from user's own establishments
+        if not is_admin() and employee.establishment_id not in allowed_est_ids:
+            continue
+
+        # Skip if employee has payroll history
+        payroll_count = PayrollEntry.query.filter_by(employee_id=emp_id).count()
+        if payroll_count > 0:
+            skipped += 1
+            skipped_names.append(employee.name)
+            continue
+
+        # Delete related data first
+        salaries = EmployeeSalary.query.filter_by(employee_id=emp_id).all()
+        for sal in salaries:
+            EmployeeSalaryHead.query.filter_by(employee_salary_id=sal.id).delete()
+            db.session.delete(sal)
+
+        Nominee.query.filter_by(employee_id=emp_id).delete()
+        TransferHistory.query.filter_by(employee_id=emp_id).delete()
+        db.session.delete(employee)
+        deleted += 1
+
+    if deleted > 0:
+        db.session.commit()
+        flash(f'{deleted} employee(s) deleted successfully.', 'success')
+
+    if skipped > 0:
+        preview = ', '.join(skipped_names[:3])
+        if len(skipped_names) > 3:
+            preview += f' and {len(skipped_names) - 3} more'
+        flash(
+            f'{skipped} employee(s) skipped — they have payroll records ({preview}). '
+            f'Use Edit → Exit Date to deactivate them instead.',
+            'warning'
+        )
+
+    return redirect(url_for('employee.employee_list'))
+
+
+# =============================================
+# UPDATE EMPLOYEES FROM EXCEL (UPSERT MODE)
+# =============================================
+
+@employee_bulk_bp.route('/employees/update-from-excel', methods=['POST'])
+def update_employees_from_excel():
+    """Re-upload a corrected Excel to update existing employee data.
+    Match key: UAN Number (primary) → ESIC IP Number (fallback).
+    Only non-blank fields are updated. Unmatched rows are created as new employees.
+    Salary data is NOT updated through this route.
+    """
+    file = request.files.get('file')
+    if not file or file.filename == '':
+        flash('Please select a file.', 'danger')
+        return redirect(url_for('employee.employee_list'))
+
+    try:
+        from openpyxl import load_workbook
+        wb = load_workbook(file, data_only=True)
+        ws = wb.active
+        rows = list(ws.iter_rows(values_only=True))
+
+        if not rows:
+            flash('File is empty.', 'danger')
+            return redirect(url_for('employee.employee_list'))
+
+        # Find header row (scan first 5 rows)
+        header_idx = None
+        headers = []
+        for idx, row in enumerate(rows[:5]):
+            row_str = [str(c).strip().lower() if c else '' for c in row]
+            if any('employee name' in cell or 'employeename' in cell or
+                   ('name' in cell and 'father' not in cell and 'husband' not in cell)
+                   for cell in row_str):
+                header_idx = idx
+                headers = [str(c).strip() if c else '' for c in row]
+                break
+
+        if header_idx is None:
+            flash('Could not find header row with "Employee Name". Please use the standard template.', 'danger')
+            return redirect(url_for('employee.employee_list'))
+
+        # Build establishment lookup (user's establishments only)
+        est_lookup = {}
+        for est in user_establishments().filter_by(is_active=True).all():
+            est_lookup[est.company_name.lower()] = est.id
+            if est.pf_code:
+                est_lookup[est.pf_code.lower()] = est.id
+
+        allowed_est_ids = set(get_user_est_ids())
+
+        # Map columns — same logic as import
+        col_map = {}
+        for idx, h in enumerate(headers):
+            hl = h.lower().replace('_', '').replace(' ', '').replace('*', '')
+            if 'establishment' in hl or 'pfcode' in hl or 'company' in hl:
+                col_map['establishment'] = idx
+            elif 'employeename' in hl or ('name' in hl and 'father' not in hl
+                                           and 'husband' not in hl and 'bank' not in hl):
+                col_map['name'] = idx
+            elif 'father' in hl or 'husband' in hl:
+                col_map['father'] = idx
+            elif 'gender' in hl:
+                col_map['gender'] = idx
+            elif 'birth' in hl or 'dob' in hl:
+                col_map['dob'] = idx
+            elif 'joining' in hl or 'doj' in hl:
+                col_map['doj'] = idx
+            elif 'uan' in hl:
+                col_map['uan'] = idx
+            elif 'esic' in hl or 'ipnumber' in hl:
+                col_map['esic'] = idx
+            elif 'aadhaar' in hl or 'aadhar' in hl:
+                col_map['aadhaar'] = idx
+            elif 'pan' in hl:
+                col_map['pan'] = idx
+            elif 'mobile' in hl or 'phone' in hl:
+                col_map['mobile'] = idx
+            elif 'email' in hl:
+                col_map['email'] = idx
+            elif 'designation' in hl:
+                col_map['designation'] = idx
+            elif 'department' in hl:
+                col_map['department'] = idx
+            elif 'bankname' in hl or (hl == 'bank'):
+                col_map['bank_name'] = idx
+            elif 'account' in hl:
+                col_map['account'] = idx
+            elif 'ifsc' in hl:
+                col_map['ifsc'] = idx
+            elif 'marital' in hl:
+                col_map['marital'] = idx
+            elif 'address' in hl:
+                col_map['address'] = idx
+            elif 'internalcode' in hl or 'internalempcode' in hl or 'empcode' in hl:
+                col_map['internal_code'] = idx
+
+        from app.routes.bulk import _parse_date
+
+        updated = 0
+        created = 0
+        skipped_rows = 0
+        errors = []
+
+        for row_num, row in enumerate(rows[header_idx + 1:], 1):
+            try:
+                # Helper: get a column value for the current row (default-arg captures row)
+                def _get(key, _r=row):
+                    i = col_map.get(key)
+                    if i is not None and i < len(_r) and _r[i] is not None:
+                        val = str(_r[i]).strip()
+                        if val.endswith('.0'):
+                            val = val[:-2]
+                        return val if val else None
+                    return None
+
+                name = _get('name')
+                if not name:
+                    continue  # blank row — skip silently
+
+                uan = _get('uan')
+                esic = _get('esic')
+
+                if not uan and not esic:
+                    skipped_rows += 1
+                    errors.append(f'Row {row_num} ({name}): No UAN or ESIC — cannot match employee')
+                    continue
+
+                # --- Match existing employee ---
+                emp = None
+                if uan:
+                    emp = Employee.query.filter_by(uan_number=uan).first()
+                if not emp and esic:
+                    emp = Employee.query.filter_by(esic_ip_number=esic).first()
+
+                if emp:
+                    # Security check
+                    if not is_admin() and emp.establishment_id not in allowed_est_ids:
+                        skipped_rows += 1
+                        errors.append(f'Row {row_num} ({name}): Access denied for this establishment')
+                        continue
+
+                    # Update only non-blank fields
+                    emp.name = name.upper()
+                    if _get('father'):
+                        emp.father_husband_name = _get('father').upper()
+                    if _get('gender'):
+                        emp.gender = _get('gender').capitalize()
+
+                    dob_raw = row[col_map['dob']] if col_map.get('dob') is not None and col_map['dob'] < len(row) else None
+                    doj_raw = row[col_map['doj']] if col_map.get('doj') is not None and col_map['doj'] < len(row) else None
+                    if dob_raw:
+                        d = _parse_date(dob_raw)
+                        if d:
+                            emp.date_of_birth = d
+                    if doj_raw:
+                        d = _parse_date(doj_raw)
+                        if d:
+                            emp.date_of_joining = d
+
+                    if uan:
+                        emp.uan_number = uan
+                    if esic:
+                        emp.esic_ip_number = esic
+                    if _get('aadhaar'):
+                        emp.aadhaar_number = _get('aadhaar')
+                    if _get('pan'):
+                        emp.pan_number = _get('pan').upper()
+                    if _get('mobile'):
+                        emp.mobile_number = _get('mobile')
+                    if _get('email'):
+                        emp.email = _get('email')
+                    if _get('designation'):
+                        emp.designation = _get('designation')
+                    if _get('department'):
+                        emp.department = _get('department')
+                    if _get('marital'):
+                        emp.marital_status = _get('marital')
+                    if _get('address'):
+                        emp.address = _get('address')
+                    if _get('bank_name'):
+                        emp.bank_name = _get('bank_name')
+                    if _get('account'):
+                        emp.bank_account_number = _get('account')
+                    if _get('ifsc'):
+                        emp.bank_ifsc_code = _get('ifsc').upper()
+                    if _get('internal_code'):
+                        emp.internal_emp_code = _get('internal_code')
+
+                    updated += 1
+
+                else:
+                    # --- Not found: create as new employee ---
+                    est_val = _get('establishment')
+                    est_id = None
+                    if est_val:
+                        est_id = est_lookup.get(est_val.lower())
+                    if not est_id:
+                        skipped_rows += 1
+                        errors.append(
+                            f'Row {row_num} ({name}): Not found in system and '
+                            f'establishment "{est_val or "??"}" not recognised — skipped'
+                        )
+                        continue
+
+                    father = _get('father')
+                    gender = _get('gender')
+                    if not father or not gender:
+                        skipped_rows += 1
+                        errors.append(f'Row {row_num} ({name}): New employee requires Father/Husband Name and Gender')
+                        continue
+
+                    dob_raw = row[col_map['dob']] if col_map.get('dob') is not None and col_map['dob'] < len(row) else None
+                    doj_raw = row[col_map['doj']] if col_map.get('doj') is not None and col_map['doj'] < len(row) else None
+                    dob = _parse_date(dob_raw)
+                    doj = _parse_date(doj_raw)
+
+                    if not dob or not doj:
+                        skipped_rows += 1
+                        errors.append(f'Row {row_num} ({name}): Invalid date of birth or joining — skipped')
+                        continue
+
+                    emp_code = Employee.generate_emp_code()
+                    new_emp = Employee(
+                        emp_code=emp_code,
+                        establishment_id=est_id,
+                        name=name.upper(),
+                        father_husband_name=father.upper(),
+                        gender=gender.capitalize(),
+                        date_of_birth=dob,
+                        date_of_joining=doj,
+                        uan_number=uan,
+                        esic_ip_number=esic,
+                        aadhaar_number=_get('aadhaar'),
+                        pan_number=_get('pan').upper() if _get('pan') else None,
+                        mobile_number=_get('mobile'),
+                        email=_get('email'),
+                        marital_status=_get('marital'),
+                        designation=_get('designation'),
+                        department=_get('department'),
+                        address=_get('address'),
+                        bank_name=_get('bank_name'),
+                        bank_account_number=_get('account'),
+                        bank_ifsc_code=_get('ifsc').upper() if _get('ifsc') else None,
+                        internal_emp_code=_get('internal_code'),
+                        is_active=True
+                    )
+                    db.session.add(new_emp)
+                    created += 1
+
+            except Exception as e:
+                errors.append(f'Row {row_num}: {str(e)}')
+
+        if updated > 0 or created > 0:
+            db.session.commit()
+            log_activity('excel_update',
+                         f'Excel update: {updated} updated, {created} new employees')
+
+        # Flash result summary
+        parts = []
+        if updated > 0:
+            parts.append(f'{updated} employee(s) updated')
+        if created > 0:
+            parts.append(f'{created} new employee(s) added')
+        if skipped_rows > 0:
+            parts.append(f'{skipped_rows} row(s) skipped')
+
+        if updated > 0 or created > 0:
+            flash('. '.join(parts) + '.', 'success')
+        else:
+            flash(
+                'No employees were updated. ' + ('. '.join(parts) + '.' if parts else 'Please check the file format.'),
+                'warning'
+            )
+
+        for err in errors[:5]:
+            flash(err, 'danger')
+
+        return redirect(url_for('employee.employee_list'))
+
+    except Exception as e:
+        flash(f'Error reading file: {str(e)}', 'danger')
+        return redirect(url_for('employee.employee_list'))
 
 
 # =============================================

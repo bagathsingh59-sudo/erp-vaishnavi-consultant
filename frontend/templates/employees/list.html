@@ -4,37 +4,55 @@
 {% block page_header %}Employees{% endblock %}
 
 {% block content %}
+{# Hidden form — JS populates #selectedIds before submit #}
+<form id="bulkDeleteForm" method="POST"
+      action="{{ url_for('employee_bulk.employee_bulk_delete') }}"
+      style="display:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="ids" id="selectedIds">
+</form>
+
 <div class="table-container">
-    <!-- Header -->
+
+    <!-- ── Header ── -->
     <div class="table-header">
         <div class="table-title">
             <i class="bi bi-people"></i>
             All Employees
-            <span class="badge bg-primary bg-opacity-10 text-primary ms-2" style="font-size:0.75rem; border-radius:20px; padding:3px 12px;">
+            <span class="badge bg-primary bg-opacity-10 text-primary ms-2"
+                  style="font-size:0.75rem; border-radius:20px; padding:3px 12px;">
                 {{ employees|length }}
             </span>
         </div>
-        <div class="d-flex gap-2 align-items-center">
+        <div class="d-flex gap-2 align-items-center flex-wrap">
             <form method="GET" class="search-box">
                 <i class="bi bi-search"></i>
-                <input type="text" name="search" class="form-control" placeholder="Search name, UAN, ESIC, Aadhaar..."
+                <input type="text" name="search" class="form-control"
+                       placeholder="Search name, UAN, ESIC, Aadhaar..."
                        value="{{ search }}">
                 <input type="hidden" name="establishment" value="{{ selected_est_filter }}">
                 <input type="hidden" name="status" value="{{ filter_status }}">
             </form>
-            <a href="{{ url_for('employee_bulk.export_employees', establishment=selected_est_filter, status=filter_status) }}" class="btn btn-light" title="Export to Excel">
+            <a href="{{ url_for('employee_bulk.export_employees', establishment=selected_est_filter, status=filter_status) }}"
+               class="btn btn-light" title="Export to Excel">
                 <i class="bi bi-file-earmark-arrow-down me-1"></i> Export
             </a>
-            <a href="{{ url_for('employee_bulk.import_employees') }}" class="btn btn-light" title="Import from Excel">
+            <a href="{{ url_for('employee_bulk.import_employees') }}"
+               class="btn btn-light" title="Import new employees from Excel">
                 <i class="bi bi-file-earmark-arrow-up me-1"></i> Import
             </a>
+            <button type="button" class="btn btn-light"
+                    data-bs-toggle="modal" data-bs-target="#updateExcelModal"
+                    title="Re-upload Excel to update existing employees">
+                <i class="bi bi-arrow-repeat me-1"></i> Update
+            </button>
             <a href="{{ url_for('employee.employee_add') }}" class="btn btn-primary">
                 <i class="bi bi-plus-lg me-1"></i> Add Employee
             </a>
         </div>
     </div>
 
-    <!-- Filters -->
+    <!-- ── Filters ── -->
     <div class="filter-bar">
         <span style="font-size:0.78rem; color:var(--text-secondary); font-weight:600;">Status:</span>
         <a href="{{ url_for('employee.employee_list', search=search, establishment=selected_est_filter) }}"
@@ -45,17 +63,37 @@
            class="filter-btn {{ 'active' if filter_status == 'inactive' }}">Exited</a>
 
         <span style="margin-left:12px; font-size:0.78rem; color:var(--text-secondary); font-weight:600;">Establishment:</span>
-        <select onchange="filterByEst(this.value)" style="font-size:0.78rem; padding:4px 10px; border-radius:20px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-secondary); max-width:220px;">
+        <select onchange="filterByEst(this.value)"
+                style="font-size:0.78rem; padding:4px 10px; border-radius:20px;
+                       border:1px solid var(--border-color); background:var(--card-bg);
+                       color:var(--text-secondary); max-width:220px;">
             <option value="">All Establishments</option>
             {% for est in establishments %}
-                <option value="{{ est.id }}" {% if selected_est_filter|string == est.id|string %}selected{% endif %}>
+                <option value="{{ est.id }}"
+                    {% if selected_est_filter|string == est.id|string %}selected{% endif %}>
                     {{ est.company_name }}
                 </option>
             {% endfor %}
         </select>
     </div>
 
-    <!-- Table -->
+    <!-- ── Bulk Action Bar (hidden until ≥1 checkbox ticked) ── -->
+    <div id="bulkActionBar"
+         style="display:none; background:#fef2f2; border:1px solid #fecaca;
+                border-radius:8px; padding:10px 16px; margin-bottom:10px;
+                align-items:center; gap:12px;">
+        <i class="bi bi-check2-square" style="color:#dc2626; font-size:1.1rem;"></i>
+        <span id="selectedCount"
+              style="font-size:0.85rem; color:#dc2626; font-weight:600;"></span>
+        <button class="btn btn-sm btn-danger" onclick="confirmBulkDelete()">
+            <i class="bi bi-trash3 me-1"></i> Delete Selected
+        </button>
+        <button class="btn btn-sm btn-light" onclick="clearSelection()">
+            <i class="bi bi-x me-1"></i> Cancel
+        </button>
+    </div>
+
+    <!-- ── Table ── -->
     {% if employees %}
     <style>
         /* Sticky Actions column on the right */
@@ -72,14 +110,12 @@
             background: var(--primary, #6c3fc5);
             z-index: 3;
         }
-        /* Make the scroll container have a max height so vertical + horizontal scroll from top */
         .emp-scroll-wrapper {
             overflow: auto;
             max-height: 75vh;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
         }
-        /* Sticky header row */
         .emp-table thead th {
             position: sticky;
             top: 0;
@@ -88,12 +124,37 @@
         .emp-table thead th:last-child {
             z-index: 5;
         }
+        /* Checkbox column */
+        .emp-table th.col-check,
+        .emp-table td.col-check {
+            width: 38px;
+            min-width: 38px;
+            text-align: center;
+            padding: 8px 4px;
+        }
+        .emp-cb {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: var(--primary, #6c3fc5);
+            vertical-align: middle;
+        }
+        /* Highlight selected rows */
+        .emp-table tbody tr.row-selected {
+            background: #f3f0ff !important;
+        }
+        .emp-table tbody tr.row-selected td:last-child {
+            background: #f3f0ff !important;
+        }
     </style>
     <div class="emp-scroll-wrapper">
         <table class="table emp-table">
             <thead>
                 <tr>
-                    <th>#</th>
+                    <th class="col-check">
+                        <input type="checkbox" class="emp-cb" id="selectAll"
+                               title="Select / Deselect All">
+                    </th>
                     <th>UAN</th>
                     <th>Employee Name</th>
                     <th>Establishment</th>
@@ -108,24 +169,37 @@
             <tbody>
                 {% for emp in employees %}
                 <tr>
-                    <td style="color:var(--text-light);">{{ loop.index }}</td>
-                    <td><code style="font-size:0.8rem; background:var(--primary-light); color:var(--primary); padding:2px 8px; border-radius:4px;">{{ emp.uan_number or '---' }}</code></td>
+                    <td class="col-check">
+                        <input type="checkbox" class="emp-cb emp-row-cb"
+                               value="{{ emp.id }}">
+                    </td>
+                    <td>
+                        <code style="font-size:0.8rem; background:var(--primary-light);
+                                     color:var(--primary); padding:2px 8px; border-radius:4px;">
+                            {{ emp.uan_number or '---' }}
+                        </code>
+                    </td>
                     <td>
                         <a href="{{ url_for('employee.employee_view', id=emp.id) }}"
                            class="text-decoration-none company-name-cell"
                            style="{% if emp.name_status == 'mismatch' %}color:#dc2626 !important; font-weight:700;{% elif emp.name_status == 'accepted' %}color:#d97706 !important;{% endif %}">
                             {{ emp.name }}
                             {% if emp.name_status == 'mismatch' %}
-                                <i class="bi bi-exclamation-triangle-fill" style="color:#dc2626; font-size:0.65rem;" title="Name mismatch! ERP: {{ emp.name }} | EPFO: {{ emp.epfo_name }}"></i>
+                                <i class="bi bi-exclamation-triangle-fill"
+                                   style="color:#dc2626; font-size:0.65rem;"
+                                   title="Name mismatch! ERP: {{ emp.name }} | EPFO: {{ emp.epfo_name }}"></i>
                             {% elif emp.name_status == 'accepted' %}
-                                <i class="bi bi-check-circle" style="color:#d97706; font-size:0.65rem;" title="Mismatch accepted. EPFO: {{ emp.epfo_name }}"></i>
+                                <i class="bi bi-check-circle"
+                                   style="color:#d97706; font-size:0.65rem;"
+                                   title="Mismatch accepted. EPFO: {{ emp.epfo_name }}"></i>
                             {% endif %}
                         </a>
                         <br><small style="color:var(--text-light);">{{ emp.father_husband_name }}</small>
                     </td>
                     <td>
                         <a href="{{ url_for('establishment.establishment_view', id=emp.establishment.id) }}"
-                           class="text-decoration-none" style="font-size:0.85rem; color:var(--text-secondary);">
+                           class="text-decoration-none"
+                           style="font-size:0.85rem; color:var(--text-secondary);">
                             {{ emp.establishment.company_name }}
                         </a>
                     </td>
@@ -133,17 +207,25 @@
                     <td>
                         <small style="color:var(--text-light); font-size:0.75rem;">{{ emp.emp_code }}</small>
                         {% if emp.internal_emp_code %}
-                            <br><small style="color:var(--text-light); font-size:0.7rem;" title="Client Internal Code">Int: {{ emp.internal_emp_code }}</small>
+                            <br><small style="color:var(--text-light); font-size:0.7rem;"
+                                       title="Client Internal Code">Int: {{ emp.internal_emp_code }}</small>
                         {% endif %}
                     </td>
-                    <td style="font-size:0.85rem; white-space:nowrap;">{{ emp.date_of_joining.strftime('%d %b %Y') }}</td>
+                    <td style="font-size:0.85rem; white-space:nowrap;">
+                        {{ emp.date_of_joining.strftime('%d %b %Y') }}
+                    </td>
                     <td style="text-align:right; font-size:0.82rem; white-space:nowrap;">
                         {% set cur_sal = emp.salaries|selectattr('is_current')|first %}
                         {% if cur_sal %}
                             {% if cur_sal.salary_type == 'daily_wages' %}
-                                <span style="font-weight:600;">{{ "₹{:,.0f}".format(cur_sal.daily_rate or 0) }}</span><small style="color:#64748b;">/day</small>
+                                <span style="font-weight:600;">
+                                    {{ "₹{:,.0f}".format(cur_sal.daily_rate or 0) }}
+                                </span>
+                                <small style="color:#64748b;">/day</small>
                             {% else %}
-                                <span style="font-weight:600;">{{ "₹{:,.0f}".format(cur_sal.gross_salary or 0) }}</span>
+                                <span style="font-weight:600;">
+                                    {{ "₹{:,.0f}".format(cur_sal.gross_salary or 0) }}
+                                </span>
                             {% endif %}
                         {% else %}
                             <span style="color:#cbd5e1;">---</span>
@@ -151,9 +233,13 @@
                     </td>
                     <td>
                         {% if emp.is_active %}
-                            <span class="badge-status badge-active"><i class="bi bi-circle-fill" style="font-size:0.4rem"></i> Active</span>
+                            <span class="badge-status badge-active">
+                                <i class="bi bi-circle-fill" style="font-size:0.4rem"></i> Active
+                            </span>
                         {% else %}
-                            <span class="badge-status badge-inactive"><i class="bi bi-circle-fill" style="font-size:0.4rem"></i> Exited</span>
+                            <span class="badge-status badge-inactive">
+                                <i class="bi bi-circle-fill" style="font-size:0.4rem"></i> Exited
+                            </span>
                         {% endif %}
                     </td>
                     <td>
@@ -164,7 +250,9 @@
                                class="btn-action" title="Edit"><i class="bi bi-pencil"></i></a>
                             <a href="{{ url_for('employee.employee_transfer', id=emp.id) }}"
                                class="btn-action" title="Transfer"><i class="bi bi-arrow-left-right"></i></a>
-                            <form method="POST" action="{{ url_for('employee.employee_delete', id=emp.id) }}" style="display:inline;">
+                            <form method="POST"
+                                  action="{{ url_for('employee.employee_delete', id=emp.id) }}"
+                                  style="display:inline;">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn-action danger" title="Delete"
                                         onclick="return confirm('Delete employee {{ emp.name }}?')">
@@ -178,11 +266,10 @@
             </tbody>
         </table>
     </div>
+
     {% else %}
     <div class="empty-state">
-        <div class="empty-state-icon">
-            <i class="bi bi-people"></i>
-        </div>
+        <div class="empty-state-icon"><i class="bi bi-people"></i></div>
         {% if search %}
             <h5>No results found</h5>
             <p>No employees match "{{ search }}".</p>
@@ -198,11 +285,66 @@
         {% endif %}
     </div>
     {% endif %}
+
+</div>{# end .table-container #}
+
+
+<!-- ══════════════════════════════════════════
+     UPDATE FROM EXCEL  Modal
+══════════════════════════════════════════ -->
+<div class="modal fade" id="updateExcelModal" tabindex="-1"
+     aria-labelledby="updateExcelModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="updateExcelModalLabel">
+                    <i class="bi bi-arrow-repeat me-2" style="color:#6c3fc5;"></i>
+                    Update Employees from Excel
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST"
+                  action="{{ url_for('employee_bulk.update_employees_from_excel') }}"
+                  enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <div class="alert alert-info py-2 mb-3" style="font-size:0.83rem;">
+                        <i class="bi bi-info-circle-fill me-1"></i>
+                        <strong>How it works:</strong><br>
+                        • Employees are matched by <strong>UAN Number</strong> (primary) or
+                          <strong>ESIC IP Number</strong> (fallback)<br>
+                        • Only non-blank fields in the file will update existing records<br>
+                        • Employees not found in the system will be <em>created</em> as new<br>
+                        • <strong>Salary data is not changed</strong> by this upload
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label fw-semibold mb-1">Select Excel File</label>
+                        <input type="file" name="file" accept=".xlsx,.xls"
+                               class="form-control" required>
+                        <div class="form-text mt-1">
+                            Use the same column format as the Import template
+                            (Download Template button on the Import page).
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light"
+                            data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-arrow-repeat me-1"></i> Update Now
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
+
 {% endblock %}
+
 
 {% block scripts %}
 <script>
+    // ── Establishment filter dropdown ──
     function filterByEst(estId) {
         var url = new URL(window.location.href);
         if (estId) {
@@ -211,6 +353,84 @@
             url.searchParams.delete('establishment');
         }
         window.location.href = url.toString();
+    }
+
+    // ── Bulk Select / Deselect ──
+    const selectAllCb  = document.getElementById('selectAll');
+    const bulkBar      = document.getElementById('bulkActionBar');
+    const countSpan    = document.getElementById('selectedCount');
+
+    function getChecked() {
+        return document.querySelectorAll('.emp-row-cb:checked');
+    }
+
+    function updateBulkBar() {
+        const checked = getChecked();
+        const n = checked.length;
+        const allCbs = document.querySelectorAll('.emp-row-cb');
+
+        if (n > 0) {
+            bulkBar.style.display = 'flex';
+            countSpan.textContent = n + ' employee' + (n !== 1 ? 's' : '') + ' selected';
+        } else {
+            bulkBar.style.display = 'none';
+            countSpan.textContent = '';
+        }
+
+        // Update Select-All checkbox state
+        if (selectAllCb) {
+            selectAllCb.indeterminate = n > 0 && n < allCbs.length;
+            selectAllCb.checked = n > 0 && n === allCbs.length;
+        }
+
+        // Highlight selected rows
+        document.querySelectorAll('.emp-row-cb').forEach(cb => {
+            const tr = cb.closest('tr');
+            if (tr) {
+                tr.classList.toggle('row-selected', cb.checked);
+            }
+        });
+    }
+
+    // Select-All header checkbox
+    if (selectAllCb) {
+        selectAllCb.addEventListener('change', function () {
+            document.querySelectorAll('.emp-row-cb').forEach(cb => {
+                cb.checked = this.checked;
+            });
+            updateBulkBar();
+        });
+    }
+
+    // Individual row checkboxes
+    document.querySelectorAll('.emp-row-cb').forEach(cb => {
+        cb.addEventListener('change', updateBulkBar);
+    });
+
+    // Cancel button
+    function clearSelection() {
+        document.querySelectorAll('.emp-row-cb').forEach(cb => cb.checked = false);
+        if (selectAllCb) { selectAllCb.checked = false; selectAllCb.indeterminate = false; }
+        updateBulkBar();
+    }
+
+    // Delete Selected button
+    function confirmBulkDelete() {
+        const checked = getChecked();
+        const n = checked.length;
+        if (n === 0) return;
+
+        const msg =
+            'Delete ' + n + ' selected employee' + (n !== 1 ? 's' : '') + '?\n\n' +
+            '• Employees with payroll records will be skipped automatically.\n' +
+            '• Use Edit → Exit Date to deactivate those employees instead.\n\n' +
+            'This action cannot be undone.';
+
+        if (confirm(msg)) {
+            const ids = Array.from(checked).map(cb => cb.value).join(',');
+            document.getElementById('selectedIds').value = ids;
+            document.getElementById('bulkDeleteForm').submit();
+        }
     }
 </script>
 {% endblock %}
