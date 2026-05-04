@@ -450,6 +450,16 @@
                         title="Upload filled Excel attendance">
                     <i class="bi bi-upload me-1"></i> Upload Attendance
                 </button>
+                <form method="POST"
+                      action="{{ url_for('payroll.payroll_sync_employees', payroll_id=payroll.id) }}"
+                      style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline-info btn-sm"
+                            title="Add employees who were registered after this payroll was created"
+                            onclick="return confirm('Sync all active employees into this payroll?\n\nThis adds any employees who were added to the system after the payroll was first created.\n\nAfter syncing, download a fresh Universal Template to include all employees.')">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Sync
+                    </button>
+                </form>
                 <span style="border-left:2px solid #e2e8f0; height:22px;"></span>
                     <button type="submit" class="btn btn-primary btn-sm">
                         <i class="bi bi-calculator me-1"></i> Save & Calculate

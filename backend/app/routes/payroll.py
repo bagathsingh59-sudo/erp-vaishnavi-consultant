@@ -2856,6 +2856,7 @@ def upload_attendance(payroll_id):
 
     # ── Parse rows and update entries ──
     updated_count = 0
+    auto_added_count = 0   # employees auto-added because they joined after payroll creation
     rate_changes = []
     error_rows = []
 
@@ -2909,12 +2910,66 @@ def upload_attendance(payroll_id):
                         break
 
         if not emp_id or emp_id not in entries_map:
-            # Log error only if row has actual data
-            id_check = str(row[uan_col - 1].value).strip() if row[uan_col - 1].value else ''
-            name_check = str(row[name_col - 1].value).strip() if row[name_col - 1].value else ''
-            if id_check or name_check:
-                error_rows.append(f'Row {data_start_row + row_idx}: Not matched ({name_check or id_check})')
-            continue
+            # ── Auto-create PayrollEntry (universal template only) ──
+            # Handles the common case where employees were imported AFTER the
+            # payroll was created — payroll_create() only captures employees that
+            # exist at creation time, so late-added employees have no entry.
+            # We find the employee in the Employee table and create one on-the-fly.
+            if is_universal and (uan_value or esic_value or emp_name_val):
+                auto_emp = None
+                if uan_value:
+                    auto_emp = Employee.query.filter_by(
+                        uan_number=uan_value,
+                        establishment_id=est.id,
+                        is_active=True
+                    ).first()
+                if not auto_emp and esic_value:
+                    auto_emp = Employee.query.filter_by(
+                        esic_ip_number=esic_value,
+                        establishment_id=est.id,
+                        is_active=True
+                    ).first()
+                if not auto_emp and emp_name_val:
+                    auto_emp = Employee.query.filter(
+                        db.func.upper(Employee.name) == emp_name_val.upper(),
+                        Employee.establishment_id == est.id,
+                        Employee.is_active == True
+                    ).first()
+
+                if auto_emp:
+                    # Create missing PayrollEntry for this employee
+                    salary_auto = EmployeeSalary.query.filter_by(
+                        employee_id=auto_emp.id, is_current=True).first()
+                    new_entry = PayrollEntry(
+                        monthly_payroll_id=payroll_id,
+                        employee_id=auto_emp.id,
+                        days_present=payroll.working_days,
+                        days_absent=0,
+                        paid_holidays=0,
+                        ot_hours=0,
+                        total_payable_days=payroll.working_days,
+                        gross_salary=salary_auto.gross_salary if salary_auto else 0
+                    )
+                    if hasattr(new_entry, 'rate_overrides'):
+                        new_entry.rate_overrides = None
+                    db.session.add(new_entry)
+                    db.session.flush()
+                    entries_map[auto_emp.id] = new_entry
+                    emp_id = auto_emp.id
+                    auto_added_count += 1
+                    # Fall through — emp_id is now valid, attendance will be applied below
+                else:
+                    id_check = str(row[uan_col - 1].value).strip() if row[uan_col - 1].value else ''
+                    name_check = str(row[name_col - 1].value).strip() if row[name_col - 1].value else ''
+                    if id_check or name_check:
+                        error_rows.append(f'Row {data_start_row + row_idx}: Not matched ({name_check or id_check})')
+                    continue
+            else:
+                id_check = str(row[uan_col - 1].value).strip() if row[uan_col - 1].value else ''
+                name_check = str(row[name_col - 1].value).strip() if row[name_col - 1].value else ''
+                if id_check or name_check:
+                    error_rows.append(f'Row {data_start_row + row_idx}: Not matched ({name_check or id_check})')
+                continue
 
         entry = entries_map[emp_id]
         matched_emp_ids.add(emp_id)
@@ -3078,10 +3133,14 @@ def upload_attendance(payroll_id):
                 entry.rate_overrides = None
                 zero_count += 1
 
+    # Refresh total employee count (auto-adds may have increased it)
+    payroll.total_employees = PayrollEntry.query.filter_by(monthly_payroll_id=payroll_id).count()
     db.session.commit()
 
     # ── Show result messages ──
     msg = f'Attendance uploaded for {updated_count} employees.'
+    if auto_added_count > 0:
+        msg += f' {auto_added_count} new employee(s) were automatically added to the payroll.'
     if zero_count > 0:
         msg += f' {zero_count} employees not in file — set to 0 days (absent).'
     flash(msg, 'success')
@@ -3099,6 +3158,87 @@ def upload_attendance(payroll_id):
         flash(err_msg, 'warning')
 
     flash('Now click "Save & Calculate" to compute salary, EPF, ESIC, and Net Pay.', 'info')
+    return redirect(url_for('payroll.payroll_process', payroll_id=payroll_id))
+
+
+# ═════════════════════════════════════════════════════════════════
+#  SYNC EMPLOYEES INTO PAYROLL
+#  Adds PayrollEntry records for active employees registered after
+#  the payroll was originally created.
+# ═════════════════════════════════════════════════════════════════
+@payroll_bp.route('/payroll/<int:payroll_id>/sync-employees', methods=['POST'])
+def payroll_sync_employees(payroll_id):
+    """Add PayrollEntry records for any active employees not yet in this payroll.
+    Handles: employees uploaded/added after the payroll was first created."""
+    payroll = MonthlyPayroll.query.get_or_404(payroll_id)
+    est = payroll.establishment
+    verify_est_ownership(est)
+
+    if payroll.status == 'finalized':
+        flash('Cannot sync — this payroll is already finalized. Reopen first.', 'danger')
+        return redirect(url_for('payroll.payroll_process', payroll_id=payroll_id))
+
+    # IDs already in this payroll
+    existing_emp_ids = {
+        row[0] for row in
+        db.session.query(PayrollEntry.employee_id).filter_by(
+            monthly_payroll_id=payroll_id).all()
+    }
+
+    last_day = date(payroll.year, payroll.month,
+                    calendar.monthrange(payroll.year, payroll.month)[1])
+    first_day = date(payroll.year, payroll.month, 1)
+
+    # Find active employees for this establishment who have no entry yet
+    query = Employee.query.filter(
+        Employee.establishment_id == est.id,
+        Employee.is_active == True,
+        Employee.date_of_joining <= last_day
+    )
+    if existing_emp_ids:
+        query = query.filter(~Employee.id.in_(list(existing_emp_ids)))
+
+    new_employees = query.order_by(Employee.name).all()
+    added = 0
+
+    for emp in new_employees:
+        salary = EmployeeSalary.query.filter_by(
+            employee_id=emp.id, is_current=True).first()
+
+        # Prorate for mid-month joiners
+        if emp.date_of_joining > first_day:
+            remaining = (last_day - emp.date_of_joining).days + 1
+            default_present = min(remaining, payroll.working_days)
+        else:
+            default_present = payroll.working_days
+
+        entry = PayrollEntry(
+            monthly_payroll_id=payroll_id,
+            employee_id=emp.id,
+            days_present=default_present,
+            days_absent=0,
+            paid_holidays=0,
+            ot_hours=0,
+            total_payable_days=default_present,
+            gross_salary=salary.gross_salary if salary else 0
+        )
+        if hasattr(entry, 'rate_overrides'):
+            entry.rate_overrides = None
+        db.session.add(entry)
+        added += 1
+
+    if added > 0:
+        payroll.total_employees = len(existing_emp_ids) + added
+        db.session.commit()
+        flash(
+            f'{added} employee(s) added to this payroll. '
+            f'Total now: {payroll.total_employees} employees. '
+            f'Download a fresh Universal Template and upload attendance.',
+            'success'
+        )
+    else:
+        flash('All active employees are already in this payroll — nothing to sync.', 'info')
+
     return redirect(url_for('payroll.payroll_process', payroll_id=payroll_id))
 
 
