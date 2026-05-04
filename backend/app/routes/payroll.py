@@ -1455,6 +1455,57 @@ def payroll_process(payroll_id):
     verify_est_ownership(est)
     config = PayrollConfig.query.filter_by(establishment_id=est.id).first()
 
+    # ══════════════════════════════════════════════════════════════
+    # AUTO-SYNC: Silently add any active employees missing from this payroll.
+    # Runs every time the page opens (unless finalized / NIL).
+    # This handles: employees imported after payroll was created,
+    # establishments with 300, 500, 1000+ employees — any count works.
+    # ══════════════════════════════════════════════════════════════
+    if payroll.status != 'finalized' and not payroll.is_nil:
+        existing_emp_ids = {
+            row[0] for row in
+            db.session.query(PayrollEntry.employee_id).filter_by(
+                monthly_payroll_id=payroll_id).all()
+        }
+        last_day_sync = date(payroll.year, payroll.month,
+                             calendar.monthrange(payroll.year, payroll.month)[1])
+        first_day_sync = date(payroll.year, payroll.month, 1)
+
+        q_new = Employee.query.filter(
+            Employee.establishment_id == est.id,
+            Employee.is_active == True,
+            Employee.date_of_joining <= last_day_sync
+        )
+        if existing_emp_ids:
+            q_new = q_new.filter(~Employee.id.in_(list(existing_emp_ids)))
+        new_emps = q_new.all()
+
+        if new_emps:
+            for emp_s in new_emps:
+                sal_s = EmployeeSalary.query.filter_by(
+                    employee_id=emp_s.id, is_current=True).first()
+                if emp_s.date_of_joining > first_day_sync:
+                    rem = (last_day_sync - emp_s.date_of_joining).days + 1
+                    def_present = min(rem, payroll.working_days)
+                else:
+                    def_present = payroll.working_days
+                ent_new = PayrollEntry(
+                    monthly_payroll_id=payroll_id,
+                    employee_id=emp_s.id,
+                    days_present=def_present,
+                    days_absent=0,
+                    paid_holidays=0,
+                    ot_hours=0,
+                    total_payable_days=def_present,
+                    gross_salary=sal_s.gross_salary if sal_s else 0
+                )
+                if hasattr(ent_new, 'rate_overrides'):
+                    ent_new.rate_overrides = None
+                db.session.add(ent_new)
+            payroll.total_employees = len(existing_emp_ids) + len(new_emps)
+            db.session.commit()
+
+    # Load all entries — guaranteed to include every active employee now
     entries = PayrollEntry.query.filter_by(monthly_payroll_id=payroll_id).join(Employee).order_by(Employee.name).all()
 
     # Get salary heads for this establishment
@@ -3259,6 +3310,27 @@ def download_universal_template(payroll_id):
     est = payroll.establishment
     verify_est_ownership(est)
     config = PayrollConfig.query.filter_by(establishment_id=est.id).first()
+
+    # Auto-sync: add any missing active employees before building the template
+    if payroll.status != 'finalized' and not payroll.is_nil:
+        _ex_ids = {r[0] for r in db.session.query(PayrollEntry.employee_id).filter_by(monthly_payroll_id=payroll_id).all()}
+        _last = date(payroll.year, payroll.month, calendar.monthrange(payroll.year, payroll.month)[1])
+        _first = date(payroll.year, payroll.month, 1)
+        _q = Employee.query.filter(Employee.establishment_id == est.id, Employee.is_active == True, Employee.date_of_joining <= _last)
+        if _ex_ids:
+            _q = _q.filter(~Employee.id.in_(list(_ex_ids)))
+        for _emp in _q.all():
+            _sal = EmployeeSalary.query.filter_by(employee_id=_emp.id, is_current=True).first()
+            _def = min(((_last - _emp.date_of_joining).days + 1), payroll.working_days) if _emp.date_of_joining > _first else payroll.working_days
+            _ent = PayrollEntry(monthly_payroll_id=payroll_id, employee_id=_emp.id,
+                                days_present=_def, days_absent=0, paid_holidays=0, ot_hours=0,
+                                total_payable_days=_def, gross_salary=_sal.gross_salary if _sal else 0)
+            if hasattr(_ent, 'rate_overrides'):
+                _ent.rate_overrides = None
+            db.session.add(_ent)
+            _ex_ids.add(_emp.id)
+        payroll.total_employees = len(_ex_ids)
+        db.session.commit()
 
     # Get all active employees in this payroll with their salary records
     entries = PayrollEntry.query.filter_by(
