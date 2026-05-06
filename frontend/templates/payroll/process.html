@@ -521,7 +521,7 @@
                         </td>
                         <td>
                             <input type="number" name="present_{{ entry.employee_id }}" class="form-control form-control-sm"
-                                   value="{{ entry.days_present }}" step="0.5" min="0" max="{{ payroll.working_days }}"
+                                   value="{{ entry.days_present }}" step="any" min="0"
                                    style="width:55px; font-size:0.8rem; padding:2px 4px; text-align:center;"
                                    {% if payroll.status == 'finalized' %}disabled{% endif %}
                                    onchange="autoCalcAbsent(this, {{ entry.employee_id }})">
@@ -534,7 +534,7 @@
                         {% if config.paid_holiday_type == 'separate' %}
                         <td>
                             <input type="number" name="ph_{{ entry.employee_id }}" class="form-control form-control-sm"
-                                   value="{{ entry.paid_holidays }}" step="0.5" min="0"
+                                   value="{{ entry.paid_holidays }}" step="any" min="0"
                                    style="width:50px; font-size:0.8rem; padding:2px 4px; text-align:center;"
                                    {% if payroll.status == 'finalized' %}disabled{% endif %}>
                         </td>
@@ -542,7 +542,7 @@
                         {% if config.ot_applicable %}
                         <td>
                             <input type="number" name="ot_{{ entry.employee_id }}" class="form-control form-control-sm"
-                                   value="{{ entry.ot_hours }}" step="0.5" min="0"
+                                   value="{{ entry.ot_hours }}" step="any" min="0"
                                    style="width:55px; font-size:0.8rem; padding:2px 4px; text-align:center;"
                                    {% if payroll.status == 'finalized' %}disabled{% endif %}>
                         </td>

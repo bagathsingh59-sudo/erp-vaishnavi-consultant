@@ -74,7 +74,7 @@
                     <label class="form-label" style="font-weight:600;">New Daily Rate (₹) <span class="text-danger">*</span></label>
                     <div class="input-group">
                         <span class="input-group-text" style="font-size:0.75rem; color:#94a3b8;">Old: ₹{{ "{:,.0f}".format(tmpl.daily_rate or 0) }}</span>
-                        <input type="number" name="daily_rate" class="form-control" step="0.01" min="0"
+                        <input type="number" name="daily_rate" class="form-control" step="any" min="0"
                                value="{{ tmpl.daily_rate or 0 }}" style="font-size:1.1rem; font-weight:700;">
                     </div>
                 </div>
