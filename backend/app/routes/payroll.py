@@ -2347,12 +2347,17 @@ def _calculate_pt(gross, state='karnataka', month=None):
     """
     state = (state or 'karnataka').lower().strip()
 
-    # ── KARNATAKA ──
+    # ── KARNATAKA ── Revised: Amendment Act 2025, effective 1-Apr-2025
+    # Old threshold was ₹15,000. Raised to ₹25,000.
+    # ≤₹24,999 → Nil | ≥₹25,000 → ₹200/month (₹300 in February)
+    # Annual total: 11 × ₹200 + ₹300 = ₹2,500
     if state == 'karnataka':
-        if gross <= 15000:
+        if gross < 25000:
             return 0
         else:
-            return 200  # Max ₹200/month (₹2,400/year)
+            if month == 2:
+                return 300
+            return 200
 
     # ── MAHARASHTRA ──
     # Men: ₹2,500/year. Women: Nil up to ₹25,000.
