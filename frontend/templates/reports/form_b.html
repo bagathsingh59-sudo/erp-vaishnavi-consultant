@@ -159,7 +159,7 @@
         <thead>
             <tr>
                 <th rowspan="2" style="min-width:35px;">Sr.<br>No.</th>
-                <th rowspan="2" style="min-width:80px;">Emp.<br>Code</th>
+                <th rowspan="2" style="min-width:80px;">UAN /<br>ESIC IP</th>
                 <th rowspan="2" style="min-width:160px; text-align:left;">Name</th>
                 <th rowspan="2">Rate of<br>Wages</th>
                 <th rowspan="2">No. of<br>Days<br>worked</th>
@@ -201,12 +201,12 @@
             {% for row in rows %}
             <tr>
                 <td class="text-center">{{ loop.index }}</td>
-                <td class="text-center" style="font-size:0.75rem;">{{ row.emp_code }}</td>
+                <td class="text-center" style="font-size:0.75rem;">{% if config.epf_applicable %}{{ row.uan or '—' }}{% elif config.esic_applicable %}{{ row.esic_ip or 'NA' }}{% else %}{{ row.emp_code }}{% endif %}</td>
                 <td style="text-align:left; font-weight:600;">{{ row.name }}</td>
                 <td class="text-right">{{ "%.2f"|format(row.rate) }}</td>
                 <td class="text-center">{{ row.days_worked|int if row.days_worked == row.days_worked|int else "%.1f"|format(row.days_worked) }}</td>
                 <td class="text-center">{{ row.ph_days|int if row.ph_days else 0 }}</td>
-                <td class="text-center">{{ "%.0f"|format(row.ot_days) }}</td>
+                <td class="text-center">{{ row.ot_days|int if row.ot_days == row.ot_days|int else "%.2f"|format(row.ot_days) }}</td>
                 <td class="text-right">{{ row.basic|int }}</td>
                 <td class="text-right">{{ row.spl_basic|int }}</td>
                 <td class="text-right">{{ row.da|int }}</td>

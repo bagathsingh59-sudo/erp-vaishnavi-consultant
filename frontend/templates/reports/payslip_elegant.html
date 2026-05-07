@@ -304,7 +304,7 @@
         <!-- Period Bar -->
         <div class="period-bar">
             <span>Pay Period <strong>01 {{ payroll.month_name[:3] }} – {{ '%02d'|format(payroll.total_days if payroll.total_days else 30) }} {{ payroll.month_name[:3] }} {{ payroll.year }}</strong></span>
-            <span>Days Worked <strong>{{ slip.entry.days_present|int }} / {{ payroll.working_days or 26 }}</strong></span>
+            <span>Days Worked <strong>{{ slip.entry.days_present|int if slip.entry.days_present == slip.entry.days_present|int else "%.2f"|format(slip.entry.days_present) }} / {{ payroll.working_days or 26 }}</strong></span>
             <span>Payable Days <strong>{{ slip.entry.total_payable_days|int if slip.entry.total_payable_days == slip.entry.total_payable_days|int else slip.entry.total_payable_days }}</strong></span>
         </div>
 

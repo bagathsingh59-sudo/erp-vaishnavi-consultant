@@ -79,13 +79,13 @@
             <table class="form-b-table">
                 <thead>
                     <tr>
-                        <th>Sr.</th><th>Emp Code</th><th style="text-align:left;">Name</th>
+                        <th>Sr.</th><th>UAN / ESIC IP</th><th style="text-align:left;">Name</th>
                         <th>Rate</th><th>Days</th><th>PH</th><th>OT Days</th>
                         <th>Basic</th><th>Spl Basic</th><th>DA</th><th>OT Amt</th>
                         <th>HRA</th><th>Others</th><th>NPH</th>
                         <th style="background:#dcfce7;">Gross</th>
                         <th class="ded-header">PF</th><th class="ded-header">ESIC</th>
-                        <th class="ded-header">Society</th><th class="ded-header">IT</th>
+                        <th class="ded-header">PT</th><th class="ded-header">IT</th>
                         <th class="ded-header">Ins</th><th class="ded-header">LWF</th>
                         <th class="ded-header">Recov</th>
                         <th>Tot Ded</th>
@@ -97,12 +97,12 @@
                     {% for row in rows %}
                     <tr>
                         <td class="text-center">{{ loop.index }}</td>
-                        <td class="text-center">{{ row.emp_code }}</td>
+                        <td class="text-center">{% if config.epf_applicable %}{{ row.uan or '—' }}{% elif config.esic_applicable %}{{ row.esic_ip or 'NA' }}{% else %}{{ row.emp_code }}{% endif %}</td>
                         <td style="text-align:left; font-weight:600;">{{ row.name }}</td>
                         <td class="text-right">{{ "%.2f"|format(row.rate) }}</td>
                         <td class="text-center">{{ row.days_worked|int if row.days_worked == row.days_worked|int else "%.1f"|format(row.days_worked) }}</td>
                         <td class="text-center">{{ row.ph_days|int if row.ph_days else 0 }}</td>
-                        <td class="text-center">{{ "%.0f"|format(row.ot_days) }}</td>
+                        <td class="text-center">{{ row.ot_days|int if row.ot_days == row.ot_days|int else "%.2f"|format(row.ot_days) }}</td>
                         <td class="text-right">{{ row.basic|int }}</td>
                         <td class="text-right">{{ row.spl_basic|int }}</td>
                         <td class="text-right">{{ row.da|int }}</td>
@@ -113,7 +113,7 @@
                         <td class="text-right gross-col">{{ "{:,.0f}".format(row.gross) }}</td>
                         <td class="text-right">{{ row.pf|int }}</td>
                         <td class="text-right">{{ row.esic|int }}</td>
-                        <td class="text-right">{{ row.society|int }}</td>
+                        <td class="text-right">{{ row.pt|int }}</td>
                         <td class="text-right">{{ row.income_tax|int }}</td>
                         <td class="text-right">{{ row.insurance|int }}</td>
                         <td class="text-right">{{ row.lwf|int }}</td>
@@ -143,7 +143,7 @@
                         <td></td>
                         <td class="text-center">{{ ns.t_days|int }}</td>
                         <td class="text-center">{{ ns.t_ph|int }}</td>
-                        <td class="text-center">{{ "%.0f"|format(ns.t_ot) }}</td>
+                        <td class="text-center">{{ ns.t_ot|int if ns.t_ot == ns.t_ot|int else "%.2f"|format(ns.t_ot) }}</td>
                         <td class="text-right">{{ ns.t_basic|int }}</td>
                         <td class="text-right">{{ ns.t_spl|int }}</td>
                         <td class="text-right">{{ ns.t_da|int }}</td>
@@ -182,7 +182,7 @@
             <table class="fd-table">
                 <thead>
                     <tr>
-                        <th>Emp Code</th><th style="text-align:left;">Name</th>
+                        <th>UAN / ESIC IP</th><th style="text-align:left;">Name</th>
                         <th>Designation</th><th>Place</th>
                         {% for d in range(1, num_days + 1) %}
                         <th class="{% if d in rest_days %}rest{% elif d in holiday_days %}holiday{% endif %}">{{ d }}</th>
@@ -194,7 +194,7 @@
                     {% set ns2 = namespace(t_days=0, t_hours=0) %}
                     {% for att in attendance %}
                     <tr>
-                        <td>{{ att.emp.internal_emp_code if att.emp.use_internal_code and att.emp.internal_emp_code else att.emp.emp_code }}</td>
+                        <td>{% if config.epf_applicable %}{{ att.emp.uan_number or '—' }}{% elif config.esic_applicable %}{{ att.emp.esic_ip_number or 'NA' }}{% else %}{{ att.emp.internal_emp_code if att.emp.use_internal_code and att.emp.internal_emp_code else att.emp.emp_code }}{% endif %}</td>
                         <td style="text-align:left; font-weight:600; white-space:nowrap;">{{ att.emp.name.upper() }}</td>
                         <td>{{ att.emp.designation or '' }}</td>
                         <td></td>
@@ -202,11 +202,11 @@
                             {% set mark = att.marks.get(d, '') %}
                             <td class="{% if mark == 'R' %}rest{% elif mark == 'H' %}holiday{% elif mark == 'A' %}absent{% endif %}">{{ mark }}</td>
                         {% endfor %}
-                        <td style="font-weight:700;">{{ att.days_present|int }}</td>
+                        <td style="font-weight:700;">{{ att.days_present|int if att.days_present == att.days_present|int else "%.2f"|format(att.days_present) }}</td>
                         <td>{{ att.hours }}</td>
                         <td></td>
                     </tr>
-                    {% set ns2.t_days = ns2.t_days + att.days_present|int %}
+                    {% set ns2.t_days = ns2.t_days + att.days_present %}
                     {% set ns2.t_hours = ns2.t_hours + att.hours %}
                     {% endfor %}
                     <tr class="total-row">

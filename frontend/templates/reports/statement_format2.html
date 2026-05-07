@@ -180,7 +180,7 @@
                     <td class="text-right">{{ "{:,.0f}".format(entry._nph_amount) if entry._nph_amount else "-" }}</td>
                     <td class="text-right" style="font-weight:700; background:#f0fdf4;">{{ "{:,.0f}".format(entry.earned_gross) }}</td>
                     {% if config.ot_applicable %}
-                    <td class="text-center">{{ entry.ot_hours|int if entry.ot_hours else "-" }}</td>
+                    <td class="text-center">{{ (entry.ot_hours|int if entry.ot_hours == entry.ot_hours|int else "%.2f"|format(entry.ot_hours)) if entry.ot_hours else "-" }}</td>
                     <td class="text-right">{{ "{:,.0f}".format(entry.ot_amount) }}</td>
                     {% endif %}
                     {% if config.epf_applicable %}

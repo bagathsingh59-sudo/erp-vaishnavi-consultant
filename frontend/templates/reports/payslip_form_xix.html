@@ -196,7 +196,7 @@
         <table class="details-table">
             <tr>
                 <td class="label-cell">No. of Days Worked</td>
-                <td class="value-cell">{{ slip.entry.days_present|int }}</td>
+                <td class="value-cell">{{ slip.entry.days_present|int if slip.entry.days_present == slip.entry.days_present|int else "%.2f"|format(slip.entry.days_present) }}</td>
             </tr>
             <tr>
                 <td class="label-cell">Paid Holidays (NPH/PH)</td>

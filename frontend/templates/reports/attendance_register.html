@@ -94,15 +94,15 @@
                     </td>
                 {% endfor %}
 
-                <td class="summary-col">{{ att.days_present|int }}</td>
-                <td class="summary-col">{{ att.days_absent|int }}</td>
-                <td class="summary-col">{{ att.paid_holidays|int }}</td>
-                <td class="summary-col" style="font-weight:700;">{{ att.total_days|int }}</td>
+                <td class="summary-col">{{ att.days_present|int if att.days_present == att.days_present|int else "%.2f"|format(att.days_present) }}</td>
+                <td class="summary-col">{{ att.days_absent|int if att.days_absent == att.days_absent|int else "%.2f"|format(att.days_absent) }}</td>
+                <td class="summary-col">{{ att.paid_holidays|int if att.paid_holidays == att.paid_holidays|int else "%.2f"|format(att.paid_holidays) }}</td>
+                <td class="summary-col" style="font-weight:700;">{{ att.total_days|int if att.total_days == att.total_days|int else "%.2f"|format(att.total_days) }}</td>
             </tr>
-            {% set ns.t_pres = ns.t_pres + att.days_present|int %}
-            {% set ns.t_abs = ns.t_abs + att.days_absent|int %}
-            {% set ns.t_ph = ns.t_ph + att.paid_holidays|int %}
-            {% set ns.t_total = ns.t_total + att.total_days|int %}
+            {% set ns.t_pres = ns.t_pres + att.days_present %}
+            {% set ns.t_abs = ns.t_abs + att.days_absent %}
+            {% set ns.t_ph = ns.t_ph + att.paid_holidays %}
+            {% set ns.t_total = ns.t_total + att.total_days %}
             {% endfor %}
 
             <tr class="total-row">

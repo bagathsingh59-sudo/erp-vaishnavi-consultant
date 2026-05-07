@@ -354,7 +354,7 @@
                 <td class="name-cell">{{ row.emp.name }}</td>
                 <td class="center" style="font-size:8.5px;">{{ row.emp.uan_number or '—' }}</td>
                 <td class="center" style="font-size:8.5px;">{{ row.emp.esic_ip_number or '—' }}</td>
-                <td class="center">{{ row.entry.days_present|int }}</td>
+                <td class="center">{{ row.entry.days_present|int if row.entry.days_present == row.entry.days_present|int else "%.2f"|format(row.entry.days_present) }}</td>
                 <td>{{ "{:,.0f}".format(row.entry.earned_gross) }}</td>
                 {% if config.epf_applicable %}
                 <td>{{ "{:,.0f}".format(row.entry.epf_wages) }}</td>
