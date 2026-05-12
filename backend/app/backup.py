@@ -55,6 +55,9 @@ def create_backup(user_id, label=None):
     if not db_url:
         print('[BACKUP] DATABASE_URL not set')
         return None
+    # Railway uses postgres:// scheme; pg_dump requires postgresql://
+    if db_url.startswith('postgres://'):
+        db_url = 'postgresql://' + db_url[len('postgres://'):]
 
     # Step 1: Create SQL dump in a temp file
     tmp_sql = None
@@ -136,6 +139,9 @@ def restore_backup(user_id, filename, is_admin_user=False):
     db_url = os.getenv('DATABASE_URL', '')
     if not db_url:
         return None
+    # Railway uses postgres:// scheme; psql requires postgresql://
+    if db_url.startswith('postgres://'):
+        db_url = 'postgresql://' + db_url[len('postgres://'):]
 
     sql_path = None
     temp_sql = None
