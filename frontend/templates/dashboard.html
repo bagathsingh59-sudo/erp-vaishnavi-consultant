@@ -240,6 +240,46 @@
 ]
 </script>
 
+<!-- ==================== CREDENTIAL SEARCH WIDGET ==================== -->
+<div id="credSearchWidget" class="mb-4" style="position:relative;">
+    <div style="background:#fff; border-radius:12px; border:1px solid #e2e8f0; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+        <!-- Header -->
+        <div style="padding:12px 16px 0; display:flex; align-items:center; gap:8px;">
+            <span style="font-size:1rem;">🔑</span>
+            <span style="font-weight:700; font-size:0.82rem; color:#1e293b;">Quick Credential Lookup</span>
+            <span style="font-size:0.68rem; color:#94a3b8; margin-left:4px;">— Search EPF / ESIC login details instantly</span>
+        </div>
+        <!-- Search Input -->
+        <div style="padding:10px 16px 12px; position:relative;">
+            <div style="position:relative;">
+                <i class="bi bi-search" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:0.82rem; pointer-events:none;"></i>
+                <input type="text" id="credSearchInput"
+                    oninput="credSearch()"
+                    placeholder="Type establishment name, PF code, or username…"
+                    autocomplete="off"
+                    style="width:100%; padding:8px 12px 8px 34px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:0.82rem; color:#1e293b; outline:none; transition:border-color 0.15s;"
+                    onfocus="this.style.borderColor='#6366f1'"
+                    onblur="this.style.borderColor='#e2e8f0'"
+                >
+            </div>
+        </div>
+    </div>
+    <!-- Results Dropdown -->
+    <div id="credResults" style="
+        display:none;
+        position:absolute;
+        left:0; right:0;
+        top:100%;
+        margin-top:4px;
+        background:#fff;
+        border-radius:10px;
+        border:1px solid #e2e8f0;
+        box-shadow:0 8px 24px rgba(0,0,0,0.10);
+        z-index:200;
+        max-height:420px;
+        overflow-y:auto;
+    "></div>
+</div>
 
 <!-- ==================== LICENSE EXPIRY ALERTS ==================== -->
 {% if license_alerts %}
@@ -688,27 +728,10 @@
                             {% endif %}
                         </td>
                         <td class="text-center">
-                            <div class="d-flex align-items-center justify-content-center gap-1">
-                                <a href="{{ url_for('establishment.select_establishment', est_id=item.est.id) }}"
-                                   class="btn btn-sm btn-primary" style="font-size: 0.72rem; padding: 3px 10px;">
-                                    Open <i class="bi bi-arrow-right ms-1"></i>
-                                </a>
-                                {% if item.epf_cred or item.esic_cred %}
-                                <button type="button"
-                                    class="btn btn-sm btn-outline-secondary"
-                                    style="font-size: 0.72rem; padding: 3px 7px;"
-                                    title="View Login Credentials"
-                                    onclick="showCredModal(
-                                        {{ item.est.display_name|tojson }},
-                                        {{ (item.epf_cred.username if item.epf_cred else '')|tojson }},
-                                        {{ (item.epf_cred.password if item.epf_cred else '')|tojson }},
-                                        {{ (item.esic_cred.username if item.esic_cred else '')|tojson }},
-                                        {{ (item.esic_cred.password if item.esic_cred else '')|tojson }}
-                                    )">
-                                    🔑
-                                </button>
-                                {% endif %}
-                            </div>
+                            <a href="{{ url_for('establishment.select_establishment', est_id=item.est.id) }}"
+                               class="btn btn-sm btn-primary" style="font-size: 0.72rem; padding: 3px 10px;">
+                                Open <i class="bi bi-arrow-right ms-1"></i>
+                            </a>
                         </td>
                     </tr>
                     {% endfor %}
@@ -728,83 +751,6 @@
     </div>
 </div>
 
-<!-- ==================== CREDENTIAL POPUP MODAL ==================== -->
-<div class="modal fade" id="credModal" tabindex="-1" aria-labelledby="credModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
-        <div class="modal-content" style="border-radius:14px; border:none; box-shadow:0 20px 60px rgba(0,0,0,0.15);">
-            <div class="modal-header" style="background:linear-gradient(135deg,#4f46e5,#7c3aed); border-radius:14px 14px 0 0; border:none; padding:14px 20px;">
-                <h6 class="modal-title text-white mb-0" id="credModalLabel" style="font-size:0.9rem; font-weight:700;">
-                    <i class="bi bi-key-fill me-2"></i><span id="credModalEstName">Login Credentials</span>
-                </h6>
-                <button type="button" class="btn-close btn-close-white btn-sm" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body" style="padding:20px;">
-                <!-- EPF block -->
-                <div id="credEpfBlock" class="mb-3">
-                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-                        <span style="background:#dbeafe; color:#1d4ed8; padding:2px 10px; border-radius:6px; font-size:0.72rem; font-weight:700;">EPF</span>
-                        <span style="font-size:0.72rem; color:#64748b;">Employee Provident Fund</span>
-                    </div>
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px;">
-                        <div class="d-flex align-items-center justify-content-between mb-1">
-                            <span style="font-size:0.68rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px;">Username / ID</span>
-                            <button type="button" onclick="credCopy('credEpfUser', this)" class="btn btn-sm" style="padding:1px 7px; font-size:0.65rem; background:#e0e7ff; color:#4f46e5; border:none; border-radius:4px;">
-                                <i class="bi bi-clipboard me-1"></i>Copy
-                            </button>
-                        </div>
-                        <div id="credEpfUser" style="font-family:monospace; font-size:0.85rem; color:#1e293b; word-break:break-all;">—</div>
-                        <div class="d-flex align-items-center justify-content-between mt-2 mb-1">
-                            <span style="font-size:0.68rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px;">Password</span>
-                            <div class="d-flex gap-1">
-                                <button type="button" onclick="credToggle('credEpfPassDisplay','credEpfPassPlain',this)" class="btn btn-sm" style="padding:1px 7px; font-size:0.65rem; background:#f1f5f9; color:#64748b; border:none; border-radius:4px;">
-                                    <i class="bi bi-eye me-1"></i>Show
-                                </button>
-                                <button type="button" onclick="credCopy('credEpfPassPlain', this)" class="btn btn-sm" style="padding:1px 7px; font-size:0.65rem; background:#e0e7ff; color:#4f46e5; border:none; border-radius:4px;">
-                                    <i class="bi bi-clipboard me-1"></i>Copy
-                                </button>
-                            </div>
-                        </div>
-                        <div id="credEpfPassDisplay" style="font-family:monospace; font-size:0.85rem; color:#64748b; letter-spacing:3px;">••••••••</div>
-                        <div id="credEpfPassPlain" style="display:none; font-family:monospace; font-size:0.85rem; color:#1e293b; word-break:break-all;"></div>
-                    </div>
-                </div>
-                <!-- ESIC block -->
-                <div id="credEsicBlock">
-                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-                        <span style="background:#dcfce7; color:#15803d; padding:2px 10px; border-radius:6px; font-size:0.72rem; font-weight:700;">ESIC</span>
-                        <span style="font-size:0.72rem; color:#64748b;">Employees State Insurance</span>
-                    </div>
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px;">
-                        <div class="d-flex align-items-center justify-content-between mb-1">
-                            <span style="font-size:0.68rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px;">Username / ID</span>
-                            <button type="button" onclick="credCopy('credEsicUser', this)" class="btn btn-sm" style="padding:1px 7px; font-size:0.65rem; background:#dcfce7; color:#15803d; border:none; border-radius:4px;">
-                                <i class="bi bi-clipboard me-1"></i>Copy
-                            </button>
-                        </div>
-                        <div id="credEsicUser" style="font-family:monospace; font-size:0.85rem; color:#1e293b; word-break:break-all;">—</div>
-                        <div class="d-flex align-items-center justify-content-between mt-2 mb-1">
-                            <span style="font-size:0.68rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px;">Password</span>
-                            <div class="d-flex gap-1">
-                                <button type="button" onclick="credToggle('credEsicPassDisplay','credEsicPassPlain',this)" class="btn btn-sm" style="padding:1px 7px; font-size:0.65rem; background:#f1f5f9; color:#64748b; border:none; border-radius:4px;">
-                                    <i class="bi bi-eye me-1"></i>Show
-                                </button>
-                                <button type="button" onclick="credCopy('credEsicPassPlain', this)" class="btn btn-sm" style="padding:1px 7px; font-size:0.65rem; background:#dcfce7; color:#15803d; border:none; border-radius:4px;">
-                                    <i class="bi bi-clipboard me-1"></i>Copy
-                                </button>
-                            </div>
-                        </div>
-                        <div id="credEsicPassDisplay" style="font-family:monospace; font-size:0.85rem; color:#64748b; letter-spacing:3px;">••••••••</div>
-                        <div id="credEsicPassPlain" style="display:none; font-family:monospace; font-size:0.85rem; color:#1e293b; word-break:break-all;"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer" style="border-top:1px solid #f1f5f9; padding:10px 20px;">
-                <span style="font-size:0.65rem; color:#94a3b8;"><i class="bi bi-shield-lock me-1"></i>Credentials visible only to logged-in users</span>
-                <button type="button" class="btn btn-sm btn-secondary ms-auto" data-bs-dismiss="modal" style="font-size:0.72rem; padding:3px 14px;">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block scripts %}
@@ -862,9 +808,7 @@ function heroFilter() {
         return c.name.toLowerCase().indexOf(q) >= 0 ||
                c.pf.toLowerCase().indexOf(q) >= 0 ||
                c.esic.toLowerCase().indexOf(q) >= 0 ||
-               c.company.toLowerCase().indexOf(q) >= 0 ||
-               c.epfUser.toLowerCase().indexOf(q) >= 0 ||
-               c.esicUser.toLowerCase().indexOf(q) >= 0;
+               c.company.toLowerCase().indexOf(q) >= 0;
     });
 
     resultsBox.style.display = 'block';
@@ -880,8 +824,6 @@ function heroFilter() {
     // Build result items
     var html = '';
     matches.forEach(function(c, i) {
-        var uid = 'hcred_' + i;
-
         var statusBadge = '';
         if (c.status === 'filed') {
             statusBadge = '<span style="background:#dcfce7; color:#16a34a; padding:2px 8px; border-radius:6px; font-size:0.62rem; font-weight:700;">FILED</span>';
@@ -902,72 +844,31 @@ function heroFilter() {
         // Highlight matching text
         var displayName = c.name.replace(new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi'), '<mark style="background:#c7d2fe; padding:0 2px; border-radius:2px;">$1</mark>');
 
-        // Credential rows (EPF + ESIC)
-        var credHtml = '';
-        var hasAnyCredential = c.epfUser || c.esicUser;
-        if (hasAnyCredential) {
-            var epfRow = '';
-            if (c.epfUser) {
-                epfRow = '<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">' +
-                    '<span style="background:#dbeafe; color:#1d4ed8; padding:1px 5px; border-radius:3px; font-size:0.58rem; font-weight:700; flex-shrink:0;">EPF</span>' +
-                    '<span style="font-size:0.7rem; color:#334155; font-family:monospace;">' + c.epfUser + '</span>' +
-                    '<span style="color:#94a3b8; font-size:0.65rem;">|</span>' +
-                    '<span id="' + uid + '_epf_pw" style="font-size:0.7rem; color:#64748b; font-family:monospace; letter-spacing:2px;">••••••</span>' +
-                    '<button type="button" onclick="heroTogglePw(event,\'' + uid + '_epf_pw\',' + JSON.stringify(c.epfPass) + ')" ' +
-                        'style="background:none; border:none; padding:0 2px; cursor:pointer; color:#94a3b8; font-size:0.75rem; line-height:1;" title="Show/hide">' +
-                        '<i class="bi bi-eye"></i></button>' +
-                    '<button type="button" onclick="heroCopyText(event,' + JSON.stringify(c.epfPass) + ',this)" ' +
-                        'style="background:none; border:none; padding:0 2px; cursor:pointer; color:#94a3b8; font-size:0.68rem; line-height:1;" title="Copy password">' +
-                        '<i class="bi bi-clipboard"></i></button>' +
-                '</div>';
-            }
-            var esicRow = '';
-            if (c.esicUser) {
-                esicRow = '<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:3px;">' +
-                    '<span style="background:#dcfce7; color:#15803d; padding:1px 5px; border-radius:3px; font-size:0.58rem; font-weight:700; flex-shrink:0;">ESIC</span>' +
-                    '<span style="font-size:0.7rem; color:#334155; font-family:monospace;">' + c.esicUser + '</span>' +
-                    '<span style="color:#94a3b8; font-size:0.65rem;">|</span>' +
-                    '<span id="' + uid + '_esic_pw" style="font-size:0.7rem; color:#64748b; font-family:monospace; letter-spacing:2px;">••••••</span>' +
-                    '<button type="button" onclick="heroTogglePw(event,\'' + uid + '_esic_pw\',' + JSON.stringify(c.esicPass) + ')" ' +
-                        'style="background:none; border:none; padding:0 2px; cursor:pointer; color:#94a3b8; font-size:0.75rem; line-height:1;" title="Show/hide">' +
-                        '<i class="bi bi-eye"></i></button>' +
-                    '<button type="button" onclick="heroCopyText(event,' + JSON.stringify(c.esicPass) + ',this)" ' +
-                        'style="background:none; border:none; padding:0 2px; cursor:pointer; color:#94a3b8; font-size:0.68rem; line-height:1;" title="Copy password">' +
-                        '<i class="bi bi-clipboard"></i></button>' +
-                '</div>';
-            }
-            credHtml = '<div style="margin-top:5px; padding:6px 8px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0;">' +
-                epfRow + esicRow +
-            '</div>';
-        }
-
-        html += '<div class="hero-result-item" data-index="' + i + '" style="' +
-            'display:flex; align-items:flex-start; padding:12px 20px; text-decoration:none; color:inherit;' +
+        html += '<a href="' + c.url + '" class="hero-result-item" data-index="' + i + '" style="' +
+            'display:flex; align-items:center; padding:12px 20px; text-decoration:none; color:inherit;' +
             'border-bottom:1px solid #f1f5f9; transition:background 0.15s;' +
+            'cursor:pointer;' +
         '">' +
-            '<a href="' + c.url + '" style="display:flex; align-items:center; text-decoration:none; color:inherit; flex:1; min-width:0;">' +
-                '<div style="width:40px; height:40px; border-radius:10px; background:linear-gradient(135deg,#4f46e5,#7c3aed); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.85rem; flex-shrink:0;">' +
-                    c.name.charAt(0).toUpperCase() +
-                '</div>' +
-                '<div style="flex:1; margin-left:14px; min-width:0;">' +
-                    '<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">' +
-                        '<span style="font-weight:700; font-size:0.88rem; color:#1e293b;">' + displayName + '</span>' +
-                        serviceBadge + branchBadge +
-                    '</div>' +
-                    '<div style="display:flex; align-items:center; gap:10px; margin-top:3px; font-size:0.72rem; color:#94a3b8;">' +
-                        (c.pf ? '<span><i class="bi bi-shield-check me-1"></i>' + c.pf + '</span>' : '') +
-                        (c.esic ? '<span><i class="bi bi-heart-pulse me-1"></i>' + c.esic + '</span>' : '') +
-                        '<span><i class="bi bi-people me-1"></i>' + c.emps + ' emp</span>' +
-                        (feeText ? '<span><i class="bi bi-currency-rupee me-1"></i>' + feeText + '</span>' : '') +
-                    '</div>' +
-                    credHtml +
-                '</div>' +
-            '</a>' +
-            '<div style="display:flex; align-items:center; gap:10px; flex-shrink:0; margin-left:12px; padding-top:4px;">' +
-                statusBadge +
-                '<a href="' + c.url + '" style="color:#cbd5e1; font-size:1rem;"><i class="bi bi-arrow-right"></i></a>' +
+            '<div style="width:40px; height:40px; border-radius:10px; background:linear-gradient(135deg,#4f46e5,#7c3aed); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.85rem; flex-shrink:0;">' +
+                c.name.charAt(0).toUpperCase() +
             '</div>' +
-        '</div>';
+            '<div style="flex:1; margin-left:14px; min-width:0;">' +
+                '<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">' +
+                    '<span style="font-weight:700; font-size:0.88rem; color:#1e293b;">' + displayName + '</span>' +
+                    serviceBadge + branchBadge +
+                '</div>' +
+                '<div style="display:flex; align-items:center; gap:10px; margin-top:3px; font-size:0.72rem; color:#94a3b8;">' +
+                    (c.pf ? '<span><i class="bi bi-shield-check me-1"></i>' + c.pf + '</span>' : '') +
+                    (c.esic ? '<span><i class="bi bi-heart-pulse me-1"></i>' + c.esic + '</span>' : '') +
+                    '<span><i class="bi bi-people me-1"></i>' + c.emps + ' emp</span>' +
+                    (feeText ? '<span><i class="bi bi-currency-rupee me-1"></i>' + feeText + '</span>' : '') +
+                '</div>' +
+            '</div>' +
+            '<div style="display:flex; align-items:center; gap:10px; flex-shrink:0; margin-left:12px;">' +
+                statusBadge +
+                '<i class="bi bi-arrow-right" style="color:#cbd5e1; font-size:1rem;"></i>' +
+            '</div>' +
+        '</a>';
     });
 
     listEl.innerHTML = html;
@@ -976,59 +877,12 @@ function heroFilter() {
     listEl.querySelectorAll('.hero-result-item').forEach(function(el) {
         el.addEventListener('mouseenter', function() {
             el.style.background = '#f8fafc';
-            el.style.cursor = 'default';
             _heroIdx = parseInt(el.dataset.index);
             _heroHighlight();
         });
         el.addEventListener('mouseleave', function() {
             el.style.background = '';
         });
-    });
-}
-
-// Toggle password visibility in hero search result
-function heroTogglePw(e, spanId, plainPw) {
-    e.preventDefault();
-    e.stopPropagation();
-    var span = document.getElementById(spanId);
-    if (!span) return;
-    var btn = e.currentTarget;
-    var icon = btn.querySelector('i');
-    if (span.dataset.shown === '1') {
-        span.textContent = '••••••';
-        span.style.letterSpacing = '2px';
-        span.dataset.shown = '0';
-        if (icon) { icon.className = 'bi bi-eye'; }
-    } else {
-        span.textContent = plainPw || '(empty)';
-        span.style.letterSpacing = 'normal';
-        span.dataset.shown = '1';
-        if (icon) { icon.className = 'bi bi-eye-slash'; }
-    }
-}
-
-// Copy text to clipboard from hero search result
-function heroCopyText(e, text, btn) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!text) return;
-    navigator.clipboard.writeText(text).then(function() {
-        var icon = btn.querySelector('i');
-        if (icon) { icon.className = 'bi bi-clipboard-check'; }
-        setTimeout(function() { if (icon) icon.className = 'bi bi-clipboard'; }, 1500);
-    }).catch(function() {
-        // Fallback for older browsers
-        var ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-        var icon = btn.querySelector('i');
-        if (icon) { icon.className = 'bi bi-clipboard-check'; }
-        setTimeout(function() { if (icon) icon.className = 'bi bi-clipboard'; }, 1500);
     });
 }
 
@@ -1050,15 +904,11 @@ function heroKeyNav(e) {
         _heroHighlight();
     } else if (e.key === 'Enter') {
         e.preventDefault();
-        var target = null;
         if (_heroIdx >= 0 && _heroIdx < items.length) {
-            target = items[_heroIdx];
+            window.location.href = items[_heroIdx].getAttribute('href');
         } else if (items.length === 1) {
-            target = items[0];
-        }
-        if (target) {
-            var link = target.querySelector('a[href]');
-            if (link) window.location.href = link.getAttribute('href');
+            // Auto-select if only one match
+            window.location.href = items[0].getAttribute('href');
         }
     } else if (e.key === 'Escape') {
         resultsBox.style.display = 'none';
@@ -1122,83 +972,119 @@ function filterClients() {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  CREDENTIAL MODAL — for 🔑 button in All Clients table
+//  CREDENTIAL SEARCH — Dedicated lookup for EPF/ESIC logins
 // ════════════════════════════════════════════════════════════════════
-function showCredModal(estName, epfUser, epfPass, esicUser, esicPass) {
-    // Set establishment name
-    document.getElementById('credModalEstName').textContent = estName || 'Login Credentials';
+var _credClients = [];
+try { _credClients = JSON.parse(document.getElementById('clientData').textContent); } catch(e){}
 
-    // EPF block
-    var epfBlock = document.getElementById('credEpfBlock');
-    if (epfUser) {
-        epfBlock.style.display = '';
-        document.getElementById('credEpfUser').textContent = epfUser || '—';
-        document.getElementById('credEpfPassPlain').textContent = epfPass || '';
-        document.getElementById('credEpfPassDisplay').style.display = '';
-        document.getElementById('credEpfPassDisplay').textContent = '••••••••';
-        document.getElementById('credEpfPassPlain').style.display = 'none';
-        // Reset show button
-        var epfShowBtn = epfBlock.querySelector('button[onclick*="credEpfPass"]');
-        if (epfShowBtn) { epfShowBtn.innerHTML = '<i class="bi bi-eye me-1"></i>Show'; }
-    } else {
-        epfBlock.style.display = 'none';
+function credSearch() {
+    var q = document.getElementById('credSearchInput').value.trim().toLowerCase();
+    var box = document.getElementById('credResults');
+    if (!q || q.length < 2) { box.style.display = 'none'; return; }
+
+    var matches = _credClients.filter(function(c) {
+        return c.name.toLowerCase().indexOf(q) >= 0 ||
+               c.pf.toLowerCase().indexOf(q) >= 0 ||
+               c.esic.toLowerCase().indexOf(q) >= 0 ||
+               c.company.toLowerCase().indexOf(q) >= 0 ||
+               c.epfUser.toLowerCase().indexOf(q) >= 0 ||
+               c.esicUser.toLowerCase().indexOf(q) >= 0;
+    });
+
+    if (matches.length === 0) {
+        box.innerHTML = '<div style="padding:14px 20px; font-size:0.78rem; color:#94a3b8; text-align:center;"><i class="bi bi-search me-2"></i>No results</div>';
+        box.style.display = 'block';
+        return;
     }
 
-    // ESIC block
-    var esicBlock = document.getElementById('credEsicBlock');
-    if (esicUser) {
-        esicBlock.style.display = '';
-        document.getElementById('credEsicUser').textContent = esicUser || '—';
-        document.getElementById('credEsicPassPlain').textContent = esicPass || '';
-        document.getElementById('credEsicPassDisplay').style.display = '';
-        document.getElementById('credEsicPassDisplay').textContent = '••••••••';
-        document.getElementById('credEsicPassPlain').style.display = 'none';
-        // Reset show button
-        var esicShowBtn = esicBlock.querySelector('button[onclick*="credEsicPass"]');
-        if (esicShowBtn) { esicShowBtn.innerHTML = '<i class="bi bi-eye me-1"></i>Show'; }
-    } else {
-        esicBlock.style.display = 'none';
-    }
+    var html = '';
+    matches.slice(0, 8).forEach(function(c, i) {
+        var safeId = 'cs_' + i;
+        var epfRow = '', esicRow = '';
 
-    var modal = new bootstrap.Modal(document.getElementById('credModal'));
-    modal.show();
+        if (c.epfUser) {
+            epfRow = '<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:4px;">' +
+                '<span style="background:#dbeafe; color:#1d4ed8; padding:1px 7px; border-radius:4px; font-size:0.6rem; font-weight:700; flex-shrink:0; min-width:36px; text-align:center;">EPF</span>' +
+                '<span style="font-family:monospace; font-size:0.75rem; color:#1e293b; flex:1; min-width:0; word-break:break-all;">' + c.epfUser + '</span>' +
+                '<span style="color:#94a3b8; font-size:0.72rem; flex-shrink:0;">Pass:</span>' +
+                '<span id="' + safeId + '_epf" data-plain="' + c.epfPass.replace(/"/g,'&quot;') + '" style="font-family:monospace; font-size:0.75rem; color:#64748b; letter-spacing:2px; flex-shrink:0;">••••••</span>' +
+                '<button type="button" onclick="csPwToggle(event,\'' + safeId + '_epf\')" style="background:none;border:none;padding:1px 3px;cursor:pointer;color:#94a3b8;font-size:0.8rem;line-height:1;" title="Show/Hide"><i class="bi bi-eye"></i></button>' +
+                '<button type="button" onclick="csCopy(event,\'' + safeId + '_epf\')" style="background:none;border:none;padding:1px 3px;cursor:pointer;color:#94a3b8;font-size:0.8rem;line-height:1;" title="Copy password"><i class="bi bi-clipboard"></i></button>' +
+            '</div>';
+        }
+        if (c.esicUser) {
+            esicRow = '<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">' +
+                '<span style="background:#dcfce7; color:#15803d; padding:1px 7px; border-radius:4px; font-size:0.6rem; font-weight:700; flex-shrink:0; min-width:36px; text-align:center;">ESIC</span>' +
+                '<span style="font-family:monospace; font-size:0.75rem; color:#1e293b; flex:1; min-width:0; word-break:break-all;">' + c.esicUser + '</span>' +
+                '<span style="color:#94a3b8; font-size:0.72rem; flex-shrink:0;">Pass:</span>' +
+                '<span id="' + safeId + '_esic" data-plain="' + c.esicPass.replace(/"/g,'&quot;') + '" style="font-family:monospace; font-size:0.75rem; color:#64748b; letter-spacing:2px; flex-shrink:0;">••••••</span>' +
+                '<button type="button" onclick="csPwToggle(event,\'' + safeId + '_esic\')" style="background:none;border:none;padding:1px 3px;cursor:pointer;color:#94a3b8;font-size:0.8rem;line-height:1;" title="Show/Hide"><i class="bi bi-eye"></i></button>' +
+                '<button type="button" onclick="csCopy(event,\'' + safeId + '_esic\')" style="background:none;border:none;padding:1px 3px;cursor:pointer;color:#94a3b8;font-size:0.8rem;line-height:1;" title="Copy password"><i class="bi bi-clipboard"></i></button>' +
+            '</div>';
+        }
+
+        if (!c.epfUser && !c.esicUser) return;  // skip if no credentials
+
+        html +=
+            '<div style="padding:10px 16px; border-bottom:1px solid #f1f5f9;">' +
+                '<div style="font-weight:700; font-size:0.82rem; color:#1e293b; margin-bottom:6px;">' +
+                    '<i class="bi bi-building me-1" style="color:#94a3b8;"></i>' + c.name +
+                    (c.pf ? '<span style="font-size:0.65rem; color:#94a3b8; margin-left:8px; font-weight:400;">' + c.pf + '</span>' : '') +
+                '</div>' +
+                epfRow + esicRow +
+            '</div>';
+    });
+
+    box.innerHTML = html || '<div style="padding:14px 20px; font-size:0.78rem; color:#94a3b8; text-align:center;"><i class="bi bi-key me-2"></i>No credentials found for matching establishments</div>';
+    box.style.display = 'block';
 }
 
-function credToggle(displayId, plainId, btn) {
-    var disp = document.getElementById(displayId);
-    var plain = document.getElementById(plainId);
-    if (!disp || !plain) return;
-    if (plain.style.display === 'none') {
-        disp.style.display = 'none';
-        plain.style.display = '';
-        btn.innerHTML = '<i class="bi bi-eye-slash me-1"></i>Hide';
+function csPwToggle(e, spanId) {
+    e.preventDefault(); e.stopPropagation();
+    var span = document.getElementById(spanId);
+    if (!span) return;
+    var btn = e.currentTarget;
+    var icon = btn.querySelector('i');
+    if (span.dataset.shown === '1') {
+        span.textContent = '••••••';
+        span.style.letterSpacing = '2px';
+        span.dataset.shown = '0';
+        if (icon) icon.className = 'bi bi-eye';
     } else {
-        disp.style.display = '';
-        plain.style.display = 'none';
-        btn.innerHTML = '<i class="bi bi-eye me-1"></i>Show';
+        span.textContent = span.dataset.plain || '(empty)';
+        span.style.letterSpacing = 'normal';
+        span.dataset.shown = '1';
+        if (icon) icon.className = 'bi bi-eye-slash';
     }
 }
 
-function credCopy(sourceId, btn) {
-    var el = document.getElementById(sourceId);
-    if (!el) return;
-    var text = el.textContent.trim();
-    if (!text || text === '—') return;
+function csCopy(e, spanId) {
+    e.preventDefault(); e.stopPropagation();
+    var span = document.getElementById(spanId);
+    if (!span) return;
+    var text = span.dataset.plain || '';
+    if (!text) return;
+    var btn = e.currentTarget;
+    var icon = btn.querySelector('i');
     navigator.clipboard.writeText(text).then(function() {
-        var orig = btn.innerHTML;
-        btn.innerHTML = '<i class="bi bi-clipboard-check me-1"></i>Copied!';
-        setTimeout(function() { btn.innerHTML = orig; }, 1500);
+        if (icon) icon.className = 'bi bi-clipboard-check';
+        setTimeout(function() { if (icon) icon.className = 'bi bi-clipboard'; }, 1500);
     }).catch(function() {
         var ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed'; ta.style.opacity = '0';
-        document.body.appendChild(ta); ta.select();
-        document.execCommand('copy');
+        ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy');
         document.body.removeChild(ta);
-        var orig = btn.innerHTML;
-        btn.innerHTML = '<i class="bi bi-clipboard-check me-1"></i>Copied!';
-        setTimeout(function() { btn.innerHTML = orig; }, 1500);
+        if (icon) icon.className = 'bi bi-clipboard-check';
+        setTimeout(function() { if (icon) icon.className = 'bi bi-clipboard'; }, 1500);
     });
 }
+
+// Close credential search on outside click
+document.addEventListener('click', function(e) {
+    var cs = document.getElementById('credSearchWidget');
+    if (cs && !cs.contains(e.target)) {
+        document.getElementById('credResults').style.display = 'none';
+    }
+});
 </script>
 {% endblock %}

@@ -53,14 +53,135 @@
 
             {% if selected_est %}
             <!-- ========== ESTABLISHMENT SELECTED — SCOPED VIEW ========== -->
-            <div style="margin: 10px 12px; padding: 10px 12px; background: linear-gradient(135deg, #4f46e5, #7c3aed); border-radius: 8px; color: white;">
-                <div style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; margin-bottom: 3px;">Working On</div>
-                <div style="font-size: 0.82rem; font-weight: 600; line-height: 1.3;">{{ selected_est.display_name }}</div>
-                {% if selected_est.pf_code %}
-                <div style="font-size: 0.68rem; opacity: 0.85; margin-top: 2px;">{{ selected_est.pf_code }}</div>
+            {# Collect EPF and ESIC credentials — match by portal_name containing 'EPF' or 'ESIC' #}
+            {% set epf_cred = namespace(value=None) %}
+            {% set esic_cred = namespace(value=None) %}
+            {% for cred in selected_est.credentials %}
+                {% if 'EPF' in cred.portal_name.upper() and not epf_cred.value %}
+                    {% set epf_cred.value = cred %}
                 {% endif %}
+                {% if 'ESIC' in cred.portal_name.upper() and not esic_cred.value %}
+                    {% set esic_cred.value = cred %}
+                {% endif %}
+            {% endfor %}
+            {% set epf_cred = epf_cred.value %}
+            {% set esic_cred = esic_cred.value %}
+
+            <div style="margin: 10px 12px; position: relative;">
+                <!-- Clickable chip -->
+                <div id="workingOnChip"
+                     onclick="toggleCredPopup()"
+                     style="padding: 10px 12px; background: linear-gradient(135deg, #4f46e5, #7c3aed); border-radius: 8px; color: white; cursor: pointer; user-select: none; transition: opacity 0.15s;"
+                     onmouseenter="this.style.opacity='0.92'"
+                     onmouseleave="this.style.opacity='1'"
+                     title="Click to view login credentials">
+                    <div style="display:flex; align-items:center; justify-content:space-between;">
+                        <div style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8;">Working On</div>
+                        {% if epf_cred or esic_cred %}
+                        <i id="credChevron" class="bi bi-chevron-down" style="font-size:0.65rem; opacity:0.7; transition:transform 0.2s;"></i>
+                        {% endif %}
+                    </div>
+                    <div style="font-size: 0.82rem; font-weight: 600; line-height: 1.3; margin-top:2px;">{{ selected_est.display_name }}</div>
+                    {% if selected_est.pf_code %}
+                    <div style="font-size: 0.68rem; opacity: 0.85; margin-top: 2px;">{{ selected_est.pf_code }}</div>
+                    {% endif %}
+                    {% if epf_cred or esic_cred %}
+                    <div style="font-size:0.6rem; opacity:0.7; margin-top:4px;"><i class="bi bi-key me-1"></i>Click for login credentials</div>
+                    {% endif %}
+                </div>
+
+                <!-- Credential popup panel -->
+                {% if epf_cred or esic_cred %}
+                <div id="credPopup" style="
+                    display:none;
+                    position:absolute;
+                    top:calc(100% + 6px);
+                    left:0; right:0;
+                    background:#fff;
+                    border-radius:10px;
+                    border:1px solid #e2e8f0;
+                    box-shadow:0 12px 36px rgba(0,0,0,0.18);
+                    z-index:9999;
+                    overflow:hidden;
+                ">
+                    <!-- Popup header -->
+                    <div style="background:linear-gradient(135deg,#4f46e5,#7c3aed); padding:8px 12px; display:flex; align-items:center; justify-content:space-between;">
+                        <span style="color:#fff; font-size:0.72rem; font-weight:700;"><i class="bi bi-key-fill me-1"></i>Login Credentials</span>
+                        <button type="button" onclick="toggleCredPopup()" style="background:none;border:none;color:rgba(255,255,255,0.8);font-size:0.85rem;padding:0;cursor:pointer;line-height:1;">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+
+                    <!-- Popup body -->
+                    <div style="padding:10px 12px;">
+                        <div style="font-size:0.7rem; font-weight:700; color:#334155; margin-bottom:8px; word-break:break-word;">{{ selected_est.display_name }}</div>
+
+                        {% if epf_cred %}
+                        <!-- EPF block -->
+                        <div style="background:#f0f4ff; border-radius:7px; padding:8px 10px; margin-bottom:8px;">
+                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
+                                <span style="background:#dbeafe; color:#1d4ed8; padding:1px 7px; border-radius:4px; font-size:0.6rem; font-weight:700;">EPF</span>
+                                <span style="font-size:0.62rem; color:#64748b;">Employee Provident Fund</span>
+                            </div>
+                            <div style="font-size:0.65rem; color:#64748b; margin-bottom:2px;">UserID</div>
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; margin-bottom:6px;">
+                                <span style="font-family:monospace; font-size:0.75rem; color:#1e293b; word-break:break-all;">{{ epf_cred.username }}</span>
+                                <button type="button" onclick="wcCopy(this, {{ epf_cred.username|tojson }})"
+                                    style="background:none;border:none;cursor:pointer;color:#6366f1;font-size:0.8rem;padding:2px;flex-shrink:0;" title="Copy UserID">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </div>
+                            <div style="font-size:0.65rem; color:#64748b; margin-bottom:2px;">Password</div>
+                            <div style="display:flex; align-items:center; gap:4px;">
+                                <span id="wc_epf_pw" data-plain="{{ epf_cred.password }}" style="font-family:monospace; font-size:0.75rem; color:#64748b; letter-spacing:2px; flex:1;">••••••••</span>
+                                <button type="button" onclick="wcToggle('wc_epf_pw', this)"
+                                    style="background:none;border:none;cursor:pointer;color:#6366f1;font-size:0.8rem;padding:2px;flex-shrink:0;" title="Show/Hide">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                                <button type="button" onclick="wcCopy(this, {{ epf_cred.password|tojson }})"
+                                    style="background:none;border:none;cursor:pointer;color:#6366f1;font-size:0.8rem;padding:2px;flex-shrink:0;" title="Copy Password">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if esic_cred %}
+                        <!-- ESIC block -->
+                        <div style="background:#f0fdf4; border-radius:7px; padding:8px 10px;">
+                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
+                                <span style="background:#dcfce7; color:#15803d; padding:1px 7px; border-radius:4px; font-size:0.6rem; font-weight:700;">ESIC</span>
+                                <span style="font-size:0.62rem; color:#64748b;">State Insurance</span>
+                            </div>
+                            <div style="font-size:0.65rem; color:#64748b; margin-bottom:2px;">UserID</div>
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; margin-bottom:6px;">
+                                <span style="font-family:monospace; font-size:0.75rem; color:#1e293b; word-break:break-all;">{{ esic_cred.username }}</span>
+                                <button type="button" onclick="wcCopy(this, {{ esic_cred.username|tojson }})"
+                                    style="background:none;border:none;cursor:pointer;color:#16a34a;font-size:0.8rem;padding:2px;flex-shrink:0;" title="Copy UserID">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </div>
+                            <div style="font-size:0.65rem; color:#64748b; margin-bottom:2px;">Password</div>
+                            <div style="display:flex; align-items:center; gap:4px;">
+                                <span id="wc_esic_pw" data-plain="{{ esic_cred.password }}" style="font-family:monospace; font-size:0.75rem; color:#64748b; letter-spacing:2px; flex:1;">••••••••</span>
+                                <button type="button" onclick="wcToggle('wc_esic_pw', this)"
+                                    style="background:none;border:none;cursor:pointer;color:#16a34a;font-size:0.8rem;padding:2px;flex-shrink:0;" title="Show/Hide">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                                <button type="button" onclick="wcCopy(this, {{ esic_cred.password|tojson }})"
+                                    style="background:none;border:none;cursor:pointer;color:#16a34a;font-size:0.8rem;padding:2px;flex-shrink:0;" title="Copy Password">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Back to Dashboard link (outside chip) -->
                 <a href="{{ url_for('establishment.deselect_establishment') }}"
-                   style="display: inline-block; margin-top: 6px; font-size: 0.68rem; color: #fbbf24; text-decoration: none;">
+                   style="display: inline-block; margin-top: 6px; font-size: 0.68rem; color: #a5b4fc; text-decoration: none; padding-left:2px;">
                     <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
                 </a>
             </div>
@@ -1274,5 +1395,66 @@
     })();
     </script>
     {% endif %}
+
+    <!-- Working On Chip — Credential Popup JS -->
+    <script>
+    function toggleCredPopup() {
+        var popup = document.getElementById('credPopup');
+        var chevron = document.getElementById('credChevron');
+        if (!popup) return;
+        if (popup.style.display === 'none' || popup.style.display === '') {
+            popup.style.display = 'block';
+            if (chevron) chevron.style.transform = 'rotate(180deg)';
+        } else {
+            popup.style.display = 'none';
+            if (chevron) chevron.style.transform = 'rotate(0deg)';
+        }
+    }
+
+    function wcToggle(spanId, btn) {
+        var span = document.getElementById(spanId);
+        if (!span) return;
+        var icon = btn.querySelector('i');
+        if (span.dataset.shown === '1') {
+            span.textContent = '••••••••';
+            span.style.letterSpacing = '2px';
+            span.dataset.shown = '0';
+            if (icon) icon.className = 'bi bi-eye';
+        } else {
+            span.textContent = span.dataset.plain || '(empty)';
+            span.style.letterSpacing = 'normal';
+            span.dataset.shown = '1';
+            if (icon) icon.className = 'bi bi-eye-slash';
+        }
+    }
+
+    function wcCopy(btn, text) {
+        if (!text) return;
+        var icon = btn.querySelector('i');
+        navigator.clipboard.writeText(text).then(function() {
+            if (icon) icon.className = 'bi bi-clipboard-check';
+            setTimeout(function() { if (icon) icon.className = 'bi bi-clipboard'; }, 1500);
+        }).catch(function() {
+            var ta = document.createElement('textarea');
+            ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+            document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+            document.body.removeChild(ta);
+            if (icon) icon.className = 'bi bi-clipboard-check';
+            setTimeout(function() { if (icon) icon.className = 'bi bi-clipboard'; }, 1500);
+        });
+    }
+
+    // Close popup when clicking anywhere outside the chip/popup
+    document.addEventListener('click', function(e) {
+        var chip = document.getElementById('workingOnChip');
+        var popup = document.getElementById('credPopup');
+        var chevron = document.getElementById('credChevron');
+        if (!chip || !popup) return;
+        if (!chip.contains(e.target) && !popup.contains(e.target)) {
+            popup.style.display = 'none';
+            if (chevron) chevron.style.transform = 'rotate(0deg)';
+        }
+    });
+    </script>
 </body>
 </html>
