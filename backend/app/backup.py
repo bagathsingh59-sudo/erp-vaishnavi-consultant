@@ -1,17 +1,22 @@
 """
-Database Backup Utility — PostgreSQL (ZIP compressed)
-=======================================================
+Database Backup Utility — PostgreSQL (multi-part ZIP)
+======================================================
 Each user gets their own backup directory.
 Admin can see all backups across all users.
 Supports: Create (ZIP), Download, Delete, Search, Restore, Import.
 
-- Creates ZIP backups containing pg_dump SQL inside (smaller, portable)
-- Supports importing ZIP/SQL from user's local disk for disaster recovery
-- Queries live PostgreSQL database size for Railway storage gauge
+Backup structure inside each ZIP:
+  part_01_pre_data.sql   — CREATE TABLE, sequences, types, functions
+  part_02_data.sql       — All INSERT/COPY data rows  (largest file)
+  part_03_post_data.sql  — Indexes, foreign keys, constraints
+  manifest.txt           — File list, sizes, creation info
 
-Backup directory structure:
+Restore executes parts in order (01→02→03), logging each file name.
+Backward-compatible: old single-file ZIPs and raw .sql files also work.
+
+Directory structure:
   data/backups/{user_id}/erp_backup_2026-03-24_14-30-45.zip
-  data/backups/{user_id}/erp_backup_2026-03-24_14-30-45.label.txt  (optional)
+  data/backups/{user_id}/erp_backup_2026-03-24_14-30-45.label.txt
 """
 
 import os
@@ -21,6 +26,10 @@ import shutil
 import tempfile
 from datetime import datetime
 
+
+BACKUP_EXT = '.zip'
+LEGACY_EXT = '.sql'
+
 # Module-level: stores the last error detail for the route to display
 _last_backup_error = ''
 
@@ -29,192 +38,231 @@ def get_last_backup_error():
     return _last_backup_error
 
 
-def diagnose_backup():
-    """Run diagnostic checks and return a dict with status of each component.
-    Used by the /backup/diagnose API endpoint for browser console debugging."""
-    import shutil as _shutil
-    checks = {}
+# ─────────────────────────────────────────────────────────────
+#  Internal helpers
+# ─────────────────────────────────────────────────────────────
 
-    # 1. DATABASE_URL present?
-    db_url = os.getenv('DATABASE_URL', '')
-    checks['database_url_set'] = bool(db_url)
-    if db_url and '@' in db_url:
-        # Mask password for safe display
-        try:
-            before_at = db_url.split('@')[0]
-            after_at = db_url.split('@', 1)[1]
-            if '://' in before_at:
-                scheme_user = before_at.split('://')[0] + '://' + before_at.split('://', 1)[1].split(':')[0]
-                checks['database_url_masked'] = scheme_user + ':****@' + after_at
-            else:
-                checks['database_url_masked'] = '(set but could not mask)'
-        except Exception:
-            checks['database_url_masked'] = '(set)'
+def _norm_url(db_url):
+    """Convert postgres:// → postgresql:// (Railway uses the short form)."""
+    if db_url.startswith('postgres://'):
+        return 'postgresql://' + db_url[len('postgres://'):]
+    return db_url
+
+
+def _format_size(size_bytes):
+    """Human-readable file size."""
+    if size_bytes < 1024:
+        return f'{size_bytes} B'
+    elif size_bytes < 1024 * 1024:
+        return f'{size_bytes / 1024:.1f} KB'
+    elif size_bytes < 1024 * 1024 * 1024:
+        return f'{size_bytes / (1024 * 1024):.1f} MB'
     else:
-        checks['database_url_masked'] = '(not set)'
+        return f'{size_bytes / (1024 * 1024 * 1024):.2f} GB'
 
-    # 2. URL scheme correct for pg_dump?
-    checks['url_scheme_ok'] = db_url.startswith('postgres://') or db_url.startswith('postgresql://')
-    checks['url_scheme'] = db_url.split('://')[0] + '://' if '://' in db_url else 'unknown'
 
-    # 3. pg_dump installed?
-    pgdump_path = _shutil.which('pg_dump')
-    checks['pgdump_found'] = bool(pgdump_path)
-    checks['pgdump_path'] = pgdump_path or 'NOT FOUND'
+def _run_pgdump(db_url, section_flag, output_path, timeout=600):
+    """
+    Run pg_dump for one section into output_path.
+    section_flag: '--section=pre-data' | '--section=data' | '--section=post-data'
+    Returns (success, stderr_text).
+    """
+    cmd = [
+        'pg_dump',
+        '--no-owner', '--no-acl',
+        '--lock-wait-timeout=30000',   # 30 s — avoids hanging on locked tables
+        section_flag,
+        '-f', output_path,
+        db_url,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    return result.returncode == 0, result.stderr.strip()
 
-    # 4. pg_dump version?
-    if pgdump_path:
-        try:
-            ver = subprocess.run(['pg_dump', '--version'], capture_output=True, text=True, timeout=5)
-            checks['pgdump_version'] = ver.stdout.strip() or ver.stderr.strip()
-        except Exception as e:
-            checks['pgdump_version'] = f'error: {e}'
-    else:
-        checks['pgdump_version'] = 'n/a'
 
-    # 5. Backup directory writable?
+def _get_sql_files_from_zip(zip_path):
+    """
+    Extract all .sql files from a ZIP into a temp directory.
+    Returns (tmpdir, sorted_filepath_list).
+    On error returns (None, []).
+    Handles both new multi-part ZIPs and legacy single-file ZIPs.
+    """
     try:
-        backup_dir = get_backup_dir('test_diag')
-        test_file = os.path.join(backup_dir, '_diag_test.tmp')
-        with open(test_file, 'w') as f:
-            f.write('ok')
-        os.remove(test_file)
-        checks['backup_dir_writable'] = True
-        checks['backup_dir'] = backup_dir
+        tmpdir = tempfile.mkdtemp(prefix='pgrestore_')
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            sql_members = sorted(
+                [m for m in zf.namelist() if m.lower().endswith('.sql')]
+            )
+            if not sql_members:
+                shutil.rmtree(tmpdir, ignore_errors=True)
+                return None, []
+            extracted = []
+            for member in sql_members:
+                out_path = os.path.join(tmpdir, os.path.basename(member))
+                with zf.open(member) as src, open(out_path, 'wb') as dst:
+                    shutil.copyfileobj(src, dst)
+                extracted.append(out_path)
+        return tmpdir, extracted
     except Exception as e:
-        checks['backup_dir_writable'] = False
-        checks['backup_dir_error'] = str(e)
-
-    # 6. Overall verdict
-    checks['can_backup'] = (
-        checks['database_url_set'] and
-        checks['pgdump_found'] and
-        checks['backup_dir_writable']
-    )
-    checks['last_error'] = _last_backup_error
-
-    return checks
+        print(f'[BACKUP] Error extracting ZIP: {e}')
+        if 'tmpdir' in dir() and tmpdir:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+        return None, []
 
 
-BACKUP_EXT = '.zip'   # New backups use ZIP
-LEGACY_EXT = '.sql'   # Older backups may be raw SQL
-
+# ─────────────────────────────────────────────────────────────
+#  Directory helpers
+# ─────────────────────────────────────────────────────────────
 
 def get_backup_dir(user_id=None):
-    """Get the backup directory for a user (or root). Creates if missing.
-    backup.py lives at backend/app/backup.py — data/ is at repo root,
-    so we go up 2 levels (backend/app/ → backend/ → repo root → data/)."""
+    """
+    Return (and create) the backup directory for a user.
+    backup.py lives at backend/app/ — data/ is 2 levels up at repo root.
+    """
     base_dir = os.path.abspath(os.path.dirname(__file__))
-    if user_id:
-        backup_dir = os.path.join(base_dir, '..', '..', 'data', 'backups', user_id)
-    else:
-        backup_dir = os.path.join(base_dir, '..', '..', 'data', 'backups')
-    os.makedirs(backup_dir, exist_ok=True)
-    return os.path.abspath(backup_dir)
+    path = os.path.join(base_dir, '..', '..', 'data', 'backups',
+                        user_id) if user_id else \
+           os.path.join(base_dir, '..', '..', 'data', 'backups')
+    os.makedirs(path, exist_ok=True)
+    return os.path.abspath(path)
 
+
+# ─────────────────────────────────────────────────────────────
+#  Create backup
+# ─────────────────────────────────────────────────────────────
 
 def create_backup(user_id, label=None):
     """
-    Create a ZIP-compressed PostgreSQL backup using pg_dump.
-    The ZIP contains: <filename>.sql and optionally <filename>.label.txt
-    Returns dict with backup info or None on error.
+    Create a 3-part ZIP backup using pg_dump sections.
+
+    ZIP contents:
+      part_01_pre_data.sql  — schema (CREATE TABLE, sequences, …)
+      part_02_data.sql      — all row data  (largest; split-friendly)
+      part_03_post_data.sql — indexes, FK constraints (applied after data)
+      manifest.txt          — human-readable summary of parts + sizes
+
+    Returns info dict on success, None on failure.
     """
     global _last_backup_error
     _last_backup_error = ''
 
     backup_dir = get_backup_dir(user_id)
-    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    basename = f'erp_backup_{timestamp}'
-    zip_filename = basename + BACKUP_EXT
-    zip_path = os.path.join(backup_dir, zip_filename)
+    timestamp  = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    basename   = f'erp_backup_{timestamp}'
+    zip_path   = os.path.join(backup_dir, basename + BACKUP_EXT)
 
     db_url = os.getenv('DATABASE_URL', '')
     if not db_url:
-        _last_backup_error = 'DATABASE_URL environment variable is not set.'
+        _last_backup_error = 'DATABASE_URL is not set.'
         print(f'[BACKUP] {_last_backup_error}')
         return None
-    # Railway uses postgres:// scheme; pg_dump requires postgresql://
-    if db_url.startswith('postgres://'):
-        db_url = 'postgresql://' + db_url[len('postgres://'):]
+    db_url = _norm_url(db_url)
 
-    # Check pg_dump is available before trying
-    import shutil as _shutil
-    if not _shutil.which('pg_dump'):
-        _last_backup_error = 'pg_dump not found on this server. Install postgresql-client.'
+    if not shutil.which('pg_dump'):
+        _last_backup_error = 'pg_dump not found. Install postgresql-client.'
         print(f'[BACKUP] {_last_backup_error}')
         return None
 
-    # Step 1: Create SQL dump in a temp file
-    tmp_sql = None
+    # 3 sections — named so they sort into restore order automatically
+    SECTIONS = [
+        ('part_01_pre_data.sql',  '--section=pre-data'),
+        ('part_02_data.sql',      '--section=data'),
+        ('part_03_post_data.sql', '--section=post-data'),
+    ]
+
+    tmpdir = None
     try:
-        fd, tmp_sql = tempfile.mkstemp(suffix='.sql', prefix='pgdump_')
-        os.close(fd)
+        tmpdir = tempfile.mkdtemp(prefix='pgdump_')
+        created = []
 
-        result = subprocess.run(
-            ['pg_dump', '--no-owner', '--no-acl', '-f', tmp_sql, db_url],
-            capture_output=True, text=True, timeout=300
-        )
-        if result.returncode != 0:
-            _last_backup_error = f'pg_dump failed (exit {result.returncode}): {result.stderr.strip()}'
-            print(f'[BACKUP] {_last_backup_error}')
-            return None
+        for fname, flag in SECTIONS:
+            fpath = os.path.join(tmpdir, fname)
+            print(f'[BACKUP] Dumping {fname} …')
+            ok, err = _run_pgdump(db_url, flag, fpath)
+            if not ok:
+                _last_backup_error = f'pg_dump {flag} failed: {err}'
+                print(f'[BACKUP] {_last_backup_error}')
+                return None
+            size = os.path.getsize(fpath)
+            created.append((fname, fpath, size))
+            print(f'[BACKUP] Done {fname} ({_format_size(size)})')
 
-        # Step 2: Pack SQL into ZIP (with DEFLATE compression)
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
-            zf.write(tmp_sql, arcname=basename + '.sql')
+        # Build manifest
+        manifest_lines = [
+            'ERP Database Backup — Multi-Part',
+            f'Created   : {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}',
+            f'Label     : {label.strip() if label else "(none)"}',
+            '',
+            'Parts (execute in order during restore):',
+        ]
+        for fname, _, size in created:
+            manifest_lines.append(f'  {fname}  ({_format_size(size)})')
+        manifest_lines += [
+            '',
+            'Restore command (each part):',
+            '  psql $DATABASE_URL -f <part_file>',
+            '',
+            'Total uncompressed SQL:',
+            f'  {_format_size(sum(s for _, _, s in created))}',
+        ]
+        manifest_text = '\n'.join(manifest_lines) + '\n'
+
+        # Pack into ZIP (DEFLATE level 9 — SQL text compresses very well)
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED,
+                             compresslevel=9) as zf:
+            for fname, fpath, _ in created:
+                zf.write(fpath, arcname=fname)
+            zf.writestr('manifest.txt', manifest_text)
             if label and label.strip():
-                # Include label inside ZIP as a metadata file
                 zf.writestr(basename + '.label.txt', label.strip())
 
-        # Save label externally too (for listing without opening ZIP)
+        # External label sidecar (for listing without opening ZIP)
         if label and label.strip():
-            with open(os.path.join(backup_dir, basename + '.label.txt'), 'w', encoding='utf-8') as f:
+            with open(os.path.join(backup_dir, basename + '.label.txt'),
+                      'w', encoding='utf-8') as f:
                 f.write(label.strip())
 
         size_bytes = os.path.getsize(zip_path)
+        print(f'[BACKUP] ZIP created: {basename}.zip ({_format_size(size_bytes)})')
         return {
-            'filename': zip_filename,
-            'path': zip_path,
-            'size_bytes': size_bytes,
+            'filename':     basename + BACKUP_EXT,
+            'path':         zip_path,
+            'size_bytes':   size_bytes,
             'size_display': _format_size(size_bytes),
-            'created_at': datetime.now(),
-            'label': label.strip() if label else '',
-            'user_id': user_id,
+            'created_at':   datetime.now(),
+            'label':        label.strip() if label else '',
+            'user_id':      user_id,
+            'parts':        [f for f, _, _ in created],
         }
+
     except Exception as e:
         _last_backup_error = f'Exception: {e}'
-        print(f'[BACKUP] Error creating backup: {e}')
+        print(f'[BACKUP] Error: {e}')
         if os.path.exists(zip_path):
             try: os.remove(zip_path)
             except OSError: pass
         return None
     finally:
-        if tmp_sql and os.path.exists(tmp_sql):
-            try: os.remove(tmp_sql)
-            except OSError: pass
+        if tmpdir:
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 def create_restore_point(user_id):
-    """Auto-backup before a restore — labeled so user can find it later."""
+    """Auto-backup before a restore so the user can always go back."""
     return create_backup(user_id, label='Auto Restore Point (before restore)')
 
 
-def _extract_sql_from_zip(zip_path):
-    """Extract the .sql file from a ZIP backup to a temp file.
-    Returns the temp file path (caller must delete)."""
-    with zipfile.ZipFile(zip_path, 'r') as zf:
-        sql_members = [m for m in zf.namelist() if m.lower().endswith('.sql')]
-        if not sql_members:
-            return None
-        fd, tmp_sql = tempfile.mkstemp(suffix='.sql', prefix='pgrestore_')
-        os.close(fd)
-        with zf.open(sql_members[0]) as src, open(tmp_sql, 'wb') as dst:
-            shutil.copyfileobj(src, dst)
-        return tmp_sql
-
+# ─────────────────────────────────────────────────────────────
+#  Restore backup
+# ─────────────────────────────────────────────────────────────
 
 def restore_backup(user_id, filename, is_admin_user=False):
-    """Restore a backup file. Creates a restore point first."""
+    """
+    Restore from a backup ZIP.
+    - Creates a restore-point first.
+    - Extracts all .sql parts from ZIP, sorted by filename.
+    - Executes each part via psql, logging the filename as it runs.
+    - Backward-compatible with legacy single-file ZIPs.
+    """
     restore_point = create_restore_point(user_id)
     if not restore_point:
         return None
@@ -226,69 +274,75 @@ def restore_backup(user_id, filename, is_admin_user=False):
     db_url = os.getenv('DATABASE_URL', '')
     if not db_url:
         return None
-    # Railway uses postgres:// scheme; psql requires postgresql://
-    if db_url.startswith('postgres://'):
-        db_url = 'postgresql://' + db_url[len('postgres://'):]
+    db_url = _norm_url(db_url)
 
-    sql_path = None
-    temp_sql = None
+    tmpdir = None
     try:
         if filepath.lower().endswith('.zip'):
-            temp_sql = _extract_sql_from_zip(filepath)
-            if not temp_sql:
-                print('[BACKUP] No .sql found inside ZIP')
+            tmpdir, sql_files = _get_sql_files_from_zip(filepath)
+            if not sql_files:
+                print('[BACKUP] No .sql files found in ZIP')
                 return None
-            sql_path = temp_sql
         else:
-            sql_path = filepath
+            # Legacy raw .sql file
+            sql_files = [filepath]
 
-        result = subprocess.run(
-            ['psql', db_url, '-f', sql_path],
-            capture_output=True, text=True, timeout=300
-        )
-        if result.returncode != 0:
-            print(f'[BACKUP] psql restore error: {result.stderr}')
-            return None
+        parts_done = []
+        for sql_path in sql_files:
+            fname = os.path.basename(sql_path)
+            print(f'[BACKUP] Executing: {fname} …')
+            result = subprocess.run(
+                ['psql', db_url, '-f', sql_path],
+                capture_output=True, text=True, timeout=600
+            )
+            if result.returncode != 0:
+                print(f'[BACKUP] psql error on {fname}: {result.stderr[:500]}')
+                return None
+            parts_done.append(fname)
+            print(f'[BACKUP] Done   : {fname}')
 
         return {
             'restored_from': filename,
             'restore_point': restore_point['filename'],
-            'success': True,
+            'success':       True,
+            'parts_executed': parts_done,
         }
+
     except Exception as e:
-        print(f'[BACKUP] Error restoring backup: {e}')
+        print(f'[BACKUP] Restore error: {e}')
         return None
     finally:
-        if temp_sql and os.path.exists(temp_sql):
-            try: os.remove(temp_sql)
-            except OSError: pass
+        if tmpdir:
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
+
+# ─────────────────────────────────────────────────────────────
+#  Import (upload from user's local disk)
+# ─────────────────────────────────────────────────────────────
 
 def import_backup_file(user_id, uploaded_file, label=None):
     """
-    Import an uploaded backup file (ZIP or SQL) from user's local disk.
-    Saves it to user's backup directory with proper naming.
-    Returns dict with info or None on error.
+    Save an uploaded .zip or .sql backup file into the user's backup dir.
+    Validates ZIP contains at least one .sql part.
+    Returns info dict or None on error.
     """
     if not uploaded_file or not uploaded_file.filename:
         return None
 
     backup_dir = get_backup_dir(user_id)
-    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    original_name = os.path.basename(uploaded_file.filename)
-    lower = original_name.lower()
+    timestamp  = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    original   = os.path.basename(uploaded_file.filename)
+    lower      = original.lower()
+    basename   = f'erp_backup_{timestamp}_imported'
 
-    # Determine file type
     if lower.endswith('.zip'):
-        basename = f'erp_backup_{timestamp}_imported'
-        new_filename = basename + '.zip'
-        new_path = os.path.join(backup_dir, new_filename)
+        new_path = os.path.join(backup_dir, basename + '.zip')
         try:
             uploaded_file.save(new_path)
-            # Validate ZIP has a SQL inside
             with zipfile.ZipFile(new_path, 'r') as zf:
-                sql_members = [m for m in zf.namelist() if m.lower().endswith('.sql')]
-                if not sql_members:
+                sql_parts = sorted([m for m in zf.namelist()
+                                    if m.lower().endswith('.sql')])
+                if not sql_parts:
                     os.remove(new_path)
                     return None
         except (zipfile.BadZipFile, Exception) as e:
@@ -299,17 +353,15 @@ def import_backup_file(user_id, uploaded_file, label=None):
             return None
 
     elif lower.endswith('.sql'):
-        # Convert raw SQL to ZIP for consistency
-        basename = f'erp_backup_{timestamp}_imported'
-        new_filename = basename + '.zip'
-        new_path = os.path.join(backup_dir, new_filename)
+        # Wrap raw SQL into a ZIP for storage consistency
+        new_path = os.path.join(backup_dir, basename + '.zip')
         try:
-            # Save SQL temporarily, then zip
             fd, tmp_sql = tempfile.mkstemp(suffix='.sql', prefix='pgimport_')
             os.close(fd)
             uploaded_file.save(tmp_sql)
-            with zipfile.ZipFile(new_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
-                zf.write(tmp_sql, arcname=basename + '.sql')
+            with zipfile.ZipFile(new_path, 'w', zipfile.ZIP_DEFLATED,
+                                 compresslevel=9) as zf:
+                zf.write(tmp_sql, arcname='part_01_data.sql')
             os.remove(tmp_sql)
         except Exception as e:
             print(f'[BACKUP] Import SQL error: {e}')
@@ -320,72 +372,66 @@ def import_backup_file(user_id, uploaded_file, label=None):
     else:
         return None
 
-    # Save label
-    final_label = (label or f'Imported: {original_name}').strip()
+    final_label = (label or f'Imported: {original}').strip()
     try:
-        with open(os.path.join(backup_dir, basename + '.label.txt'), 'w', encoding='utf-8') as f:
+        with open(os.path.join(backup_dir, basename + '.label.txt'),
+                  'w', encoding='utf-8') as f:
             f.write(final_label)
     except OSError:
         pass
 
     size_bytes = os.path.getsize(new_path)
     return {
-        'filename': new_filename,
-        'path': new_path,
-        'size_bytes': size_bytes,
+        'filename':     basename + '.zip',
+        'path':         new_path,
+        'size_bytes':   size_bytes,
         'size_display': _format_size(size_bytes),
-        'created_at': datetime.now(),
-        'label': final_label,
-        'user_id': user_id,
+        'created_at':   datetime.now(),
+        'label':        final_label,
+        'user_id':      user_id,
     }
 
 
+# ─────────────────────────────────────────────────────────────
+#  List / get / delete
+# ─────────────────────────────────────────────────────────────
+
 def list_backups(user_id=None, is_admin_user=False, search=None):
-    """List backup files sorted by date (newest first).
-    Shows both .zip (new) and .sql (legacy) files."""
+    """List backup files sorted newest-first."""
     backups = []
-    root_backup_dir = get_backup_dir()
+    root_dir = get_backup_dir()
 
     if is_admin_user:
         scan_dirs = []
-        if os.path.exists(root_backup_dir):
-            for item in os.listdir(root_backup_dir):
-                item_path = os.path.join(root_backup_dir, item)
+        if os.path.exists(root_dir):
+            for item in os.listdir(root_dir):
+                item_path = os.path.join(root_dir, item)
                 if os.path.isdir(item_path):
                     scan_dirs.append((item, item_path))
-            scan_dirs.append(('legacy', root_backup_dir))
+            scan_dirs.append(('legacy', root_dir))
     else:
-        if user_id:
-            scan_dirs = [(user_id, get_backup_dir(user_id))]
-        else:
-            scan_dirs = []
+        scan_dirs = [(user_id, get_backup_dir(user_id))] if user_id else []
 
     for owner_id, dir_path in scan_dirs:
         if not os.path.exists(dir_path):
             continue
-        for filename in os.listdir(dir_path):
-            if not filename.startswith('erp_backup_'):
+        for fname in os.listdir(dir_path):
+            if not fname.startswith('erp_backup_'):
                 continue
-            if not (filename.endswith('.zip') or filename.endswith('.sql')):
+            if not (fname.endswith('.zip') or fname.endswith('.sql')):
                 continue
-            filepath = os.path.join(dir_path, filename)
-            stat = os.stat(filepath)
-            size_bytes = stat.st_size
+            fpath = os.path.join(dir_path, fname)
+            stat  = os.stat(fpath)
 
-            # Extract timestamp from filename
-            ts = filename.replace('erp_backup_', '')
-            ts = ts.rsplit('.', 1)[0]    # strip extension
-            # Handle "_imported" suffix
-            ts_base = ts.split('_imported')[0]
+            ts_raw = fname.replace('erp_backup_', '').rsplit('.', 1)[0]
+            ts_base = ts_raw.split('_imported')[0]
             try:
                 created = datetime.strptime(ts_base, '%Y-%m-%d_%H-%M-%S')
             except ValueError:
                 created = datetime.fromtimestamp(stat.st_ctime)
 
-            # Read label (external .label.txt)
-            base_no_ext = os.path.splitext(filepath)[0]
-            label_path = base_no_ext + '.label.txt'
             label = ''
+            label_path = os.path.splitext(fpath)[0] + '.label.txt'
             if os.path.exists(label_path):
                 try:
                     with open(label_path, 'r', encoding='utf-8') as f:
@@ -393,21 +439,32 @@ def list_backups(user_id=None, is_admin_user=False, search=None):
                 except Exception:
                     pass
 
+            # Count SQL parts inside ZIP for display
+            parts_count = 1
+            if fname.endswith('.zip'):
+                try:
+                    with zipfile.ZipFile(fpath, 'r') as zf:
+                        parts_count = len([m for m in zf.namelist()
+                                           if m.lower().endswith('.sql')])
+                except Exception:
+                    pass
+
             if search:
                 sl = search.lower()
-                if (sl not in filename.lower() and sl not in label.lower()
+                if (sl not in fname.lower() and sl not in label.lower()
                         and sl not in owner_id.lower()):
                     continue
 
             backups.append({
-                'filename': filename,
-                'path': filepath,
-                'size_bytes': size_bytes,
-                'size_display': _format_size(size_bytes),
-                'created_at': created,
-                'label': label,
-                'owner_id': owner_id,
-                'format': 'ZIP' if filename.endswith('.zip') else 'SQL',
+                'filename':     fname,
+                'path':         fpath,
+                'size_bytes':   stat.st_size,
+                'size_display': _format_size(stat.st_size),
+                'created_at':   created,
+                'label':        label,
+                'owner_id':     owner_id,
+                'format':       'ZIP' if fname.endswith('.zip') else 'SQL',
+                'parts_count':  parts_count,
             })
 
     backups.sort(key=lambda x: x['created_at'], reverse=True)
@@ -415,28 +472,27 @@ def list_backups(user_id=None, is_admin_user=False, search=None):
 
 
 def get_backup_path(filename, user_id=None, is_admin_user=False):
-    """Return the absolute path of a backup file if it exists and user has access."""
+    """Return absolute path of a backup file if user has access."""
     if '..' in filename or '/' in filename or '\\' in filename:
         return None
-
     if is_admin_user:
-        root_dir = get_backup_dir()
-        if os.path.exists(root_dir):
-            for item in os.listdir(root_dir):
-                item_path = os.path.join(root_dir, item)
+        root = get_backup_dir()
+        if os.path.exists(root):
+            for item in os.listdir(root):
+                item_path = os.path.join(root, item)
                 if os.path.isdir(item_path):
-                    filepath = os.path.abspath(os.path.join(item_path, filename))
-                    if os.path.exists(filepath) and filepath.startswith(os.path.abspath(root_dir)):
-                        return filepath
-            filepath = os.path.abspath(os.path.join(root_dir, filename))
-            if os.path.exists(filepath) and filepath.startswith(os.path.abspath(root_dir)):
-                return filepath
+                    fp = os.path.abspath(os.path.join(item_path, filename))
+                    if os.path.exists(fp) and fp.startswith(os.path.abspath(root)):
+                        return fp
+            fp = os.path.abspath(os.path.join(root, filename))
+            if os.path.exists(fp) and fp.startswith(os.path.abspath(root)):
+                return fp
         return None
     elif user_id:
-        user_dir = get_backup_dir(user_id)
-        filepath = os.path.abspath(os.path.join(user_dir, filename))
-        if os.path.exists(filepath) and filepath.startswith(os.path.abspath(user_dir)):
-            return filepath
+        udir = get_backup_dir(user_id)
+        fp = os.path.abspath(os.path.join(udir, filename))
+        if os.path.exists(fp) and fp.startswith(os.path.abspath(udir)):
+            return fp
     return None
 
 
@@ -446,98 +502,141 @@ def delete_backup(filename, user_id=None, is_admin_user=False):
     if filepath:
         try:
             os.remove(filepath)
-            label_path = os.path.splitext(filepath)[0] + '.label.txt'
-            if os.path.exists(label_path):
-                os.remove(label_path)
+            lp = os.path.splitext(filepath)[0] + '.label.txt'
+            if os.path.exists(lp):
+                os.remove(lp)
             return True
         except Exception as e:
-            print(f'[BACKUP] Error deleting {filename}: {e}')
+            print(f'[BACKUP] Delete error {filename}: {e}')
     return False
 
 
 def cleanup_old_backups(user_id, keep=20):
-    """Keep only the latest N backups. Returns number deleted."""
+    """Keep only the latest N backups per user. Returns count deleted."""
     backups = list_backups(user_id=user_id)
     deleted = 0
-    if len(backups) > keep:
-        for backup in backups[keep:]:
-            if delete_backup(backup['filename'], user_id):
-                deleted += 1
+    for backup in backups[keep:]:
+        if delete_backup(backup['filename'], user_id):
+            deleted += 1
     return deleted
 
 
+# ─────────────────────────────────────────────────────────────
+#  Storage / DB info
+# ─────────────────────────────────────────────────────────────
+
 def get_db_size_bytes():
-    """Query actual PostgreSQL database size in bytes. 0 on error."""
     try:
         from app import db
         from sqlalchemy import text
-        result = db.session.execute(text("SELECT pg_database_size(current_database())")).scalar()
+        result = db.session.execute(
+            text('SELECT pg_database_size(current_database())')).scalar()
         return int(result or 0)
     except Exception as e:
-        print(f'[BACKUP] Could not query DB size: {e}')
+        print(f'[BACKUP] DB size query error: {e}')
         return 0
 
 
 def get_storage_info():
-    """Return storage usage info for the circular gauge in navbar.
-    Returns: dict with used_bytes, limit_bytes, percent_used, status.
-    Railway plan limit is configurable via env var DB_STORAGE_LIMIT_MB.
-    """
     used_bytes = get_db_size_bytes()
-    # Default: 500 MB (Railway Hobby tier typical). User can override via env var.
-    limit_mb = int(os.getenv('DB_STORAGE_LIMIT_MB', '500'))
+    limit_mb   = int(os.getenv('DB_STORAGE_LIMIT_MB', '500'))
     limit_bytes = limit_mb * 1024 * 1024
-    percent = (used_bytes / limit_bytes * 100) if limit_bytes > 0 else 0
-    percent = min(100, max(0, percent))
-
-    # Traffic-light status
-    if percent >= 90:
-        status = 'danger'   # red
-    elif percent >= 70:
-        status = 'warning'  # yellow
-    else:
-        status = 'ok'       # green
-
+    percent = min(100, max(0, (used_bytes / limit_bytes * 100)
+                           if limit_bytes > 0 else 0))
+    status = ('danger' if percent >= 90 else
+              'warning' if percent >= 70 else 'ok')
     return {
-        'used_bytes': used_bytes,
-        'used_display': _format_size(used_bytes),
-        'limit_bytes': limit_bytes,
+        'used_bytes':    used_bytes,
+        'used_display':  _format_size(used_bytes),
+        'limit_bytes':   limit_bytes,
         'limit_display': _format_size(limit_bytes),
-        'percent': round(percent, 1),
-        'status': status,
-        'provider': 'Railway PostgreSQL',
+        'percent':       round(percent, 1),
+        'status':        status,
+        'provider':      'Railway PostgreSQL',
     }
 
 
 def get_db_info():
-    """Basic info about the PostgreSQL connection (password hidden)."""
     db_url = os.getenv('DATABASE_URL', '')
     display_url = db_url
     if '@' in display_url:
         parts = display_url.split('@')
-        cred_part = parts[0]
-        if ':' in cred_part.split('://')[-1]:
-            display_url = cred_part.rsplit(':', 1)[0] + ':****@' + parts[1]
-
+        cred  = parts[0]
+        if ':' in cred.split('://')[-1]:
+            display_url = cred.rsplit(':', 1)[0] + ':****@' + parts[1]
     storage = get_storage_info() if db_url else None
     return {
-        'path': display_url,
-        'exists': bool(db_url),
-        'size_bytes': storage['used_bytes'] if storage else 0,
-        'size_display': storage['used_display'] if storage else 'PostgreSQL',
+        'path':        display_url,
+        'exists':      bool(db_url),
+        'size_bytes':  storage['used_bytes'] if storage else 0,
+        'size_display':storage['used_display'] if storage else 'PostgreSQL',
         'table_count': 0,
-        'db_type': 'PostgreSQL',
-        'storage': storage,
+        'db_type':     'PostgreSQL',
+        'storage':     storage,
     }
 
 
-def _format_size(size_bytes):
-    """Convert bytes to human-readable string."""
-    if size_bytes < 1024:
-        return f'{size_bytes} B'
-    elif size_bytes < 1024 * 1024:
-        return f'{size_bytes / 1024:.1f} KB'
-    elif size_bytes < 1024 * 1024 * 1024:
-        return f'{size_bytes / (1024 * 1024):.1f} MB'
+# ─────────────────────────────────────────────────────────────
+#  Diagnostics (for /backup/diagnose endpoint)
+# ─────────────────────────────────────────────────────────────
+
+def diagnose_backup():
+    """Run pre-flight checks. Used by /backup/diagnose JSON endpoint."""
+    checks = {}
+
+    db_url = os.getenv('DATABASE_URL', '')
+    checks['database_url_set'] = bool(db_url)
+    if db_url and '@' in db_url:
+        try:
+            before_at = db_url.split('@')[0]
+            after_at  = db_url.split('@', 1)[1]
+            if '://' in before_at:
+                su = (before_at.split('://')[0] + '://'
+                      + before_at.split('://', 1)[1].split(':')[0])
+                checks['database_url_masked'] = su + ':****@' + after_at
+            else:
+                checks['database_url_masked'] = '(set)'
+        except Exception:
+            checks['database_url_masked'] = '(set)'
     else:
-        return f'{size_bytes / (1024 * 1024 * 1024):.2f} GB'
+        checks['database_url_masked'] = '(not set)'
+
+    checks['url_scheme_ok'] = (db_url.startswith('postgres://')
+                               or db_url.startswith('postgresql://'))
+    checks['url_scheme'] = (db_url.split('://')[0] + '://'
+                            if '://' in db_url else 'unknown')
+
+    pgdump = shutil.which('pg_dump')
+    checks['pgdump_found'] = bool(pgdump)
+    checks['pgdump_path']  = pgdump or 'NOT FOUND'
+    if pgdump:
+        try:
+            v = subprocess.run(['pg_dump', '--version'],
+                               capture_output=True, text=True, timeout=5)
+            checks['pgdump_version'] = v.stdout.strip() or v.stderr.strip()
+        except Exception as e:
+            checks['pgdump_version'] = f'error: {e}'
+    else:
+        checks['pgdump_version'] = 'n/a'
+
+    psql = shutil.which('psql')
+    checks['psql_found'] = bool(psql)
+    checks['psql_path']  = psql or 'NOT FOUND'
+
+    try:
+        bdir = get_backup_dir('test_diag')
+        tf   = os.path.join(bdir, '_diag_test.tmp')
+        with open(tf, 'w') as f:
+            f.write('ok')
+        os.remove(tf)
+        checks['backup_dir_writable'] = True
+        checks['backup_dir'] = bdir
+    except Exception as e:
+        checks['backup_dir_writable'] = False
+        checks['backup_dir_error'] = str(e)
+
+    checks['can_backup'] = (checks['database_url_set']
+                            and checks['pgdump_found']
+                            and checks.get('backup_dir_writable', False))
+    checks['last_error'] = _last_backup_error
+    return checks

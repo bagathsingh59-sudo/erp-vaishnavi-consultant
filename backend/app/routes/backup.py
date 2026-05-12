@@ -158,7 +158,9 @@ def backup_restore(filename):
 
     result = restore_backup(uid, filename, admin)
     if result and result.get('success'):
-        flash(f'Database restored from "{result["restored_from"]}"! '
+        parts = result.get('parts_executed', [])
+        parts_info = f' ({len(parts)} part(s): {", ".join(parts)})' if parts else ''
+        flash(f'Database restored from "{result["restored_from"]}"{parts_info}. '
               f'Restore point saved as "{result["restore_point"]}".',
               'success')
     else:
