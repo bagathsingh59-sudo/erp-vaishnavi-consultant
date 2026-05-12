@@ -2326,11 +2326,15 @@ def payroll_statement(payroll_id):
         establishment_id=est.id, is_active=True, head_type='earning', is_in_gross=True
     ).order_by(SalaryHead.display_order).all()
 
-    # Build head-wise data for each entry
+    # Build head-wise data for each entry + attach salary type and daily rate for Rate column
     for entry in entries:
         entry.head_amounts = {}
         for peh in entry.head_breakup:
             entry.head_amounts[peh.salary_head_id] = peh
+        cur_sal = EmployeeSalary.query.filter_by(
+            employee_id=entry.employee_id, is_current=True).first()
+        entry._salary_type = cur_sal.salary_type if cur_sal else (config.salary_type if config else 'monthly_fixed')
+        entry._daily_rate = cur_sal.daily_rate if cur_sal and cur_sal.daily_rate else 0
 
     generated_on = datetime.now().strftime('%d %b %Y, %I:%M %p')
 

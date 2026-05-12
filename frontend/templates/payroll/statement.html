@@ -238,6 +238,7 @@
                     <th rowspan="2">Sl</th>
                     <th rowspan="2" style="min-width:130px; text-align:left;">Employee Name</th>
                     <th rowspan="2">UAN /<br>ESIC IP</th>
+                    <th rowspan="2" style="background:#e0e7ff;">Rate</th>
                     <th colspan="3" style="background:#e0e7ff;">Attendance</th>
                     {% for head in heads %}
                     <th rowspan="2" title="{{ head.name }}">{{ head.short_code }}</th>
@@ -288,6 +289,7 @@
                         {% if entry.employee.esic_ip_number %}{{ entry.employee.esic_ip_number }}{% endif %}
                         {% if not entry.employee.uan_number and not entry.employee.esic_ip_number %}---{% endif %}
                     </td>
+                    <td class="text-right" style="font-size:0.7rem; color:#334155; background:#f8fafc;">{% if entry._salary_type == 'daily_wages' and entry._daily_rate %}{{ "%.2f"|format(entry._daily_rate) }}{% else %}{{ "{:,.0f}".format(entry.gross_salary) }}{% endif %}</td>
                     <td class="text-center">{{ entry.days_present|int if entry.days_present == entry.days_present|int else entry.days_present }}</td>
                     <td class="text-center">{{ entry.days_absent|int if entry.days_absent == entry.days_absent|int else entry.days_absent }}</td>
                     <td class="text-center" style="font-weight:600;">{{ entry.total_payable_days|int if entry.total_payable_days == entry.total_payable_days|int else entry.total_payable_days }}</td>
@@ -338,6 +340,7 @@
                 <tr class="total-row">
                     <td></td>
                     <td style="text-align:left; font-size:0.82rem;">TOTAL ({{ entries|length }} Employees)</td>
+                    <td></td>
                     <td></td>
                     <td class="text-center">{{ ns.t_present|int if ns.t_present == ns.t_present|int else ns.t_present }}</td>
                     <td class="text-center">{{ ns.t_absent|int if ns.t_absent == ns.t_absent|int else ns.t_absent }}</td>
