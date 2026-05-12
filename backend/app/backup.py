@@ -1,18 +1,20 @@
 """
-Database Backup Utility — PostgreSQL (multi-part ZIP)
-======================================================
+Database Backup Utility — PostgreSQL (multi-part ZIP, per-table data)
+======================================================================
 Each user gets their own backup directory.
 Admin can see all backups across all users.
 Supports: Create (ZIP), Download, Delete, Search, Restore, Import.
 
 Backup structure inside each ZIP:
-  part_01_pre_data.sql   — CREATE TABLE, sequences, types, functions
-  part_02_data.sql       — All INSERT/COPY data rows  (largest file)
-  part_03_post_data.sql  — Indexes, foreign keys, constraints
-  manifest.txt           — File list, sizes, creation info
+  part_01_pre_data.sql            — CREATE TABLE, sequences, types, functions
+  part_02_data_001_accounts.sql   — data for table: accounts
+  part_02_data_002_employees.sql  — data for table: employees
+  part_02_data_NNN_<table>.sql    — one file per table (never grows unbounded)
+  part_03_post_data.sql           — Indexes, FK constraints (after data = faster)
+  manifest.txt                    — File list, sizes, table count, creation info
 
-Restore executes parts in order (01→02→03), logging each file name.
-Backward-compatible: old single-file ZIPs and raw .sql files also work.
+Restore executes files in sorted order, logging each filename.
+Backward-compatible: old single-file and old 3-part ZIPs still restore.
 
 Directory structure:
   data/backups/{user_id}/erp_backup_2026-03-24_14-30-45.zip
@@ -79,6 +81,41 @@ def _run_pgdump(db_url, section_flag, output_path, timeout=600):
     return result.returncode == 0, result.stderr.strip()
 
 
+def _get_table_list(db_url, timeout=30):
+    """
+    Return sorted list of public table names via psql.
+    Uses psql so no extra Python DB dependency is needed.
+    """
+    result = subprocess.run(
+        ['psql', db_url, '-t', '-A', '-c',
+         "SELECT tablename FROM pg_tables "
+         "WHERE schemaname='public' ORDER BY tablename"],
+        capture_output=True, text=True, timeout=timeout
+    )
+    if result.returncode != 0:
+        print(f'[BACKUP] Could not list tables: {result.stderr.strip()}')
+        return []
+    return [t.strip() for t in result.stdout.strip().splitlines() if t.strip()]
+
+
+def _run_pgdump_table(db_url, table, output_path, timeout=600):
+    """
+    Dump data-only for a single table.
+    Returns (success, stderr_text).
+    """
+    cmd = [
+        'pg_dump',
+        '--no-owner', '--no-acl',
+        '--data-only',
+        '--lock-wait-timeout=30000',
+        f'--table={table}',
+        '-f', output_path,
+        db_url,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    return result.returncode == 0, result.stderr.strip()
+
+
 def _get_sql_files_from_zip(zip_path):
     """
     Extract all .sql files from a ZIP into a temp directory.
@@ -132,13 +169,19 @@ def get_backup_dir(user_id=None):
 
 def create_backup(user_id, label=None):
     """
-    Create a 3-part ZIP backup using pg_dump sections.
+    Create a per-table ZIP backup using pg_dump.
 
     ZIP contents:
-      part_01_pre_data.sql  — schema (CREATE TABLE, sequences, …)
-      part_02_data.sql      — all row data  (largest; split-friendly)
-      part_03_post_data.sql — indexes, FK constraints (applied after data)
-      manifest.txt          — human-readable summary of parts + sizes
+      part_01_pre_data.sql           — schema: CREATE TABLE, sequences, types
+      part_02_data_001_<table>.sql   — data for table 1
+      part_02_data_002_<table>.sql   — data for table 2  (one file per table)
+      …                              — scales to any number of tables
+      part_03_post_data.sql          — indexes, FK constraints (after data = faster)
+      manifest.txt                   — file list, sizes, table count, restore info
+
+    Per-table splitting means no single file ever grows unboundedly —
+    each file is limited to one table's worth of data.
+    Empty tables produce tiny files and are included for completeness.
 
     Returns info dict on success, None on failure.
     """
@@ -162,47 +205,88 @@ def create_backup(user_id, label=None):
         print(f'[BACKUP] {_last_backup_error}')
         return None
 
-    # 3 sections — named so they sort into restore order automatically
-    SECTIONS = [
-        ('part_01_pre_data.sql',  '--section=pre-data'),
-        ('part_02_data.sql',      '--section=data'),
-        ('part_03_post_data.sql', '--section=post-data'),
-    ]
-
     tmpdir = None
     try:
         tmpdir = tempfile.mkdtemp(prefix='pgdump_')
-        created = []
+        created = []   # list of (filename, filepath, size_bytes)
 
-        for fname, flag in SECTIONS:
-            fpath = os.path.join(tmpdir, fname)
-            print(f'[BACKUP] Dumping {fname} …')
-            ok, err = _run_pgdump(db_url, flag, fpath)
+        # ── Part 1: Schema (pre-data) ──────────────────────────────
+        pre_fname = 'part_01_pre_data.sql'
+        pre_path  = os.path.join(tmpdir, pre_fname)
+        print(f'[BACKUP] Dumping {pre_fname} …')
+        ok, err = _run_pgdump(db_url, '--section=pre-data', pre_path)
+        if not ok:
+            _last_backup_error = f'pg_dump --section=pre-data failed: {err}'
+            print(f'[BACKUP] {_last_backup_error}')
+            return None
+        pre_size = os.path.getsize(pre_path)
+        created.append((pre_fname, pre_path, pre_size))
+        print(f'[BACKUP] Done {pre_fname} ({_format_size(pre_size)})')
+
+        # ── Part 2: Data — one file per table ─────────────────────
+        tables = _get_table_list(db_url)
+        if not tables:
+            # Fallback: dump all data as single file if table list fails
+            print('[BACKUP] Table list unavailable — falling back to single data dump')
+            data_fname = 'part_02_data_all.sql'
+            data_path  = os.path.join(tmpdir, data_fname)
+            ok, err = _run_pgdump(db_url, '--section=data', data_path)
             if not ok:
-                _last_backup_error = f'pg_dump {flag} failed: {err}'
+                _last_backup_error = f'pg_dump --section=data failed: {err}'
                 print(f'[BACKUP] {_last_backup_error}')
                 return None
-            size = os.path.getsize(fpath)
-            created.append((fname, fpath, size))
-            print(f'[BACKUP] Done {fname} ({_format_size(size)})')
+            created.append((data_fname, data_path, os.path.getsize(data_path)))
+        else:
+            print(f'[BACKUP] Dumping data for {len(tables)} table(s) …')
+            for idx, table in enumerate(tables, 1):
+                # Sanitise table name for use in filename (keep alphanum + _)
+                safe = ''.join(c if c.isalnum() or c == '_' else '_'
+                               for c in table)[:40]
+                data_fname = f'part_02_data_{idx:03d}_{safe}.sql'
+                data_path  = os.path.join(tmpdir, data_fname)
+                ok, err = _run_pgdump_table(db_url, table, data_path)
+                if not ok:
+                    _last_backup_error = (
+                        f'pg_dump --table={table} failed: {err}')
+                    print(f'[BACKUP] {_last_backup_error}')
+                    return None
+                size = os.path.getsize(data_path)
+                created.append((data_fname, data_path, size))
+                print(f'[BACKUP] Done {data_fname} ({_format_size(size)})')
 
-        # Build manifest
+        # ── Part 3: Post-data (indexes, FK constraints) ────────────
+        post_fname = 'part_03_post_data.sql'
+        post_path  = os.path.join(tmpdir, post_fname)
+        print(f'[BACKUP] Dumping {post_fname} …')
+        ok, err = _run_pgdump(db_url, '--section=post-data', post_path)
+        if not ok:
+            _last_backup_error = f'pg_dump --section=post-data failed: {err}'
+            print(f'[BACKUP] {_last_backup_error}')
+            return None
+        post_size = os.path.getsize(post_path)
+        created.append((post_fname, post_path, post_size))
+        print(f'[BACKUP] Done {post_fname} ({_format_size(post_size)})')
+
+        # ── Manifest ────────────────────────────────────────────────
+        data_files   = [f for f, _, _ in created
+                        if f.startswith('part_02_data_')]
+        total_sql_sz = sum(s for _, _, s in created)
         manifest_lines = [
-            'ERP Database Backup — Multi-Part',
-            f'Created   : {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}',
-            f'Label     : {label.strip() if label else "(none)"}',
+            'ERP Database Backup — Per-Table Multi-Part',
+            f'Created    : {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}',
+            f'Label      : {label.strip() if label else "(none)"}',
+            f'Tables     : {len(data_files)}',
+            f'Total files: {len(created)}',
+            f'Total SQL  : {_format_size(total_sql_sz)} (before ZIP compression)',
             '',
-            'Parts (execute in order during restore):',
+            'Files (execute in this order during restore):',
         ]
         for fname, _, size in created:
-            manifest_lines.append(f'  {fname}  ({_format_size(size)})')
+            manifest_lines.append(f'  {fname:<55}  {_format_size(size):>10}')
         manifest_lines += [
             '',
-            'Restore command (each part):',
+            'Restore command (run each part file in order):',
             '  psql $DATABASE_URL -f <part_file>',
-            '',
-            'Total uncompressed SQL:',
-            f'  {_format_size(sum(s for _, _, s in created))}',
         ]
         manifest_text = '\n'.join(manifest_lines) + '\n'
 
