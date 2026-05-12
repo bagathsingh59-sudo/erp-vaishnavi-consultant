@@ -266,4 +266,34 @@
     </div>
 
 </div>
+
+<script>
+// ── Backup Diagnostics ── runs on page load, logs to browser console
+(function() {
+    fetch('/backup/diagnose')
+        .then(r => r.json())
+        .then(function(d) {
+            console.group('%c🔍 Backup Diagnostics', 'font-weight:bold; color:#4f46e5; font-size:13px;');
+            console.log('DATABASE_URL set    :', d.database_url_set);
+            console.log('DATABASE_URL (masked):', d.database_url_masked);
+            console.log('URL scheme          :', d.url_scheme);
+            console.log('URL scheme OK       :', d.url_scheme_ok);
+            console.log('pg_dump found       :', d.pgdump_found);
+            console.log('pg_dump path        :', d.pgdump_path);
+            console.log('pg_dump version     :', d.pgdump_version);
+            console.log('Backup dir writable :', d.backup_dir_writable);
+            console.log('Backup dir          :', d.backup_dir || d.backup_dir_error);
+            if (d.last_error) console.error('Last error          :', d.last_error);
+            if (d.can_backup) {
+                console.log('%c✅ All checks passed — backup should work', 'color:green; font-weight:bold;');
+            } else {
+                console.error('%c❌ Backup CANNOT run — see failed checks above', 'color:red; font-weight:bold;');
+            }
+            console.groupEnd();
+        })
+        .catch(function(e) {
+            console.error('[Backup Diagnose] fetch error:', e);
+        });
+})();
+</script>
 {% endblock %}

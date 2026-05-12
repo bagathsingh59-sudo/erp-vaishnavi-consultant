@@ -14,7 +14,8 @@ from app.user_context import current_user_id, is_admin
 from app.backup import (
     create_backup, list_backups, get_backup_path,
     delete_backup, cleanup_old_backups, get_db_info,
-    restore_backup, import_backup_file, get_storage_info
+    restore_backup, import_backup_file, get_storage_info,
+    diagnose_backup, get_last_backup_error
 )
 
 backup_bp = Blueprint('backup', __name__)
@@ -76,7 +77,8 @@ def backup_create():
         if deleted > 0:
             flash(f'Auto-cleanup: Removed {deleted} old backup(s).', 'info')
     else:
-        flash('Failed to create backup. Check server logs.', 'danger')
+        err = get_last_backup_error()
+        flash(f'Backup failed: {err}' if err else 'Backup failed. Check server logs.', 'danger')
 
     return redirect(url_for('backup.backup_home'))
 
@@ -163,6 +165,21 @@ def backup_restore(filename):
         flash('Failed to restore backup. Check server logs.', 'danger')
 
     return redirect(url_for('backup.backup_home'))
+
+
+# ═════════════════════════════════════════════
+#  API — Backup diagnostics (for console debugging)
+# ═════════════════════════════════════════════
+@backup_bp.route('/backup/diagnose')
+@login_required
+def backup_diagnose():
+    """JSON API: run all backup pre-flight checks.
+    Open browser DevTools → Console to see the result."""
+    try:
+        checks = diagnose_backup()
+        return jsonify(checks)
+    except Exception as e:
+        return jsonify({'error': str(e), 'can_backup': False}), 200
 
 
 # ═════════════════════════════════════════════

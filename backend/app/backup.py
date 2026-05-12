@@ -21,6 +21,80 @@ import shutil
 import tempfile
 from datetime import datetime
 
+# Module-level: stores the last error detail for the route to display
+_last_backup_error = ''
+
+
+def get_last_backup_error():
+    return _last_backup_error
+
+
+def diagnose_backup():
+    """Run diagnostic checks and return a dict with status of each component.
+    Used by the /backup/diagnose API endpoint for browser console debugging."""
+    import shutil as _shutil
+    checks = {}
+
+    # 1. DATABASE_URL present?
+    db_url = os.getenv('DATABASE_URL', '')
+    checks['database_url_set'] = bool(db_url)
+    if db_url and '@' in db_url:
+        # Mask password for safe display
+        try:
+            before_at = db_url.split('@')[0]
+            after_at = db_url.split('@', 1)[1]
+            if '://' in before_at:
+                scheme_user = before_at.split('://')[0] + '://' + before_at.split('://', 1)[1].split(':')[0]
+                checks['database_url_masked'] = scheme_user + ':****@' + after_at
+            else:
+                checks['database_url_masked'] = '(set but could not mask)'
+        except Exception:
+            checks['database_url_masked'] = '(set)'
+    else:
+        checks['database_url_masked'] = '(not set)'
+
+    # 2. URL scheme correct for pg_dump?
+    checks['url_scheme_ok'] = db_url.startswith('postgres://') or db_url.startswith('postgresql://')
+    checks['url_scheme'] = db_url.split('://')[0] + '://' if '://' in db_url else 'unknown'
+
+    # 3. pg_dump installed?
+    pgdump_path = _shutil.which('pg_dump')
+    checks['pgdump_found'] = bool(pgdump_path)
+    checks['pgdump_path'] = pgdump_path or 'NOT FOUND'
+
+    # 4. pg_dump version?
+    if pgdump_path:
+        try:
+            ver = subprocess.run(['pg_dump', '--version'], capture_output=True, text=True, timeout=5)
+            checks['pgdump_version'] = ver.stdout.strip() or ver.stderr.strip()
+        except Exception as e:
+            checks['pgdump_version'] = f'error: {e}'
+    else:
+        checks['pgdump_version'] = 'n/a'
+
+    # 5. Backup directory writable?
+    try:
+        backup_dir = get_backup_dir('test_diag')
+        test_file = os.path.join(backup_dir, '_diag_test.tmp')
+        with open(test_file, 'w') as f:
+            f.write('ok')
+        os.remove(test_file)
+        checks['backup_dir_writable'] = True
+        checks['backup_dir'] = backup_dir
+    except Exception as e:
+        checks['backup_dir_writable'] = False
+        checks['backup_dir_error'] = str(e)
+
+    # 6. Overall verdict
+    checks['can_backup'] = (
+        checks['database_url_set'] and
+        checks['pgdump_found'] and
+        checks['backup_dir_writable']
+    )
+    checks['last_error'] = _last_backup_error
+
+    return checks
+
 
 BACKUP_EXT = '.zip'   # New backups use ZIP
 LEGACY_EXT = '.sql'   # Older backups may be raw SQL
@@ -45,6 +119,9 @@ def create_backup(user_id, label=None):
     The ZIP contains: <filename>.sql and optionally <filename>.label.txt
     Returns dict with backup info or None on error.
     """
+    global _last_backup_error
+    _last_backup_error = ''
+
     backup_dir = get_backup_dir(user_id)
     timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     basename = f'erp_backup_{timestamp}'
@@ -53,11 +130,19 @@ def create_backup(user_id, label=None):
 
     db_url = os.getenv('DATABASE_URL', '')
     if not db_url:
-        print('[BACKUP] DATABASE_URL not set')
+        _last_backup_error = 'DATABASE_URL environment variable is not set.'
+        print(f'[BACKUP] {_last_backup_error}')
         return None
     # Railway uses postgres:// scheme; pg_dump requires postgresql://
     if db_url.startswith('postgres://'):
         db_url = 'postgresql://' + db_url[len('postgres://'):]
+
+    # Check pg_dump is available before trying
+    import shutil as _shutil
+    if not _shutil.which('pg_dump'):
+        _last_backup_error = 'pg_dump not found on this server. Install postgresql-client.'
+        print(f'[BACKUP] {_last_backup_error}')
+        return None
 
     # Step 1: Create SQL dump in a temp file
     tmp_sql = None
@@ -70,7 +155,8 @@ def create_backup(user_id, label=None):
             capture_output=True, text=True, timeout=300
         )
         if result.returncode != 0:
-            print(f'[BACKUP] pg_dump error: {result.stderr}')
+            _last_backup_error = f'pg_dump failed (exit {result.returncode}): {result.stderr.strip()}'
+            print(f'[BACKUP] {_last_backup_error}')
             return None
 
         # Step 2: Pack SQL into ZIP (with DEFLATE compression)
@@ -96,6 +182,7 @@ def create_backup(user_id, label=None):
             'user_id': user_id,
         }
     except Exception as e:
+        _last_backup_error = f'Exception: {e}'
         print(f'[BACKUP] Error creating backup: {e}')
         if os.path.exists(zip_path):
             try: os.remove(zip_path)
