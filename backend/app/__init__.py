@@ -357,6 +357,7 @@ def create_app():
         from app.models.manual_reimbursement import ManualReimbursement
         from app.models.loan import LoanAccount, LoanPayment
         from app.models.assignment_log import EstablishmentAssignmentLog
+        from app.models.backup_file import BackupFile   # persistent backup storage
         db.create_all()
 
         # Auto-migrate: add new columns to existing tables (PostgreSQL won't add via create_all)
@@ -368,7 +369,51 @@ def create_app():
         # Seed any newly added account heads for existing DBs
         _seed_missing_account_heads()
 
+    # ── Scheduled auto-backup every 15 days ───────────────────────────
+    _start_backup_scheduler(app)
+
     return app
+
+
+def _start_backup_scheduler(app):
+    """
+    Start a background APScheduler that runs daily at 02:00 server time and
+    creates a backup if the most-recent backup (any user) is ≥ 15 days old.
+
+    Multi-worker safety: the job checks the DB before acting, so even if
+    two gunicorn workers both start the scheduler, only one will actually
+    create a backup (the other sees the fresh record and skips).
+    """
+    import os
+    # Allow disabling via env var if needed (e.g. local dev with no pg_dump)
+    if os.getenv('DISABLE_BACKUP_SCHEDULER', '').lower() in ('1', 'true', 'yes'):
+        print('[SCHEDULER] Auto-backup scheduler disabled via DISABLE_BACKUP_SCHEDULER env var')
+        return
+
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.triggers.cron import CronTrigger
+
+        def _job():
+            with app.app_context():
+                from app.backup import auto_create_if_needed
+                auto_create_if_needed()
+
+        scheduler = BackgroundScheduler(daemon=True)
+        # Run at 02:00 every day; add 0-300s jitter to stagger workers
+        scheduler.add_job(
+            _job,
+            trigger=CronTrigger(hour=2, minute=0, jitter=300),
+            id='auto_backup',
+            name='Auto DB Backup (15-day)',
+            replace_existing=True,
+            misfire_grace_time=3600,   # Allow up to 1h delay (e.g. restart during window)
+        )
+        scheduler.start()
+        print('[SCHEDULER] Auto-backup scheduler started (daily at 02:00, ±5 min jitter)')
+    except Exception as e:
+        # Never crash the app if scheduler fails to start
+        print(f'[SCHEDULER] Failed to start: {e}')
 
 
 def _auto_migrate_columns(db):
