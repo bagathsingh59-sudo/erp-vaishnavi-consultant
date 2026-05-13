@@ -531,7 +531,7 @@
                     </button>
 
                     <!-- ══ CUSTOMISER PANEL ══ -->
-                    <div id="themePickerPanel" style="display:none; position:absolute; top:calc(100% + 8px); right:0; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-lg); width:296px; z-index:9999; overflow:hidden;">
+                    <div id="themePickerPanel" style="display:none; position:absolute; top:calc(100% + 8px); right:0; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-lg); width:308px; z-index:9999; overflow:hidden;">
 
                         <!-- Panel header -->
                         <div style="background:var(--gradient-primary); padding:10px 14px; display:flex; align-items:center; justify-content:space-between;">
@@ -546,11 +546,15 @@
 
                         <div style="padding:14px 14px 12px;">
 
-                            <!-- Quick presets -->
-                            <div style="font-size:0.58rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:7px;">Quick Presets</div>
-                            <div style="display:flex; gap:7px; margin-bottom:14px; flex-wrap:wrap;" id="vcThemeSwatches"></div>
+                            <!-- Preset swatches — JS renders Light / Dark rows -->
+                            <div id="vcThemeSwatches" style="margin-bottom:12px;"></div>
 
-                            <div style="height:1px; background:var(--border); margin-bottom:14px;"></div>
+                            <!-- Divider + custom label -->
+                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:12px;">
+                                <div style="flex:1; height:1px; background:var(--border);"></div>
+                                <span style="font-size:0.52rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.09em; white-space:nowrap;">✏ Custom (Light)</span>
+                                <div style="flex:1; height:1px; background:var(--border);"></div>
+                            </div>
 
                             <!-- ── MAIN COLOUR ── -->
                             <div style="margin-bottom:13px;">
@@ -1532,14 +1536,22 @@
          ═══════════════════════════════════════════════════ -->
     <script>
     (function(){
-        /* ── Preset themes — primary / accent / sidebar ── */
+        /* ── Preset themes ─────────────────────────────────
+           Each entry: id, label, p=primary, a=accent,
+           s=sidebar, hue (for slider), dark flag.
+           Light themes: white surfaces (from :root).
+           Dark  themes: override body-bg/surface/text too.
+           ─────────────────────────────────────────────── */
         var VC_PRESETS = [
-            { id:'indigo',  label:'Indigo',  p:'#4f46e5', a:'#7c3aed', s:'#0f172a', hue:243 },
-            { id:'ocean',   label:'Ocean',   p:'#0284c7', a:'#0891b2', s:'#0c1a2e', hue:200 },
-            { id:'emerald', label:'Emerald', p:'#059669', a:'#0d9488', s:'#022c22', hue:160 },
-            { id:'rose',    label:'Rose',    p:'#e11d48', a:'#db2777', s:'#1a0010', hue:347 },
-            { id:'amber',   label:'Amber',   p:'#b45309', a:'#d97706', s:'#1a0e00', hue:30  },
-            { id:'slate',   label:'Slate',   p:'#475569', a:'#6366f1', s:'#020617', hue:215 },
+            /* ☀ LIGHT ─ 4 presets */
+            { id:'indigo',   label:'Indigo',   p:'#4f46e5', a:'#7c3aed', s:'#0f172a', hue:243, dark:false },
+            { id:'azure',    label:'Azure',    p:'#1055b5', a:'#0891d8', s:'#06122e', hue:214, dark:false },
+            { id:'sage',     label:'Sage',     p:'#1a7a4e', a:'#0d9488', s:'#082316', hue:153, dark:false },
+            { id:'khata',    label:'Khata',    p:'#c0392b', a:'#e67e22', s:'#1a0505', hue:5,   dark:false },
+            /* 🌙 DARK ─ 3 presets */
+            { id:'midnight', label:'Midnight', p:'#4facfe', a:'#7c83fd', s:'#010b1a', hue:207, dark:true  },
+            { id:'carbon',   label:'Carbon',   p:'#b48efa', a:'#79c0ff', s:'#0d1117', hue:265, dark:true  },
+            { id:'aurora',   label:'Aurora',   p:'#3ecf8e', a:'#38bdf8', s:'#020c08', hue:155, dark:true  },
         ];
 
         var html = document.getElementById('htmlRoot');
@@ -1623,6 +1635,10 @@
            Individual pickers can fine-tune each channel.
            ───────────────────────────────────────────────── */
         function applyHue(hue){
+            /* Hue slider always produces a LIGHT theme.
+               Clear dark-theme data-theme attribute first so
+               surface/text tokens revert to :root (light). */
+            html.removeAttribute('data-theme');
             var p  = hslHex(hue,           68, 56); // primary
             var ac = hslHex((hue+25)%360,  72, 50); // accent (25° shift)
             var sb = hslHex(hue,           32,  9); // sidebar (very dark tinted)
@@ -1776,38 +1792,89 @@
         }
 
         /* ─────────────────────────────────────────────────
-           Build/repaint preset swatches
+           Build/repaint preset swatches — two rows:
+           ☀ Light Themes  |  🌙 Dark Themes
+           Swatch for dark = gradient(sidebar → primary)
+           to visually communicate dark bg + vivid accent.
            ───────────────────────────────────────────────── */
         function updateSwatches(){
             var wrap = document.getElementById('vcThemeSwatches');
             if(!wrap) return;
             var saved = localStorage.getItem('vc_theme') || 'indigo';
             wrap.innerHTML = '';
-            VC_PRESETS.forEach(function(t){
-                var isActive = (saved === t.id);
-                var btn = document.createElement('button');
-                btn.type = 'button';
-                btn.setAttribute('data-theme-id', t.id);
-                btn.title = t.label;
-                btn.style.cssText =
-                    'width:30px; height:30px; border-radius:50%;' +
-                    'border:' + (isActive ? '3px solid #fff; box-shadow:0 0 0 2px '+t.p+';' : '2px solid rgba(0,0,0,0.14);') +
-                    'background:' + t.p + '; cursor:pointer; transition:all 0.14s;' +
-                    'position:relative; flex-shrink:0;';
-                if(isActive){
-                    btn.innerHTML = '<i class="bi bi-check" style="color:#fff;font-size:0.75rem;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-shadow:0 1px 3px rgba(0,0,0,0.4);"></i>';
-                }
-                btn.addEventListener('click', function(){ applyPreset(t); });
-                // Label under swatch
-                var wrap2 = document.createElement('div');
-                wrap2.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:2px;';
-                wrap2.appendChild(btn);
-                var lbl = document.createElement('div');
-                lbl.style.cssText = 'font-size:0.5rem; color:var(--text-muted); white-space:nowrap;';
-                lbl.textContent = t.label;
-                wrap2.appendChild(lbl);
-                wrap.appendChild(wrap2);
-            });
+
+            var lights = VC_PRESETS.filter(function(t){ return !t.dark; });
+            var darks  = VC_PRESETS.filter(function(t){ return  t.dark; });
+
+            function makeSection(emoji, label, list){
+                var section = document.createElement('div');
+                section.style.cssText = 'margin-bottom:9px;';
+
+                /* Section label */
+                var hdr = document.createElement('div');
+                hdr.style.cssText =
+                    'font-size:0.52rem; font-weight:700; text-transform:uppercase;' +
+                    'letter-spacing:0.09em; color:var(--text-muted); margin-bottom:5px;' +
+                    'display:flex; align-items:center; gap:3px;';
+                hdr.innerHTML = '<span>' + emoji + '</span><span>' + label + '</span>';
+                section.appendChild(hdr);
+
+                /* Swatch row */
+                var row = document.createElement('div');
+                row.style.cssText = 'display:flex; gap:7px; flex-wrap:wrap;';
+
+                list.forEach(function(t){
+                    var isActive = (saved === t.id);
+                    /* Dark swatches: gradient from sidebar to primary — shows both bg + accent */
+                    var bgCss = t.dark
+                        ? 'linear-gradient(135deg,' + t.s + ' 40%,' + t.p + ')'
+                        : t.p;
+
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.setAttribute('data-theme-id', t.id);
+                    btn.title = t.label;
+                    btn.style.cssText =
+                        'width:32px; height:32px; border-radius:9px; cursor:pointer;' +
+                        'background:' + bgCss + '; flex-shrink:0; position:relative;' +
+                        'transition:transform 0.13s, box-shadow 0.13s;' +
+                        (isActive
+                            ? 'border:2.5px solid #fff; box-shadow:0 0 0 2.5px ' + t.p + ';'
+                            : 'border:1.5px solid rgba(0,0,0,0.13);');
+
+                    if(isActive){
+                        btn.innerHTML =
+                            '<i class="bi bi-check" style="color:#fff;font-size:0.8rem;' +
+                            'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);' +
+                            'text-shadow:0 1px 4px rgba(0,0,0,0.55);"></i>';
+                    }
+                    btn.addEventListener('mouseenter', function(){
+                        this.style.transform = 'scale(1.12)';
+                        this.style.boxShadow = '0 3px 10px rgba(0,0,0,0.25)';
+                    });
+                    btn.addEventListener('mouseleave', function(){
+                        this.style.transform = '';
+                        this.style.boxShadow = isActive ? '0 0 0 2.5px ' + t.p : '';
+                    });
+                    btn.addEventListener('click', function(){ applyPreset(t); });
+
+                    /* Wrapper: swatch + label below */
+                    var cell = document.createElement('div');
+                    cell.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:2px;';
+                    cell.appendChild(btn);
+                    var lbl = document.createElement('div');
+                    lbl.style.cssText = 'font-size:0.48rem; color:var(--text-muted); white-space:nowrap;';
+                    lbl.textContent = t.label;
+                    cell.appendChild(lbl);
+                    row.appendChild(cell);
+                });
+
+                section.appendChild(row);
+                wrap.appendChild(section);
+            }
+
+            makeSection('☀', 'Light Themes', lights);
+            makeSection('🌙', 'Dark Themes',  darks);
         }
 
         /* ─────────────────────────────────────────────────

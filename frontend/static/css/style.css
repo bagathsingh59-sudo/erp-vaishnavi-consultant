@@ -492,85 +492,188 @@ td .text-warning, td .text-info,
 @media print { .no-print { display: none !important; } }
 
 /* ══════════════════════════════════════════════
-   PRESET THEME OVERRIDES
+   PRESET THEME OVERRIDES  (3 Light + 3 Dark)
    Applied by JS theme switcher via data-theme=""
    attribute on <html>. Updating :root here is
    enough — all var() references cascade.
+
+   LIGHT THEMES — Azure (Zoho-inspired) · Sage (Tally/Freshbooks) · Khata (Khatabook)
+   DARK  THEMES — Midnight (Linear/Notion) · Carbon (GitHub dark) · Aurora (Supabase/Vercel)
    ══════════════════════════════════════════════ */
 
-[data-theme="ocean"] {
-    --primary:        #0284c7;
-    --primary-dark:   #0369a1;
-    --primary-light:  #e0f2fe;
-    --primary-rgb:    2, 132, 199;
-    --accent:         #0891b2;
-    --accent-dark:    #0e7490;
-    --accent-light:   #cffafe;
-    --gradient-start: #0284c7;
-    --gradient-end:   #0891b2;
-    --sidebar-bg:     #0c1a2e;
-    --sidebar-hover:  #1e3a5f;
-    --sidebar-active: #0284c7;
+/* ────────────────────────────────────────────────
+   ☀  AZURE — Professional corporate blue
+   Inspired by: Zoho CRM / Zoho Books
+   ──────────────────────────────────────────────── */
+[data-theme="azure"] {
+    --primary:        #1055b5;
+    --primary-dark:   #0d449a;
+    --primary-light:  #dbeafe;
+    --primary-rgb:    16, 85, 181;
+    --accent:         #0891d8;
+    --accent-dark:    #0773b6;
+    --accent-light:   #e0f2fe;
+    --gradient-start: #1055b5;
+    --gradient-end:   #0891d8;
+    --sidebar-bg:     #06122e;
+    --sidebar-hover:  #0d1f4a;
+    --sidebar-active: #1055b5;
 }
 
-[data-theme="emerald"] {
-    --primary:        #059669;
-    --primary-dark:   #047857;
+/* ────────────────────────────────────────────────
+   ☀  SAGE — Clean professional green
+   Inspired by: Tally · Busy Accounting · Freshbooks
+   ──────────────────────────────────────────────── */
+[data-theme="sage"] {
+    --primary:        #1a7a4e;
+    --primary-dark:   #145e3d;
     --primary-light:  #d1fae5;
-    --primary-rgb:    5, 150, 105;
+    --primary-rgb:    26, 122, 78;
     --accent:         #0d9488;
     --accent-dark:    #0f766e;
     --accent-light:   #ccfbf1;
-    --gradient-start: #059669;
+    --gradient-start: #1a7a4e;
     --gradient-end:   #0d9488;
-    --sidebar-bg:     #022c22;
-    --sidebar-hover:  #064e3b;
-    --sidebar-active: #059669;
+    --sidebar-bg:     #082316;
+    --sidebar-hover:  #0f3a24;
+    --sidebar-active: #1a7a4e;
 }
 
-[data-theme="rose"] {
-    --primary:        #e11d48;
-    --primary-dark:   #be123c;
-    --primary-light:  #ffe4e6;
-    --primary-rgb:    225, 29, 72;
-    --accent:         #db2777;
-    --accent-dark:    #be185d;
-    --accent-light:   #fce7f3;
-    --gradient-start: #e11d48;
-    --gradient-end:   #db2777;
-    --sidebar-bg:     #1a0010;
-    --sidebar-hover:  #3b0024;
-    --sidebar-active: #e11d48;
+/* ────────────────────────────────────────────────
+   ☀  KHATA — Bold red-orange brand
+   Inspired by: Khatabook · billing & ledger apps
+   ──────────────────────────────────────────────── */
+[data-theme="khata"] {
+    --primary:        #c0392b;
+    --primary-dark:   #a93226;
+    --primary-light:  #fee2e2;
+    --primary-rgb:    192, 57, 43;
+    --accent:         #e67e22;
+    --accent-dark:    #ca6f1e;
+    --accent-light:   #fef3c7;
+    --gradient-start: #c0392b;
+    --gradient-end:   #e67e22;
+    --sidebar-bg:     #1a0505;
+    --sidebar-hover:  #2d0a0a;
+    --sidebar-active: #c0392b;
 }
 
-[data-theme="amber"] {
-    --primary:        #b45309;
-    --primary-dark:   #92400e;
-    --primary-light:  #fef3c7;
-    --primary-rgb:    180, 83, 9;
-    --accent:         #d97706;
-    --accent-dark:    #b45309;
-    --accent-light:   #fef9c3;
-    --gradient-start: #b45309;
-    --gradient-end:   #d97706;
-    --sidebar-bg:     #1a0e00;
-    --sidebar-hover:  #451a03;
-    --sidebar-active: #b45309;
+/* ════════════════════════════════════════════════
+   🌙 DARK THEMES — override surface + text tokens
+   ═══════════════════════════════════════════════ */
+
+/* ────────────────────────────────────────────────
+   🌙 MIDNIGHT — Deep navy enterprise dark
+   Inspired by: Linear · Notion dark · Jira dark
+   ──────────────────────────────────────────────── */
+[data-theme="midnight"] {
+    /* Brand */
+    --primary:        #4facfe;
+    --primary-dark:   #3b98f2;
+    --primary-light:  rgba(79,172,254,0.15);
+    --primary-rgb:    79, 172, 254;
+    --accent:         #7c83fd;
+    --accent-dark:    #6b72fc;
+    --accent-light:   rgba(124,131,253,0.18);
+    --gradient-start: #4facfe;
+    --gradient-end:   #7c83fd;
+    --sidebar-bg:     #010b1a;
+    --sidebar-hover:  #061528;
+    --sidebar-active: #4facfe;
+    /* Surfaces */
+    --body-bg:        #0d1b2e;
+    --surface:        #122035;
+    --surface-alt:    #0f1c2e;
+    --surface-hover:  #1a2d45;
+    /* Borders */
+    --border:         #1e3a5f;
+    --border-strong:  #2a4d7d;
+    /* Text */
+    --text-primary:   #e8f0fe;
+    --text-secondary: #8eafd4;
+    --text-muted:     #5c7a9e;
+    --text-inverse:   #0a1525;
+    /* Shadows */
+    --shadow:         0 1px 3px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.25);
+    --shadow-sm:      0 1px 2px rgba(0,0,0,0.3);
+    --shadow-md:      0 4px 12px rgba(0,0,0,0.45);
+    --shadow-lg:      0 10px 30px rgba(0,0,0,0.55);
 }
 
-[data-theme="slate"] {
-    --primary:        #475569;
-    --primary-dark:   #334155;
-    --primary-light:  #f1f5f9;
-    --primary-rgb:    71, 85, 105;
-    --accent:         #6366f1;
-    --accent-dark:    #4f46e5;
-    --accent-light:   #e0e7ff;
-    --gradient-start: #475569;
-    --gradient-end:   #6366f1;
-    --sidebar-bg:     #020617;
-    --sidebar-hover:  #0f172a;
-    --sidebar-active: #475569;
+/* ────────────────────────────────────────────────
+   🌙 CARBON — True dark charcoal with violet accent
+   Inspired by: GitHub dark · VS Code dark · Raycast
+   ──────────────────────────────────────────────── */
+[data-theme="carbon"] {
+    /* Brand */
+    --primary:        #b48efa;
+    --primary-dark:   #a07af5;
+    --primary-light:  rgba(180,142,250,0.15);
+    --primary-rgb:    180, 142, 250;
+    --accent:         #79c0ff;
+    --accent-dark:    #58a6e8;
+    --accent-light:   rgba(121,192,255,0.18);
+    --gradient-start: #b48efa;
+    --gradient-end:   #79c0ff;
+    --sidebar-bg:     #0d1117;
+    --sidebar-hover:  #161b22;
+    --sidebar-active: #b48efa;
+    /* Surfaces */
+    --body-bg:        #161b22;
+    --surface:        #21262d;
+    --surface-alt:    #1c2128;
+    --surface-hover:  #2d333b;
+    /* Borders */
+    --border:         #30363d;
+    --border-strong:  #484f58;
+    /* Text */
+    --text-primary:   #e6edf3;
+    --text-secondary: #848d97;
+    --text-muted:     #6e7681;
+    --text-inverse:   #12161b;
+    /* Shadows */
+    --shadow:         0 1px 3px rgba(0,0,0,0.45), 0 1px 2px rgba(0,0,0,0.35);
+    --shadow-sm:      0 1px 2px rgba(0,0,0,0.4);
+    --shadow-md:      0 4px 12px rgba(0,0,0,0.55);
+    --shadow-lg:      0 10px 30px rgba(0,0,0,0.65);
+}
+
+/* ────────────────────────────────────────────────
+   🌙 AURORA — Dark teal with vivid emerald + cyan
+   Inspired by: Supabase · Vercel dark · Planetscale
+   ──────────────────────────────────────────────── */
+[data-theme="aurora"] {
+    /* Brand */
+    --primary:        #3ecf8e;
+    --primary-dark:   #32c07f;
+    --primary-light:  rgba(62,207,142,0.15);
+    --primary-rgb:    62, 207, 142;
+    --accent:         #38bdf8;
+    --accent-dark:    #22a8e5;
+    --accent-light:   rgba(56,189,248,0.18);
+    --gradient-start: #3ecf8e;
+    --gradient-end:   #38bdf8;
+    --sidebar-bg:     #020c08;
+    --sidebar-hover:  #071a10;
+    --sidebar-active: #3ecf8e;
+    /* Surfaces */
+    --body-bg:        #0c1510;
+    --surface:        #131f17;
+    --surface-alt:    #101a13;
+    --surface-hover:  #1a2d20;
+    /* Borders */
+    --border:         #1e3328;
+    --border-strong:  #2a4a37;
+    /* Text */
+    --text-primary:   #ecfdf5;
+    --text-secondary: #71b790;
+    --text-muted:     #4a8060;
+    --text-inverse:   #061008;
+    /* Shadows */
+    --shadow:         0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+    --shadow-sm:      0 1px 2px rgba(0,0,0,0.35);
+    --shadow-md:      0 4px 12px rgba(0,0,0,0.5);
+    --shadow-lg:      0 10px 30px rgba(0,0,0,0.6);
 }
 
 /* ── LINKS ────────────────────────────────────── */
@@ -650,8 +753,14 @@ td .text-warning, td .text-info,
     background: var(--primary-light) !important;
 }
 #themePickerPanel button[data-theme-id]:hover {
-    transform: scale(1.15);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    transform: scale(1.15) !important;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.32) !important;
+}
+/* Dark-mode panel readability — surfaces/text auto-inherit from CSS vars */
+#themePickerPanel {
+    color: var(--text-primary);
+    background: var(--surface);
+    border-color: var(--border);
 }
 
 /* ── HUE SLIDER — designed to match the app's UI ──
