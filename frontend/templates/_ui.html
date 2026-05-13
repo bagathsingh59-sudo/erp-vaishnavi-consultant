@@ -1,0 +1,234 @@
+{# =========================================================
+   _ui.html — Vaishnavi ERP Modular Component Library
+   Import in any template:
+       {% from '_ui.html' import page_header, card, stat_card, chip, section_title, empty_state, detail_item, search_box, alert_box, form_section %}
+   All components read from CSS custom properties defined in
+   style.css :root — so a theme change reflects everywhere.
+   ========================================================= #}
+
+
+{# ── PAGE HEADER ──────────────────────────────────────────
+   Usage:
+   {{ page_header('Employees', 'bi-people', 'Manage all staff') }}
+   With action buttons (pass raw HTML as 'actions'):
+   {% call page_header_with_actions('Title', 'bi-icon') %}
+       <a href="..." class="btn btn-brand btn-sm">Add New</a>
+   {% endcall %}
+#}
+{% macro page_header(title, icon='', subtitle='') %}
+<div class="page-header">
+    <div class="page-header-left">
+        <h4>
+            {% if icon %}<i class="{{ icon }}"></i>{% endif %}
+            {{ title }}
+        </h4>
+        {% if subtitle %}<p>{{ subtitle }}</p>{% endif %}
+    </div>
+</div>
+{% endmacro %}
+
+{% macro page_header_actions(title, icon='', subtitle='') %}
+<div class="page-header">
+    <div class="page-header-left">
+        <h4>
+            {% if icon %}<i class="{{ icon }}"></i>{% endif %}
+            {{ title }}
+        </h4>
+        {% if subtitle %}<p>{{ subtitle }}</p>{% endif %}
+    </div>
+    <div class="page-header-right">
+        {{ caller() }}
+    </div>
+</div>
+{% endmacro %}
+
+
+{# ── CARD ─────────────────────────────────────────────────
+   Usage:
+   {% call card('Card Title', 'bi-card-text') %}
+       <p>Card body content here.</p>
+   {% endcall %}
+   Without title (plain card):
+   {% call card() %}...{% endcall %}
+#}
+{% macro card(title='', icon='', footer='') %}
+<div class="card">
+    {% if title %}
+    <div class="card-header">
+        {% if icon %}<i class="{{ icon }} me-2 text-brand"></i>{% endif %}{{ title }}
+    </div>
+    {% endif %}
+    <div class="card-body">
+        {{ caller() }}
+    </div>
+    {% if footer %}
+    <div class="card-footer bg-surface-alt" style="padding:12px 24px; font-size:var(--font-size-xs); color:var(--text-secondary);">
+        {{ footer }}
+    </div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+
+{# ── STAT CARD ────────────────────────────────────────────
+   color: primary | success | warning | danger | info
+   Usage:
+   {{ stat_card('Total Clients', '312', 'bi-building', 'primary') }}
+#}
+{% macro stat_card(label, value, icon, color='primary', trend='') %}
+<div class="stat-card {{ color }}">
+    <div class="stat-icon {{ color }}">
+        <i class="{{ icon }}"></i>
+    </div>
+    <div class="stat-value">{{ value }}</div>
+    <div class="stat-label">{{ label }}</div>
+    {% if trend %}
+    <div style="font-size:var(--font-size-xs); color:var(--text-muted); margin-top:6px;">{{ trend }}</div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+
+{# ── CHIP / BADGE ─────────────────────────────────────────
+   color: primary | accent | brand | success | warning | danger | info | neutral
+   Usage:
+   {{ chip('Active', 'success') }}
+   {{ chip('EPF', 'primary', 'bi-shield-check') }}
+#}
+{% macro chip(text, color='primary', icon='') %}
+<span class="chip chip-{{ color }}">
+    {% if icon %}<i class="{{ icon }}"></i>{% endif %}
+    {{ text }}
+</span>
+{% endmacro %}
+
+
+{# ── SECTION TITLE ─────────────────────────────────────────
+   Usage:
+   {{ section_title('Employee Details', 'bi-person') }}
+#}
+{% macro section_title(text, icon='') %}
+<div class="section-title">
+    {% if icon %}<i class="{{ icon }}"></i>{% endif %}
+    {{ text }}
+</div>
+{% endmacro %}
+
+
+{# ── EMPTY STATE ──────────────────────────────────────────
+   Usage:
+   {{ empty_state('bi-inbox', 'No records found', 'Try adjusting your search filters.') }}
+#}
+{% macro empty_state(icon, title, subtitle='', action_url='', action_label='') %}
+<div class="empty-state">
+    <div class="empty-state-icon">
+        <i class="{{ icon }}"></i>
+    </div>
+    <h5>{{ title }}</h5>
+    {% if subtitle %}<p>{{ subtitle }}</p>{% endif %}
+    {% if action_url and action_label %}
+    <a href="{{ action_url }}" class="btn btn-brand btn-sm">{{ action_label }}</a>
+    {% endif %}
+</div>
+{% endmacro %}
+
+
+{# ── DETAIL ITEM (label + value pair) ─────────────────────
+   Usage (inside .detail-grid):
+   {{ detail_item('PF Code', est.pf_code) }}
+   {{ detail_item('Status', est.status, 'mono') }}
+#}
+{% macro detail_item(label, value, style='') %}
+<div>
+    <div class="detail-item-label">{{ label }}</div>
+    {% if value %}
+    <div class="detail-item-value{% if style == 'mono' %}" style="font-family:var(--font-mono){% endif %}">{{ value }}</div>
+    {% else %}
+    <div class="detail-item-value empty">—</div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+
+{# ── SEARCH BOX ───────────────────────────────────────────
+   Usage:
+   {{ search_box('myInput', 'Search establishments…', 'q') }}
+#}
+{% macro search_box(id, placeholder='Search…', name='', value='', form_action='') %}
+<div class="search-box">
+    <i class="bi bi-search"></i>
+    <input type="text"
+           id="{{ id }}"
+           {% if name %}name="{{ name }}"{% endif %}
+           {% if value %}value="{{ value }}"{% endif %}
+           class="form-control"
+           placeholder="{{ placeholder }}"
+           {% if not form_action %}oninput="this.form && this.form.submit()"{% endif %}
+           autocomplete="off">
+</div>
+{% endmacro %}
+
+
+{# ── ALERT BOX ────────────────────────────────────────────
+   type: success | warning | info | danger
+   Usage:
+   {{ alert_box('Backup created successfully.', 'success') }}
+#}
+{% macro alert_box(message, type='info', icon='', dismissible=True) %}
+{% set icons = {'success': 'bi-check-circle-fill', 'warning': 'bi-exclamation-triangle-fill', 'info': 'bi-info-circle-fill', 'danger': 'bi-x-circle-fill'} %}
+{% set auto_icon = icons[type] if type in icons else 'bi-info-circle-fill' %}
+<div class="alert alert-{{ type }} {% if dismissible %}alert-dismissible fade show{% endif %}" role="alert">
+    <i class="{{ icon if icon else auto_icon }} me-2"></i>
+    {{ message }}
+    {% if dismissible %}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    {% endif %}
+</div>
+{% endmacro %}
+
+
+{# ── FORM SECTION ─────────────────────────────────────────
+   Groups form fields with a title + description.
+   Usage:
+   {% call form_section('Personal Details', 'bi-person', 'Enter the employee\'s basic info.') %}
+       <div class="row">...</div>
+   {% endcall %}
+#}
+{% macro form_section(title, icon='', description='') %}
+<div class="form-section">
+    {% if title %}
+    <div class="form-section-title">
+        {% if icon %}<i class="{{ icon }}"></i>{% endif %}
+        {{ title }}
+    </div>
+    {% endif %}
+    {% if description %}
+    <div class="form-section-desc">{{ description }}</div>
+    {% endif %}
+    {{ caller() }}
+</div>
+{% endmacro %}
+
+
+{# ── TABLE WRAPPER ────────────────────────────────────────
+   Wraps a table with the standard card look.
+   Usage:
+   {% call table_wrap('Employee List', 'bi-people') %}
+       <table class="table">...</table>
+   {% endcall %}
+#}
+{% macro table_wrap(title='', icon='', search_placeholder='') %}
+<div class="table-container">
+    {% if title %}
+    <div class="table-header">
+        <div class="table-title">
+            {% if icon %}<i class="{{ icon }}"></i>{% endif %}
+            {{ title }}
+        </div>
+        <div>{{ caller() }}</div>
+    </div>
+    {% else %}
+    {{ caller() }}
+    {% endif %}
+</div>
+{% endmacro %}
