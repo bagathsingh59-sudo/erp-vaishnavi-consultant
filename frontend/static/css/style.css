@@ -34,10 +34,10 @@
     --sidebar-width:    260px;
 
     /* Surface / background */
-    --body-bg:          #f1f5f9;
+    --body-bg:          #f0f2ff;   /* default = indigo tint */
     --surface:          #ffffff;
-    --surface-alt:      #f8fafc;
-    --surface-hover:    #f1f5f9;
+    --surface-alt:      #eef0ff;
+    --surface-hover:    #e8eaff;
 
     /* Borders */
     --border:           #e2e8f0;
@@ -859,7 +859,9 @@ td .text-warning, td .text-info,
 .vc-color-dot:hover { transform: scale(1.1); }
 
 /* Default theme is indigo (no data-theme needed).
-   [data-theme="indigo"] is an explicit alias: */
+   [data-theme="indigo"] is an explicit alias.
+   Light themes also define --body-bg so switching
+   presets changes the page background tint too. */
 [data-theme="indigo"] {
     --primary:        #4f46e5;
     --primary-dark:   #4338ca;
@@ -873,4 +875,23 @@ td .text-warning, td .text-info,
     --sidebar-bg:     #0f172a;
     --sidebar-hover:  #1e293b;
     --sidebar-active: #4f46e5;
+    --body-bg:        #f0f2ff;   /* subtle indigo tint */
+    --surface-alt:    #eef0ff;
+}
+
+/* ── Light theme background tints ───────────────── */
+[data-theme="azure"]  {
+    --body-bg:        #f0f4fb;
+    --surface-alt:    #e8f0fa;
+    --surface-hover:  #dde8f5;
+}
+[data-theme="sage"]   {
+    --body-bg:        #f0faf4;
+    --surface-alt:    #e8f6ed;
+    --surface-hover:  #daf0e2;
+}
+[data-theme="khata"]  {
+    --body-bg:        #fff8f6;
+    --surface-alt:    #fff1ee;
+    --surface-hover:  #ffe6e1;
 }
