@@ -22,12 +22,46 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
-    <!-- Theme Restore — runs BEFORE render to prevent flash of wrong theme -->
+    <!-- Theme Restore — runs BEFORE render to prevent flash of wrong colour -->
     <script>
     (function(){
         var saved = localStorage.getItem('vc_theme');
-        if(saved && saved !== 'indigo') {
-            document.getElementById('htmlRoot').setAttribute('data-theme', saved);
+        var html  = document.getElementById('htmlRoot');
+        if(saved === 'custom'){
+            /* Restore all three custom channels inline so CSS cascade uses them */
+            var p = localStorage.getItem('vc_primary');
+            var a = localStorage.getItem('vc_accent');
+            var s = localStorage.getItem('vc_sidebar');
+            function hexRgb(h){ return parseInt(h.slice(1,3),16)+', '+parseInt(h.slice(3,5),16)+', '+parseInt(h.slice(5,7),16); }
+            function shade(hex,pct){
+                var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+                if(pct>0){r=Math.round(r+(255-r)*pct/100);g=Math.round(g+(255-g)*pct/100);b=Math.round(b+(255-b)*pct/100);}
+                else{r=Math.round(r*(1+pct/100));g=Math.round(g*(1+pct/100));b=Math.round(b*(1+pct/100));}
+                var c=function(v){return Math.max(0,Math.min(255,v)).toString(16).padStart(2,'0');};
+                return '#'+c(r)+c(g)+c(b);
+            }
+            if(p && /^#[0-9a-fA-F]{6}$/.test(p)){
+                html.style.setProperty('--primary',        p);
+                html.style.setProperty('--primary-dark',   shade(p,-22));
+                html.style.setProperty('--primary-light',  shade(p, 82));
+                html.style.setProperty('--primary-rgb',    hexRgb(p));
+                html.style.setProperty('--border-focus',   p);
+                html.style.setProperty('--link-color',     p);
+                html.style.setProperty('--link-hover',     shade(p,-22));
+                html.style.setProperty('--gradient-start', p);
+            }
+            if(a && /^#[0-9a-fA-F]{6}$/.test(a)){
+                html.style.setProperty('--accent',       a);
+                html.style.setProperty('--accent-dark',  shade(a,-18));
+                html.style.setProperty('--accent-light', shade(a, 78));
+                html.style.setProperty('--gradient-end', a);
+            }
+            if(s && /^#[0-9a-fA-F]{6}$/.test(s)){
+                html.style.setProperty('--sidebar-bg',    s);
+                html.style.setProperty('--sidebar-hover', shade(s, 12));
+            }
+        } else if(saved && saved !== 'indigo'){
+            html.setAttribute('data-theme', saved);
         }
     })();
     </script>
@@ -488,51 +522,102 @@
                     <span class="badge bg-secondary ms-1" style="font-size:0.55rem; padding:2px 6px; vertical-align:middle;">USER</span>
                     {% endif %}
                 </span>
-                <!-- ── THEME SWITCHER ── -->
+                <!-- ── THEME CUSTOMIZER ── -->
                 <div id="themeSwitcherWrap" style="position:relative; display:inline-flex;" class="no-print">
+                    <!-- Palette trigger button -->
                     <button id="themePickerBtn" type="button"
                             onclick="vcToggleThemePicker()"
                             style="width:30px; height:30px; border-radius:50%; border:2px solid var(--border); background:var(--surface); color:var(--text-secondary); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; font-size:0.85rem; transition:var(--transition);"
-                            title="Change UI colour theme">
-                        <i class="bi bi-palette"></i>
+                            title="Customise UI colours">
+                        <i class="bi bi-palette2"></i>
                     </button>
-                    <!-- Dropdown palette panel -->
-                    <div id="themePickerPanel" style="
-                        display:none; position:absolute; top:calc(100% + 8px); right:0;
-                        background:var(--surface); border:1px solid var(--border);
-                        border-radius:var(--radius); box-shadow:var(--shadow-lg);
-                        padding:14px 16px; min-width:230px; z-index:9999;">
-                        <div style="font-size:0.65rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:10px;">
-                            <i class="bi bi-palette2 me-1"></i>UI Colour Theme
-                        </div>
-                        <!-- Preset swatches — colours painted by JS from live CSS vars -->
-                        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;" id="vcThemeSwatches"></div>
-                        <!-- Custom primary colour picker -->
-                        <div style="border-top:1px solid var(--border); padding-top:10px; margin-top:2px;">
-                            <div style="font-size:0.62rem; color:var(--text-muted); margin-bottom:6px; font-weight:600;">CUSTOM COLOUR</div>
-                            <div style="display:flex; align-items:center; gap:8px;">
-                                <input type="color" id="vcCustomColor"
-                                       style="width:34px; height:34px; border:none; border-radius:6px; cursor:pointer; padding:2px;"
-                                       title="Pick a custom primary colour">
-                                <div style="flex:1;">
-                                    <div style="font-size:0.62rem; color:var(--text-secondary);">Changes primary & gradient</div>
-                                    <div style="font-size:0.58rem; color:var(--text-muted);">Sidebar colour unchanged</div>
-                                </div>
-                                <button type="button" onclick="vcApplyCustomColor()"
-                                        style="font-size:0.65rem; padding:4px 10px; border-radius:var(--radius-sm); background:var(--gradient-primary); color:var(--text-inverse); border:none; cursor:pointer; white-space:nowrap;">
-                                    Apply
-                                </button>
-                            </div>
-                        </div>
-                        <div style="margin-top:10px; border-top:1px solid var(--border); padding-top:8px; display:flex; justify-content:space-between; align-items:center;">
-                            <div style="font-size:0.6rem; color:var(--text-muted);">Current: <span id="vcCurrentThemeName" style="font-weight:700; color:var(--primary);">indigo</span></div>
+
+                    <!-- ══ CUSTOMISER PANEL ══ -->
+                    <div id="themePickerPanel" style="display:none; position:absolute; top:calc(100% + 8px); right:0; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-lg); width:296px; z-index:9999; overflow:hidden;">
+
+                        <!-- Panel header -->
+                        <div style="background:var(--gradient-primary); padding:10px 14px; display:flex; align-items:center; justify-content:space-between;">
+                            <span style="color:#fff; font-size:0.75rem; font-weight:700; letter-spacing:0.02em;">
+                                <i class="bi bi-palette2 me-1"></i>Colour Customizer
+                            </span>
                             <button type="button" onclick="vcResetTheme()"
-                                    style="font-size:0.6rem; padding:2px 8px; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--surface-alt); color:var(--text-secondary); cursor:pointer;">
-                                Reset
+                                    style="background:rgba(255,255,255,0.18); border:none; color:#fff; border-radius:5px; padding:2px 9px; font-size:0.6rem; font-weight:700; cursor:pointer; letter-spacing:0.04em;">
+                                RESET
                             </button>
                         </div>
-                    </div>
-                </div>
+
+                        <div style="padding:14px 14px 12px;">
+
+                            <!-- Quick presets -->
+                            <div style="font-size:0.58rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:7px;">Quick Presets</div>
+                            <div style="display:flex; gap:7px; margin-bottom:14px; flex-wrap:wrap;" id="vcThemeSwatches"></div>
+
+                            <div style="height:1px; background:var(--border); margin-bottom:14px;"></div>
+
+                            <!-- ── MAIN COLOUR ── -->
+                            <div style="margin-bottom:13px;">
+                                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:7px;">
+                                    <div>
+                                        <div style="font-size:0.62rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.08em;">Main Colour</div>
+                                        <div style="font-size:0.57rem; color:var(--text-muted); margin-top:1px;">Buttons, links, active states</div>
+                                    </div>
+                                    <div style="display:flex; align-items:center; gap:5px;">
+                                        <div id="vcPrimaryPreview" class="vc-color-dot" onclick="document.getElementById('vcPrimaryPicker').click()" style="background:var(--primary);" title="Click to pick"></div>
+                                        <input type="color" id="vcPrimaryPicker" style="width:0;height:0;opacity:0;position:absolute;pointer-events:none;">
+                                        <input type="text" id="vcPrimaryHex" class="vc-hex-input" maxlength="7" placeholder="#4f46e5">
+                                    </div>
+                                </div>
+                                <!-- Hue slider (rainbow gradient) -->
+                                <div style="display:flex; align-items:center; gap:7px; margin-bottom:3px;">
+                                    <span style="font-size:0.57rem; color:var(--text-muted); white-space:nowrap;">Hue</span>
+                                    <input type="range" id="vcHueSlider" class="vc-hue-slider" min="0" max="359" value="240">
+                                    <span id="vcHueVal" style="font-size:0.6rem; font-weight:700; color:var(--primary); min-width:26px; text-align:right;">240°</span>
+                                </div>
+                            </div>
+
+                            <!-- ── ACCENT COLOUR ── -->
+                            <div style="margin-bottom:13px;">
+                                <div style="display:flex; align-items:center; justify-content:space-between;">
+                                    <div>
+                                        <div style="font-size:0.62rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.08em;">Accent Colour</div>
+                                        <div style="font-size:0.57rem; color:var(--text-muted); margin-top:1px;">Gradient tail, tags, hover tints</div>
+                                    </div>
+                                    <div style="display:flex; align-items:center; gap:5px;">
+                                        <div id="vcAccentPreview" class="vc-color-dot" onclick="document.getElementById('vcAccentPicker').click()" style="background:var(--accent);" title="Click to pick"></div>
+                                        <input type="color" id="vcAccentPicker" style="width:0;height:0;opacity:0;position:absolute;pointer-events:none;">
+                                        <input type="text" id="vcAccentHex" class="vc-hex-input" maxlength="7" placeholder="#7c3aed">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- ── SECONDARY / SIDEBAR ── -->
+                            <div style="margin-bottom:14px;">
+                                <div style="display:flex; align-items:center; justify-content:space-between;">
+                                    <div>
+                                        <div style="font-size:0.62rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.08em;">Secondary (Sidebar)</div>
+                                        <div style="font-size:0.57rem; color:var(--text-muted); margin-top:1px;">Navigation sidebar background</div>
+                                    </div>
+                                    <div style="display:flex; align-items:center; gap:5px;">
+                                        <div id="vcSidebarPreview" class="vc-color-dot" onclick="document.getElementById('vcSidebarPicker').click()" style="background:var(--sidebar-bg);" title="Click to pick"></div>
+                                        <input type="color" id="vcSidebarPicker" style="width:0;height:0;opacity:0;position:absolute;pointer-events:none;">
+                                        <input type="text" id="vcSidebarHex" class="vc-hex-input" maxlength="7" placeholder="#0f172a">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Footer -->
+                            <div style="border-top:1px solid var(--border); padding-top:8px; display:flex; align-items:center; justify-content:space-between;">
+                                <div style="font-size:0.58rem; color:var(--text-muted);">
+                                    Theme: <span id="vcCurrentThemeName" style="font-weight:700; color:var(--primary);">indigo</span>
+                                </div>
+                                <div id="vcSavedBadge" style="display:none; font-size:0.57rem; color:var(--success); font-weight:600;">
+                                    <i class="bi bi-check-circle-fill me-1"></i>Saved
+                                </div>
+                            </div>
+
+                        </div><!-- /padding wrapper -->
+                    </div><!-- /panel -->
+                </div><!-- /themeSwitcherWrap -->
 
                 <a href="{{ url_for('auth.logout_page') }}" class="btn btn-sm btn-outline-secondary ms-2 no-print"
                    style="font-size:0.65rem; padding:2px 10px; border-radius:12px;" title="Logout"
@@ -569,7 +654,7 @@
         {% endwith %}
 
         <!-- Quick Navigation Bar (always visible) -->
-        <div class="no-print" style="padding:6px 24px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <div class="no-print quick-nav" style="padding:6px 24px; background:var(--surface-alt); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
             <a href="{{ url_for('establishment.dashboard') }}" class="btn btn-sm btn-outline-secondary" style="font-size:0.72rem; padding:2px 10px;">
                 <i class="bi bi-house-door me-1"></i>Main Dashboard
             </a>
@@ -1432,199 +1517,364 @@
     {% endif %}
 
     <!-- ═══════════════════════════════════════════════════
-         THEME SWITCHER — reads live CSS vars so that if
-         :root values are changed in style.css, the swatches
-         in the picker always show the actual current colours.
+         THEME CUSTOMISER — Hue slider + 3-channel pickers
+         Reads live CSS vars (getComputedStyle) so changes
+         in style.css :root are always reflected.
          ═══════════════════════════════════════════════════ -->
     <script>
     (function(){
-        /* ── Preset themes (name + which CSS vars they override) ── */
-        var VC_THEMES = [
-            { id: 'indigo',  label: 'Indigo',  primary: '#4f46e5', gradient: ['#4f46e5','#7c3aed'], sidebar: '#0f172a' },
-            { id: 'ocean',   label: 'Ocean',   primary: '#0284c7', gradient: ['#0284c7','#0891b2'], sidebar: '#0c1a2e' },
-            { id: 'emerald', label: 'Emerald', primary: '#059669', gradient: ['#059669','#0d9488'], sidebar: '#022c22' },
-            { id: 'rose',    label: 'Rose',    primary: '#e11d48', gradient: ['#e11d48','#db2777'], sidebar: '#1a0010' },
-            { id: 'amber',   label: 'Amber',   primary: '#b45309', gradient: ['#b45309','#d97706'], sidebar: '#1a0e00' },
-            { id: 'slate',   label: 'Slate',   primary: '#475569', gradient: ['#475569','#6366f1'], sidebar: '#020617' },
+        /* ── Preset themes — primary / accent / sidebar ── */
+        var VC_PRESETS = [
+            { id:'indigo',  label:'Indigo',  p:'#4f46e5', a:'#7c3aed', s:'#0f172a', hue:243 },
+            { id:'ocean',   label:'Ocean',   p:'#0284c7', a:'#0891b2', s:'#0c1a2e', hue:200 },
+            { id:'emerald', label:'Emerald', p:'#059669', a:'#0d9488', s:'#022c22', hue:160 },
+            { id:'rose',    label:'Rose',    p:'#e11d48', a:'#db2777', s:'#1a0010', hue:347 },
+            { id:'amber',   label:'Amber',   p:'#b45309', a:'#d97706', s:'#1a0e00', hue:30  },
+            { id:'slate',   label:'Slate',   p:'#475569', a:'#6366f1', s:'#020617', hue:215 },
         ];
 
-        var html       = document.getElementById('htmlRoot');
-        var swatchWrap = document.getElementById('vcThemeSwatches');
-        var curLabel   = document.getElementById('vcCurrentThemeName');
-        var customPick = document.getElementById('vcCustomColor');
+        var html = document.getElementById('htmlRoot');
 
-        /* ── Get actual (post-cascade) value of a CSS var ── */
-        function liveVar(name) {
-            return getComputedStyle(html).getPropertyValue(name).trim();
+        /* ── Read live computed CSS var ── */
+        function lv(name){ return getComputedStyle(html).getPropertyValue(name).trim(); }
+
+        /* ── HSL → hex helper ── */
+        function hslHex(h,s,l){
+            s/=100; l/=100;
+            var a=s*Math.min(l,1-l);
+            var f=function(n){ var k=(n+h/30)%12; return l-a*Math.max(-1,Math.min(k-3,Math.min(9-k,1))); };
+            var x=function(v){ return Math.round(255*v).toString(16).padStart(2,'0'); };
+            return '#'+x(f(0))+x(f(8))+x(f(4));
         }
-
-        /* ── Apply a named preset theme ── */
-        function applyTheme(id, save) {
-            if(id === 'indigo') {
-                html.removeAttribute('data-theme');
-            } else {
-                html.setAttribute('data-theme', id);
-            }
-            if(save !== false) localStorage.setItem('vc_theme', id);
-            updateSwatches();
-            if(curLabel) curLabel.textContent = id;
+        /* ── Hex → {h,s,l} ── */
+        function hexHsl(hex){
+            var r=parseInt(hex.slice(1,3),16)/255, g=parseInt(hex.slice(3,5),16)/255, b=parseInt(hex.slice(5,7),16)/255;
+            var mx=Math.max(r,g,b), mn=Math.min(r,g,b), d=mx-mn;
+            var l=(mx+mn)/2, s=d===0?0:d/(1-Math.abs(2*l-1));
+            var h=0;
+            if(d){ if(mx===r) h=((g-b)/d+6)%6; else if(mx===g) h=(b-r)/d+2; else h=(r-g)/d+4; h*=60; }
+            return {h:Math.round(h), s:Math.round(s*100), l:Math.round(l*100)};
         }
+        /* ── Hex → "r, g, b" ── */
+        function hexRgb(hex){ return parseInt(hex.slice(1,3),16)+', '+parseInt(hex.slice(3,5),16)+', '+parseInt(hex.slice(5,7),16); }
+        /* ── Shade: pct<0 darken, pct>0 lighten ── */
+        function shade(hex,pct){
+            var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+            if(pct>0){r=Math.round(r+(255-r)*pct/100);g=Math.round(g+(255-g)*pct/100);b=Math.round(b+(255-b)*pct/100);}
+            else{r=Math.round(r*(1+pct/100));g=Math.round(g*(1+pct/100));b=Math.round(b*(1+pct/100));}
+            var c=function(v){return Math.max(0,Math.min(255,v)).toString(16).padStart(2,'0');};
+            return '#'+c(r)+c(g)+c(b);
+        }
+        /* ── Validate hex string ── */
+        function validHex(v){ return /^#[0-9a-fA-F]{6}$/.test(v); }
 
-        /* ── Apply a hex custom colour (overrides --primary & gradient only) ── */
-        window.vcApplyCustomColor = function() {
-            var hex = customPick ? customPick.value : '#4f46e5';
-            var rgb = hexToRgb(hex);
-            html.removeAttribute('data-theme');   // clear any preset
+        /* ─────────────────────────────────────────────────
+           Set primary family from a hex colour
+           ───────────────────────────────────────────────── */
+        function setPrimary(hex, skipSync){
+            if(!validHex(hex)) return;
             html.style.setProperty('--primary',        hex);
-            html.style.setProperty('--primary-dark',   shadeHex(hex, -20));
-            html.style.setProperty('--primary-light',  shadeHex(hex, 80));
-            html.style.setProperty('--primary-rgb',    rgb);
-            html.style.setProperty('--accent',         shadeHex(hex, -10));
-            html.style.setProperty('--gradient-start', hex);
-            html.style.setProperty('--gradient-end',   shadeHex(hex, -15));
+            html.style.setProperty('--primary-dark',   shade(hex,-22));
+            html.style.setProperty('--primary-light',  shade(hex, 82));
+            html.style.setProperty('--primary-rgb',    hexRgb(hex));
             html.style.setProperty('--border-focus',   hex);
-            // Save as custom
-            localStorage.setItem('vc_theme', 'custom');
-            localStorage.setItem('vc_custom_hex', hex);
-            updateSwatches();
-            if(curLabel) curLabel.textContent = 'custom';
+            html.style.setProperty('--link-color',     hex);
+            html.style.setProperty('--link-hover',     shade(hex,-22));
+            html.style.setProperty('--gradient-start', hex);
+            if(!skipSync) syncPrimaryInputs(hex);
+        }
+
+        /* ─────────────────────────────────────────────────
+           Set accent colour
+           ───────────────────────────────────────────────── */
+        function setAccent(hex, skipSync){
+            if(!validHex(hex)) return;
+            html.style.setProperty('--accent',        hex);
+            html.style.setProperty('--accent-dark',   shade(hex,-18));
+            html.style.setProperty('--accent-light',  shade(hex, 78));
+            html.style.setProperty('--gradient-end',  hex);
+            if(!skipSync) syncAccentInputs(hex);
+        }
+
+        /* ─────────────────────────────────────────────────
+           Set sidebar / secondary colour
+           ───────────────────────────────────────────────── */
+        function setSidebar(hex, skipSync){
+            if(!validHex(hex)) return;
+            html.style.setProperty('--sidebar-bg',     hex);
+            html.style.setProperty('--sidebar-hover',  shade(hex, 12));
+            html.style.setProperty('--sidebar-active', lv('--primary') || '#4f46e5');
+            if(!skipSync) syncSidebarInputs(hex);
+        }
+
+        /* ─────────────────────────────────────────────────
+           Hue slider → derive primary + auto-accent
+           ───────────────────────────────────────────────── */
+        function applyHue(hue){
+            var p  = hslHex(hue,  68, 56);   // main primary
+            var ac = hslHex((hue+25)%360, 72, 50); // accent: 25° shift
+            setPrimary(p);
+            setAccent(ac);
+            saveCustom();
+            showSaved();
+        }
+
+        /* ─────────────────────────────────────────────────
+           Apply a preset (clears inline overrides first)
+           ───────────────────────────────────────────────── */
+        function applyPreset(t){
+            clearInline();
+            if(t.id === 'indigo') html.removeAttribute('data-theme');
+            else html.setAttribute('data-theme', t.id);
+            localStorage.setItem('vc_theme', t.id);
+            localStorage.removeItem('vc_primary');
+            localStorage.removeItem('vc_accent');
+            localStorage.removeItem('vc_sidebar');
+            // Sync inputs after data-theme cascade settles
+            setTimeout(function(){
+                syncAllInputs();
+                updateSwatches();
+                var curLabel = document.getElementById('vcCurrentThemeName');
+                if(curLabel) curLabel.textContent = t.label;
+            }, 30);
+            showSaved();
+        }
+
+        /* ─────────────────────────────────────────────────
+           Reset to indigo default
+           ───────────────────────────────────────────────── */
+        window.vcResetTheme = function(){
+            clearInline();
+            html.removeAttribute('data-theme');
+            localStorage.setItem('vc_theme', 'indigo');
+            localStorage.removeItem('vc_primary');
+            localStorage.removeItem('vc_accent');
+            localStorage.removeItem('vc_sidebar');
+            setTimeout(function(){ syncAllInputs(); updateSwatches(); }, 30);
+            var curLabel = document.getElementById('vcCurrentThemeName');
+            if(curLabel) curLabel.textContent = 'indigo';
+            showSaved();
         };
 
-        /* ── Reset to default (indigo) ── */
-        window.vcResetTheme = function() {
-            // Clear any inline overrides
-            html.style.removeProperty('--primary');
-            html.style.removeProperty('--primary-dark');
-            html.style.removeProperty('--primary-light');
-            html.style.removeProperty('--primary-rgb');
-            html.style.removeProperty('--accent');
-            html.style.removeProperty('--gradient-start');
-            html.style.removeProperty('--gradient-end');
-            html.style.removeProperty('--border-focus');
-            applyTheme('indigo', true);
-        };
+        function clearInline(){
+            ['--primary','--primary-dark','--primary-light','--primary-rgb',
+             '--accent','--accent-dark','--accent-light',
+             '--gradient-start','--gradient-end','--border-focus',
+             '--link-color','--link-hover',
+             '--sidebar-bg','--sidebar-hover','--sidebar-active'].forEach(function(v){
+                html.style.removeProperty(v);
+            });
+        }
 
-        /* ── Toggle picker panel ── */
-        window.vcToggleThemePicker = function() {
+        /* ─────────────────────────────────────────────────
+           Toggle the panel
+           ───────────────────────────────────────────────── */
+        window.vcToggleThemePicker = function(){
             var panel = document.getElementById('themePickerPanel');
             if(!panel) return;
-            var isOpen = panel.style.display !== 'none';
-            panel.style.display = isOpen ? 'none' : 'block';
-            if(!isOpen) updateSwatches();  // repaint every open (reflects live CSS)
+            var open = panel.style.display !== 'none';
+            panel.style.display = open ? 'none' : 'block';
+            if(!open){ syncAllInputs(); updateSwatches(); }
         };
 
-        /* ── Build/update swatches from LIVE CSS vars ── */
-        function updateSwatches() {
-            if(!swatchWrap) return;
-            var active = html.getAttribute('data-theme') || 'indigo';
-            var savedTheme = localStorage.getItem('vc_theme') || 'indigo';
-
-            swatchWrap.innerHTML = '';
-            VC_THEMES.forEach(function(t) {
-                /* Read actual colour from computed style when theme is applied —
-                   this means if :root is edited in style.css, swatches reflect that */
-                var liveColor = t.primary;
-                if(t.id === (active === '' ? 'indigo' : active)) {
-                    liveColor = liveVar('--primary') || t.primary;
-                }
-
-                var isActive = (savedTheme === t.id) || (savedTheme === '' && t.id === 'indigo');
-                var btn = document.createElement('button');
-                btn.type = 'button';
-                btn.title = t.label;
-                btn.setAttribute('data-theme-id', t.id);
-                btn.style.cssText =
-                    'width:34px; height:34px; border-radius:50%; border:' +
-                    (isActive ? '3px solid var(--text-primary)' : '2px solid rgba(0,0,0,0.12)') +
-                    '; background:' + t.primary +
-                    '; cursor:pointer; transition:all 0.15s; position:relative; flex-shrink:0;';
-                if(isActive) {
-                    // Checkmark overlay
-                    btn.innerHTML = '<i class="bi bi-check" style="color:#fff;font-size:0.9rem;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);"></i>';
-                }
-                btn.title = t.label + (isActive ? ' (active)' : '');
-                btn.addEventListener('click', function() {
-                    // Clear any custom inline vars
-                    html.style.removeProperty('--primary');
-                    html.style.removeProperty('--primary-dark');
-                    html.style.removeProperty('--primary-light');
-                    html.style.removeProperty('--primary-rgb');
-                    html.style.removeProperty('--accent');
-                    html.style.removeProperty('--gradient-start');
-                    html.style.removeProperty('--gradient-end');
-                    html.style.removeProperty('--border-focus');
-                    applyTheme(t.id, true);
-                });
-                swatchWrap.appendChild(btn);
-
-                // Tooltip label
-                var lbl = document.createElement('div');
-                lbl.style.cssText = 'font-size:0.55rem; text-align:center; color:var(--text-muted); margin-top:-2px;';
-                lbl.textContent = t.label;
-            });
-
-            // Set custom picker to current live primary colour
-            if(customPick) {
-                var livePrimary = liveVar('--primary');
-                if(livePrimary) {
-                    try { customPick.value = livePrimary; } catch(e){}
-                }
-            }
+        /* ─────────────────────────────────────────────────
+           Sync all inputs from live CSS vars
+           ───────────────────────────────────────────────── */
+        function syncAllInputs(){
+            syncPrimaryInputs(lv('--primary') || '#4f46e5');
+            syncAccentInputs(lv('--accent')   || '#7c3aed');
+            syncSidebarInputs(lv('--sidebar-bg') || '#0f172a');
+        }
+        function syncPrimaryInputs(hex){
+            var dot   = document.getElementById('vcPrimaryPreview');
+            var pick  = document.getElementById('vcPrimaryPicker');
+            var hexIn = document.getElementById('vcPrimaryHex');
+            var hsl   = hexHsl(hex);
+            var hueEl = document.getElementById('vcHueSlider');
+            var hueV  = document.getElementById('vcHueVal');
+            if(dot)   dot.style.background = hex;
+            try{ if(pick) pick.value = hex; }catch(e){}
+            if(hexIn && document.activeElement !== hexIn) hexIn.value = hex.toUpperCase();
+            if(hueEl) hueEl.value = hsl.h;
+            if(hueV)  hueV.textContent = hsl.h + '°';
+        }
+        function syncAccentInputs(hex){
+            var dot   = document.getElementById('vcAccentPreview');
+            var pick  = document.getElementById('vcAccentPicker');
+            var hexIn = document.getElementById('vcAccentHex');
+            if(dot)   dot.style.background = hex;
+            try{ if(pick) pick.value = hex; }catch(e){}
+            if(hexIn && document.activeElement !== hexIn) hexIn.value = hex.toUpperCase();
+        }
+        function syncSidebarInputs(hex){
+            var dot   = document.getElementById('vcSidebarPreview');
+            var pick  = document.getElementById('vcSidebarPicker');
+            var hexIn = document.getElementById('vcSidebarHex');
+            if(dot)   dot.style.background = hex;
+            try{ if(pick) pick.value = hex; }catch(e){}
+            if(hexIn && document.activeElement !== hexIn) hexIn.value = hex.toUpperCase();
         }
 
-        /* ── Close picker when clicking outside ── */
-        document.addEventListener('click', function(e) {
-            var wrap = document.getElementById('themeSwitcherWrap');
+        /* ─────────────────────────────────────────────────
+           Save custom state
+           ───────────────────────────────────────────────── */
+        function saveCustom(){
+            localStorage.setItem('vc_theme',   'custom');
+            localStorage.setItem('vc_primary',  lv('--primary')    || '#4f46e5');
+            localStorage.setItem('vc_accent',   lv('--accent')     || '#7c3aed');
+            localStorage.setItem('vc_sidebar',  lv('--sidebar-bg') || '#0f172a');
+            var curLabel = document.getElementById('vcCurrentThemeName');
+            if(curLabel) curLabel.textContent = 'custom';
+            updateSwatches();
+        }
+
+        /* ─────────────────────────────────────────────────
+           "Saved" flash badge
+           ───────────────────────────────────────────────── */
+        var _saveTimer;
+        function showSaved(){
+            var badge = document.getElementById('vcSavedBadge');
+            if(!badge) return;
+            badge.style.display = 'block';
+            clearTimeout(_saveTimer);
+            _saveTimer = setTimeout(function(){ badge.style.display = 'none'; }, 1800);
+        }
+
+        /* ─────────────────────────────────────────────────
+           Build/repaint preset swatches
+           ───────────────────────────────────────────────── */
+        function updateSwatches(){
+            var wrap = document.getElementById('vcThemeSwatches');
+            if(!wrap) return;
+            var saved = localStorage.getItem('vc_theme') || 'indigo';
+            wrap.innerHTML = '';
+            VC_PRESETS.forEach(function(t){
+                var isActive = (saved === t.id);
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.setAttribute('data-theme-id', t.id);
+                btn.title = t.label;
+                btn.style.cssText =
+                    'width:30px; height:30px; border-radius:50%;' +
+                    'border:' + (isActive ? '3px solid #fff; box-shadow:0 0 0 2px '+t.p+';' : '2px solid rgba(0,0,0,0.14);') +
+                    'background:' + t.p + '; cursor:pointer; transition:all 0.14s;' +
+                    'position:relative; flex-shrink:0;';
+                if(isActive){
+                    btn.innerHTML = '<i class="bi bi-check" style="color:#fff;font-size:0.75rem;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-shadow:0 1px 3px rgba(0,0,0,0.4);"></i>';
+                }
+                btn.addEventListener('click', function(){ applyPreset(t); });
+                // Label under swatch
+                var wrap2 = document.createElement('div');
+                wrap2.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:2px;';
+                wrap2.appendChild(btn);
+                var lbl = document.createElement('div');
+                lbl.style.cssText = 'font-size:0.5rem; color:var(--text-muted); white-space:nowrap;';
+                lbl.textContent = t.label;
+                wrap2.appendChild(lbl);
+                wrap.appendChild(wrap2);
+            });
+        }
+
+        /* ─────────────────────────────────────────────────
+           Wire up inputs
+           ───────────────────────────────────────────────── */
+        function wireInputs(){
+            /* Hue slider */
+            var hueSlider = document.getElementById('vcHueSlider');
+            if(hueSlider){
+                hueSlider.addEventListener('input', function(){
+                    var hue = parseInt(this.value);
+                    var hueV = document.getElementById('vcHueVal');
+                    if(hueV) hueV.textContent = hue + '°';
+                    applyHue(hue);
+                });
+            }
+
+            /* Primary colour picker */
+            var pp = document.getElementById('vcPrimaryPicker');
+            if(pp) pp.addEventListener('input', function(){
+                setPrimary(this.value);
+                html.removeAttribute('data-theme');
+                saveCustom(); showSaved();
+            });
+            /* Primary hex input */
+            var ph = document.getElementById('vcPrimaryHex');
+            if(ph) ph.addEventListener('input', function(){
+                var v = this.value.trim();
+                if(!v.startsWith('#')) v = '#'+v;
+                if(validHex(v)){ setPrimary(v,true); html.removeAttribute('data-theme'); saveCustom(); showSaved(); }
+            });
+
+            /* Accent colour picker */
+            var ap = document.getElementById('vcAccentPicker');
+            if(ap) ap.addEventListener('input', function(){
+                setAccent(this.value);
+                html.removeAttribute('data-theme');
+                saveCustom(); showSaved();
+            });
+            /* Accent hex input */
+            var ah = document.getElementById('vcAccentHex');
+            if(ah) ah.addEventListener('input', function(){
+                var v = this.value.trim();
+                if(!v.startsWith('#')) v = '#'+v;
+                if(validHex(v)){ setAccent(v,true); html.removeAttribute('data-theme'); saveCustom(); showSaved(); }
+            });
+
+            /* Sidebar colour picker */
+            var sp = document.getElementById('vcSidebarPicker');
+            if(sp) sp.addEventListener('input', function(){
+                setSidebar(this.value);
+                html.removeAttribute('data-theme');
+                saveCustom(); showSaved();
+            });
+            /* Sidebar hex input */
+            var sh = document.getElementById('vcSidebarHex');
+            if(sh) sh.addEventListener('input', function(){
+                var v = this.value.trim();
+                if(!v.startsWith('#')) v = '#'+v;
+                if(validHex(v)){ setSidebar(v,true); html.removeAttribute('data-theme'); saveCustom(); showSaved(); }
+            });
+        }
+
+        /* ─────────────────────────────────────────────────
+           Close on outside click
+           ───────────────────────────────────────────────── */
+        document.addEventListener('click', function(e){
+            var wrap  = document.getElementById('themeSwitcherWrap');
             var panel = document.getElementById('themePickerPanel');
-            if(wrap && panel && !wrap.contains(e.target)) {
+            if(wrap && panel && !wrap.contains(e.target)){
                 panel.style.display = 'none';
             }
         });
 
-        /* ── Restore saved theme on load ── */
-        (function restoreOnLoad() {
+        /* ─────────────────────────────────────────────────
+           Restore on load (data-theme already applied in
+           <head>; here we restore custom channel values)
+           ───────────────────────────────────────────────── */
+        (function restoreOnLoad(){
             var saved = localStorage.getItem('vc_theme') || 'indigo';
-            if(saved === 'custom') {
-                var hex = localStorage.getItem('vc_custom_hex');
-                if(hex) {
-                    // Defer so CSS is parsed first
-                    setTimeout(function() {
-                        if(customPick) customPick.value = hex;
-                        window.vcApplyCustomColor();
-                    }, 0);
-                }
+            var curLabel = document.getElementById('vcCurrentThemeName');
+            if(curLabel) curLabel.textContent = saved;
+
+            if(saved === 'custom'){
+                var p = localStorage.getItem('vc_primary');
+                var a = localStorage.getItem('vc_accent');
+                var s = localStorage.getItem('vc_sidebar');
+                setTimeout(function(){
+                    if(p && validHex(p)) setPrimary(p);
+                    if(a && validHex(a)) setAccent(a);
+                    if(s && validHex(s)) setSidebar(s);
+                    syncAllInputs();
+                    updateSwatches();
+                }, 0);
             } else {
-                // data-theme was already applied in <head> script — just update label
-                if(curLabel) curLabel.textContent = saved;
+                setTimeout(function(){ syncAllInputs(); updateSwatches(); }, 30);
             }
         })();
 
-        /* ── Helpers ── */
-        function hexToRgb(hex) {
-            var r = parseInt(hex.slice(1,3),16);
-            var g = parseInt(hex.slice(3,5),16);
-            var b = parseInt(hex.slice(5,7),16);
-            return r + ', ' + g + ', ' + b;
-        }
-        function shadeHex(hex, pct) {
-            /* pct: -20 = darken 20%, +80 = lighten toward white */
-            var r = parseInt(hex.slice(1,3),16);
-            var g = parseInt(hex.slice(3,5),16);
-            var b = parseInt(hex.slice(5,7),16);
-            if(pct > 0) {
-                r = Math.round(r + (255 - r) * (pct/100));
-                g = Math.round(g + (255 - g) * (pct/100));
-                b = Math.round(b + (255 - b) * (pct/100));
-            } else {
-                r = Math.round(r * (1 + pct/100));
-                g = Math.round(g * (1 + pct/100));
-                b = Math.round(b * (1 + pct/100));
-            }
-            r = Math.max(0, Math.min(255, r));
-            g = Math.max(0, Math.min(255, g));
-            b = Math.max(0, Math.min(255, b));
-            return '#' + r.toString(16).padStart(2,'0') + g.toString(16).padStart(2,'0') + b.toString(16).padStart(2,'0');
-        }
+        /* Wire up all controls */
+        wireInputs();
+
     })();
     </script>
 

@@ -91,6 +91,10 @@
     --font-size-md:     1rem;
     --font-size-lg:     1.125rem;
 
+    /* Links */
+    --link-color:       var(--primary);
+    --link-hover:       var(--primary-dark);
+
     /* Legacy aliases (keep for backward compat) */
     --card-bg:          var(--surface);
     --border-color:     var(--border);
@@ -530,16 +534,102 @@ textarea.form-control { resize: vertical; min-height: 80px; }
     --sidebar-active: #475569;
 }
 
-/* ── THEME PICKER BUTTON ─────────────────────── */
+/* ── LINKS ────────────────────────────────────── */
+/* All plain <a> links inside page content follow --primary */
+.page-content a:not(.btn):not([class*="btn-"]):not(.sidebar-link):not(.badge):not(.chip) {
+    color: var(--link-color);
+    text-decoration: underline;
+    text-decoration-color: rgba(var(--primary-rgb), 0.3);
+    text-underline-offset: 2px;
+    transition: color var(--transition-fast), text-decoration-color var(--transition-fast);
+}
+.page-content a:not(.btn):not([class*="btn-"]):not(.sidebar-link):not(.badge):not(.chip):hover {
+    color: var(--link-hover);
+    text-decoration-color: var(--link-hover);
+}
+/* Quick-nav bar links and breadcrumb links */
+.quick-nav a.btn-outline-secondary:hover,
+.quick-nav a.btn-outline-primary:hover {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--text-inverse);
+}
+
+/* ── THEME PICKER ─────────────────────────────── */
 #themePickerBtn:hover {
     border-color: var(--primary) !important;
     color: var(--primary) !important;
     background: var(--primary-light) !important;
 }
 #themePickerPanel button[data-theme-id]:hover {
-    transform: scale(1.12);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+    transform: scale(1.15);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
+
+/* Hue slider — rainbow gradient track */
+.vc-hue-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 14px;
+    border-radius: 7px;
+    background: linear-gradient(to right,
+        hsl(0,75%,55%), hsl(30,75%,55%), hsl(60,75%,55%), hsl(90,75%,55%),
+        hsl(120,75%,55%), hsl(150,75%,55%), hsl(180,75%,55%), hsl(210,75%,55%),
+        hsl(240,75%,55%), hsl(270,75%,55%), hsl(300,75%,55%), hsl(330,75%,55%),
+        hsl(359,75%,55%));
+    outline: none;
+    cursor: pointer;
+    border: none;
+    display: block;
+}
+.vc-hue-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2.5px solid rgba(0,0,0,0.18);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.28);
+    cursor: pointer;
+    transition: transform 0.12s;
+}
+.vc-hue-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.vc-hue-slider::-moz-range-thumb {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2.5px solid rgba(0,0,0,0.18);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.28);
+    cursor: pointer;
+}
+/* Hex input in theme panel */
+.vc-hex-input {
+    width: 76px;
+    font-size: 0.68rem;
+    font-family: var(--font-mono);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    padding: 3px 6px;
+    color: var(--text-primary);
+    background: var(--surface-alt);
+    text-transform: uppercase;
+    transition: border-color var(--transition-fast);
+}
+.vc-hex-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.12);
+}
+/* Color swatch preview dot */
+.vc-color-dot {
+    width: 20px; height: 20px;
+    border-radius: 5px;
+    border: 1px solid rgba(0,0,0,0.12);
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: transform 0.12s;
+}
+.vc-color-dot:hover { transform: scale(1.1); }
 
 /* Default theme is indigo (no data-theme needed).
    [data-theme="indigo"] is an explicit alias: */
