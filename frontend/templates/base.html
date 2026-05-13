@@ -1572,16 +1572,22 @@
            dark= true  → dark surfaces (overridden in CSS)
                  false → light surfaces (white/tinted bg)
            ════════════════════════════════════════════════════════ */
+        /* bg  = page body-bg (card background colour preview)
+           bg2 = for dark themes: the sidebar colour (shown left of card)
+           p   = primary brand colour
+           a   = accent (complementary — visually distinct from p)
+           s   = sidebar-bg
+           hue = default hue-slider position                           */
         var VC_PRESETS = [
-            /* ☀ LIGHT — 4 presets */
-            { id:'indigo',   bg:'#f0f2ff', label:'Indigo',   p:'#4f46e5', a:'#7c3aed', s:'#0f172a', hue:243, dark:false },
-            { id:'azure',    bg:'#f0f4fb', label:'Azure',    p:'#1055b5', a:'#0891d8', s:'#06122e', hue:214, dark:false },
-            { id:'sage',     bg:'#f0faf4', label:'Sage',     p:'#1a7a4e', a:'#0d9488', s:'#082316', hue:153, dark:false },
-            { id:'khata',    bg:'#fff8f6', label:'Khata',    p:'#c0392b', a:'#e67e22', s:'#1a0505', hue:5,   dark:false },
-            /* 🌙 DARK — 3 presets */
-            { id:'midnight', bg:'#0d1b2e', label:'Midnight', p:'#4facfe', a:'#7c83fd', s:'#010b1a', hue:207, dark:true  },
-            { id:'carbon',   bg:'#161b22', label:'Carbon',   p:'#b48efa', a:'#79c0ff', s:'#0d1117', hue:265, dark:true  },
-            { id:'aurora',   bg:'#0c1510', label:'Aurora',   p:'#3ecf8e', a:'#38bdf8', s:'#020c08', hue:155, dark:true  },
+            /* ☀ LIGHT — body-bg tinted, white cards, themed sidebar */
+            { id:'indigo',   bg:'#f0f2ff', label:'Indigo',   p:'#4f46e5', a:'#f59e0b', s:'#1e1b4b', hue:243, dark:false },
+            { id:'azure',    bg:'#f0f5fb', label:'Azure',    p:'#1a6bce', a:'#ea580c', s:'#071124', hue:214, dark:false },
+            { id:'sage',     bg:'#f0faf4', label:'Sage',     p:'#166534', a:'#a855f7', s:'#052e16', hue:142, dark:false },
+            { id:'khata',    bg:'#fff8f7', label:'Khata',    p:'#be123c', a:'#0d9488', s:'#1c0410', hue:349, dark:false },
+            /* 🌙 DARK SIDEBAR — vivid primary on white + deep dark sidebar */
+            { id:'midnight', bg:'#f4f7fc', label:'Midnight', p:'#2563eb', a:'#f59e0b', s:'#020d1a', hue:217, dark:true  },
+            { id:'carbon',   bg:'#faf9ff', label:'Carbon',   p:'#7c3aed', a:'#0ea5e9', s:'#0d1117', hue:265, dark:true  },
+            { id:'aurora',   bg:'#f0fdf9', label:'Aurora',   p:'#059669', a:'#6366f1', s:'#020c08', hue:153, dark:true  },
         ];
 
         var html = document.getElementById('htmlRoot');
@@ -1674,24 +1680,18 @@
                              (sidebar stays from dark preset).
            ───────────────────────────────────────────────── */
         function applyHue(hue){
-            var baseId = localStorage.getItem('vc_theme') || 'indigo';
-            var preset = null;
-            for(var i=0;i<VC_PRESETS.length;i++){
-                if(VC_PRESETS[i].id === baseId){ preset = VC_PRESETS[i]; break; }
-            }
-            var isDark = preset && preset.dark;
-
-            var p  = hslHex(hue,           68, isDark ? 70 : 56); // brighter for dark bg
-            var ac = hslHex((hue+25)%360,  72, isDark ? 65 : 50);
+            /* Primary: saturated, readable on white (works for both light + dark sidebar themes)
+               Accent: opposite hue (180° complementary) — always visually distinct from primary
+               Sidebar: deep dark tinted variant of the hue                                      */
+            var p  = hslHex(hue,           70, 44);
+            var ac = hslHex((hue+180)%360, 65, 48);
+            var sb = hslHex(hue,           42,  8);
             setPrimary(p);
             setAccent(ac);
-            if(!isDark){
-                var sb = hslHex(hue, 32, 9);
-                setSidebar(sb);
-            }
+            setSidebar(sb);
             html.style.setProperty('--gradient-primary',
                 'linear-gradient(135deg,' + p + ',' + ac + ')');
-            syncPreviewStrips(p, ac, isDark ? null : hslHex(hue,32,9));
+            syncPreviewStrips(p, ac, sb);
             saveFinetuned();
             showSaved();
         }
@@ -1922,38 +1922,50 @@
 
                 list.forEach(function(t){
                     var isActive = (saved === t.id);
-                    var textHint = t.dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.09)';
 
-                    /* Card */
+                    /* ── Card ───────────────────────────────────
+                       Light themes: solid body-bg fill + accent strip
+                       Dark  themes: left strip = deep sidebar colour,
+                                     right = white content area
+                                     This shows BOTH the dark sidebar
+                                     and the clean white content at once.
+                       ─────────────────────────────────────────── */
                     var card = document.createElement('div');
                     card.title = t.label;
                     card.setAttribute('data-theme-id', t.id);
+
+                    /* Background: for dark themes show sidebar|content split */
+                    var cardBg = t.dark
+                        ? 'linear-gradient(90deg, ' + t.s + ' 30%, ' + t.bg + ' 30%)'
+                        : t.bg;
+
                     card.style.cssText =
                         'width:54px; height:40px; border-radius:8px; overflow:hidden;' +
                         'cursor:pointer; flex-shrink:0; position:relative;' +
-                        'background:' + t.bg + ';' +
+                        'background:' + cardBg + ';' +
                         'transition:transform 0.12s ease, box-shadow 0.15s ease;' +
                         (isActive
-                            ? 'border:2px solid ' + t.p + '; box-shadow:0 0 0 2px ' + t.p + '3a;'
+                            ? 'border:2px solid ' + t.p + '; box-shadow:0 0 0 2.5px ' + t.p + '40;'
                             : 'border:1.5px solid rgba(128,128,128,0.18);');
 
-                    /* Accent strip at top */
+                    /* Accent strip at very top (full width, primary colour) */
                     var strip = document.createElement('div');
                     strip.style.cssText = 'height:5px; background:' + t.p + '; width:100%;';
                     card.appendChild(strip);
 
-                    /* Content hint rows */
+                    /* Content hint rows — on the RIGHT (content area) for dark themes */
+                    var hintOffset = t.dark ? '30%' : '0%';
+                    var textHint = 'rgba(0,0,0,0.10)';
                     var hint = document.createElement('div');
-                    hint.style.cssText = 'padding:4px 5px 0; display:flex; flex-direction:column; gap:3px;';
+                    hint.style.cssText =
+                        'position:absolute; bottom:4px; left:' + hintOffset +
+                        '; right:3px; display:flex; flex-direction:column; gap:3px;';
                     var r1 = document.createElement('div');
-                    r1.style.cssText = 'height:3px; border-radius:2px; width:68%; background:' + t.p + '; opacity:0.4;';
+                    r1.style.cssText = 'height:3px; border-radius:2px; width:80%; background:' + t.p + '; opacity:0.45;';
                     var r2 = document.createElement('div');
-                    r2.style.cssText = 'height:3px; border-radius:2px; width:50%; background:' + textHint + ';';
-                    var r3 = document.createElement('div');
-                    r3.style.cssText = 'height:3px; border-radius:2px; width:40%; background:' + textHint + '; opacity:0.5;';
+                    r2.style.cssText = 'height:3px; border-radius:2px; width:60%; background:' + textHint + ';';
                     hint.appendChild(r1);
                     hint.appendChild(r2);
-                    hint.appendChild(r3);
                     card.appendChild(hint);
 
                     /* Active checkmark dot */

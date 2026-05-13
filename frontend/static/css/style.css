@@ -34,10 +34,10 @@
     --sidebar-width:    260px;
 
     /* Surface / background */
-    --body-bg:          #f0f2ff;   /* default = indigo tint */
+    --body-bg:          #f1f5f9;   /* neutral default — each theme overrides this */
     --surface:          #ffffff;
-    --surface-alt:      #eef0ff;
-    --surface-hover:    #e8eaff;
+    --surface-alt:      #f8fafc;
+    --surface-hover:    #f1f5f9;
 
     /* Borders */
     --border:           #e2e8f0;
@@ -491,189 +491,199 @@ td .text-warning, td .text-info,
 /* ── PRINT ────────────────────────────────────── */
 @media print { .no-print { display: none !important; } }
 
-/* ══════════════════════════════════════════════
-   PRESET THEME OVERRIDES  (3 Light + 3 Dark)
-   Applied by JS theme switcher via data-theme=""
-   attribute on <html>. Updating :root here is
-   enough — all var() references cascade.
+/* ══════════════════════════════════════════════════════
+   PRESET THEME OVERRIDES  (4 Light + 3 Dark)
+   ──────────────────────────────────────────────────────
+   LIGHT THEMES: tinted body-bg · white cards · dark
+   themed sidebar · COMPLEMENTARY accent (opposite on
+   the colour wheel so accent ≠ primary visually)
 
-   LIGHT THEMES — Azure (Zoho-inspired) · Sage (Tally/Freshbooks) · Khata (Khatabook)
-   DARK  THEMES — Midnight (Linear/Notion) · Carbon (GitHub dark) · Aurora (Supabase/Vercel)
-   ══════════════════════════════════════════════ */
+   DARK THEMES: REDESIGNED — dark sidebar only.
+   Main content area stays WHITE. Vivid saturated primary
+   that pops on white backgrounds. Complementary accent.
+   Enterprise "sidebar-forward" look — not a dark-room app.
+   ══════════════════════════════════════════════════════ */
 
-/* ────────────────────────────────────────────────
-   ☀  AZURE — Professional corporate blue
-   Inspired by: Zoho CRM / Zoho Books
-   ──────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────
+   ☀ AZURE — Corporate blue · Zoho / Freshdesk style
+   Complementary accent: burnt orange (blue ↔ orange)
+   Sidebar: deep navy-ink
+   ──────────────────────────────────────────────────── */
 [data-theme="azure"] {
-    --primary:        #1055b5;
-    --primary-dark:   #0d449a;
+    --primary:        #1a6bce;
+    --primary-dark:   #1558af;
     --primary-light:  #dbeafe;
-    --primary-rgb:    16, 85, 181;
-    --accent:         #0891d8;
-    --accent-dark:    #0773b6;
-    --accent-light:   #e0f2fe;
-    --gradient-start: #1055b5;
-    --gradient-end:   #0891d8;
-    --sidebar-bg:     #06122e;
-    --sidebar-hover:  #0d1f4a;
-    --sidebar-active: #1055b5;
+    --primary-rgb:    26, 107, 206;
+    --accent:         #ea580c;          /* burnt orange — opposite to blue */
+    --accent-dark:    #c2410c;
+    --accent-light:   #ffedd5;
+    --gradient-start: #1a6bce;
+    --gradient-end:   #0ea5e9;          /* sky-blue for gradient harmony */
+    --sidebar-bg:     #071124;          /* deep navy-ink */
+    --sidebar-hover:  #0f1f42;
+    --sidebar-active: #1a6bce;
+    --body-bg:        #f0f5fb;
+    --surface-alt:    #e6effa;
+    --surface-hover:  #dce8f6;
 }
 
-/* ────────────────────────────────────────────────
-   ☀  SAGE — Clean professional green
-   Inspired by: Tally · Busy Accounting · Freshbooks
-   ──────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────
+   ☀ SAGE — Forest green · Tally / Busy Accounting
+   Complementary accent: violet-purple (green ↔ purple)
+   Sidebar: near-black forest
+   ──────────────────────────────────────────────────── */
 [data-theme="sage"] {
-    --primary:        #1a7a4e;
-    --primary-dark:   #145e3d;
-    --primary-light:  #d1fae5;
-    --primary-rgb:    26, 122, 78;
-    --accent:         #0d9488;
+    --primary:        #166534;
+    --primary-dark:   #14532d;
+    --primary-light:  #dcfce7;
+    --primary-rgb:    22, 101, 52;
+    --accent:         #a855f7;          /* violet — opposite to green */
+    --accent-dark:    #9333ea;
+    --accent-light:   #f3e8ff;
+    --gradient-start: #166534;
+    --gradient-end:   #0d9488;          /* teal for gradient harmony */
+    --sidebar-bg:     #052e16;          /* near-black forest */
+    --sidebar-hover:  #0f4a25;
+    --sidebar-active: #166534;
+    --body-bg:        #f0faf4;
+    --surface-alt:    #e2f5ea;
+    --surface-hover:  #d1ecdb;
+}
+
+/* ────────────────────────────────────────────────────
+   ☀ KHATA — Bold crimson · Khatabook / billing apps
+   Complementary accent: teal-cyan (red ↔ teal)
+   Sidebar: near-black maroon
+   ──────────────────────────────────────────────────── */
+[data-theme="khata"] {
+    --primary:        #be123c;
+    --primary-dark:   #9f1239;
+    --primary-light:  #ffe4e6;
+    --primary-rgb:    190, 18, 60;
+    --accent:         #0d9488;          /* teal — opposite to crimson */
     --accent-dark:    #0f766e;
     --accent-light:   #ccfbf1;
-    --gradient-start: #1a7a4e;
-    --gradient-end:   #0d9488;
-    --sidebar-bg:     #082316;
-    --sidebar-hover:  #0f3a24;
-    --sidebar-active: #1a7a4e;
+    --gradient-start: #be123c;
+    --gradient-end:   #e11d48;          /* rose for gradient harmony */
+    --sidebar-bg:     #1c0410;          /* near-black maroon */
+    --sidebar-hover:  #3b0a22;
+    --sidebar-active: #be123c;
+    --body-bg:        #fff8f7;
+    --surface-alt:    #fff0f0;
+    --surface-hover:  #ffe4e4;
 }
 
-/* ────────────────────────────────────────────────
-   ☀  KHATA — Bold red-orange brand
-   Inspired by: Khatabook · billing & ledger apps
-   ──────────────────────────────────────────────── */
-[data-theme="khata"] {
-    --primary:        #c0392b;
-    --primary-dark:   #a93226;
-    --primary-light:  #fee2e2;
-    --primary-rgb:    192, 57, 43;
-    --accent:         #e67e22;
-    --accent-dark:    #ca6f1e;
-    --accent-light:   #fef3c7;
-    --gradient-start: #c0392b;
-    --gradient-end:   #e67e22;
-    --sidebar-bg:     #1a0505;
-    --sidebar-hover:  #2d0a0a;
-    --sidebar-active: #c0392b;
-}
+/* ════════════════════════════════════════════════════
+   🌙 DARK SIDEBAR THEMES — enterprise "sidebar-forward"
+   ─────────────────────────────────────────────────────
+   Sidebar = very deep dark (theme-specific black)
+   Content area = WHITE (light surfaces, dark text)
+   Primary = vivid saturated colour on white
+   Accent = complementary to primary
+   ════════════════════════════════════════════════════ */
 
-/* ════════════════════════════════════════════════
-   🌙 DARK THEMES — override surface + text tokens
-   ═══════════════════════════════════════════════ */
-
-/* ────────────────────────────────────────────────
-   🌙 MIDNIGHT — Deep navy enterprise dark
-   Inspired by: Linear · Notion dark · Jira dark
-   ──────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────
+   🌙 MIDNIGHT — Deep navy sidebar · vivid blue on white
+   Accent: amber-gold (blue ↔ orange/gold complement)
+   ──────────────────────────────────────────────────── */
 [data-theme="midnight"] {
-    /* Brand */
-    --primary:        #4facfe;
-    --primary-dark:   #3b98f2;
-    --primary-light:  rgba(79,172,254,0.15);
-    --primary-rgb:    79, 172, 254;
-    --accent:         #7c83fd;
-    --accent-dark:    #6b72fc;
-    --accent-light:   rgba(124,131,253,0.18);
-    --gradient-start: #4facfe;
-    --gradient-end:   #7c83fd;
-    --sidebar-bg:     #010b1a;
-    --sidebar-hover:  #061528;
-    --sidebar-active: #4facfe;
-    /* Surfaces */
-    --body-bg:        #0d1b2e;
-    --surface:        #122035;
-    --surface-alt:    #0f1c2e;
-    --surface-hover:  #1a2d45;
-    /* Borders */
-    --border:         #1e3a5f;
-    --border-strong:  #2a4d7d;
-    /* Text */
-    --text-primary:   #e8f0fe;
-    --text-secondary: #8eafd4;
-    --text-muted:     #5c7a9e;
-    --text-inverse:   #0a1525;
-    /* Shadows */
-    --shadow:         0 1px 3px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.25);
-    --shadow-sm:      0 1px 2px rgba(0,0,0,0.3);
-    --shadow-md:      0 4px 12px rgba(0,0,0,0.45);
-    --shadow-lg:      0 10px 30px rgba(0,0,0,0.55);
+    /* Vivid brand on white */
+    --primary:        #2563eb;
+    --primary-dark:   #1d4ed8;
+    --primary-light:  #dbeafe;
+    --primary-rgb:    37, 99, 235;
+    --accent:         #f59e0b;          /* amber-gold — complementary to blue */
+    --accent-dark:    #d97706;
+    --accent-light:   #fef3c7;
+    --gradient-start: #2563eb;
+    --gradient-end:   #7c3aed;          /* blue→violet gradient */
+    --sidebar-bg:     #020d1a;          /* deepest navy — almost black */
+    --sidebar-hover:  #0a1f3d;
+    --sidebar-active: #2563eb;
+    /* WHITE content surfaces */
+    --body-bg:        #f4f7fc;
+    --surface:        #ffffff;
+    --surface-alt:    #f0f5fd;
+    --surface-hover:  #e8f0fa;
+    /* Light borders + dark text — readable on white */
+    --border:         #e2e8f0;
+    --border-strong:  #cbd5e1;
+    --text-primary:   #1e293b;
+    --text-secondary: #475569;
+    --text-muted:     #94a3b8;
+    --text-inverse:   #ffffff;
+    --shadow:         0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-sm:      0 1px 2px rgba(0,0,0,0.05);
+    --shadow-md:      0 4px 12px rgba(0,0,0,0.08);
+    --shadow-lg:      0 10px 30px rgba(0,0,0,0.12);
 }
 
-/* ────────────────────────────────────────────────
-   🌙 CARBON — True dark charcoal with violet accent
-   Inspired by: GitHub dark · VS Code dark · Raycast
-   ──────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────
+   🌙 CARBON — Near-black sidebar · rich violet on white
+   Accent: sky-blue (violet ↔ cyan/blue complement)
+   ──────────────────────────────────────────────────── */
 [data-theme="carbon"] {
-    /* Brand */
-    --primary:        #b48efa;
-    --primary-dark:   #a07af5;
-    --primary-light:  rgba(180,142,250,0.15);
-    --primary-rgb:    180, 142, 250;
-    --accent:         #79c0ff;
-    --accent-dark:    #58a6e8;
-    --accent-light:   rgba(121,192,255,0.18);
-    --gradient-start: #b48efa;
-    --gradient-end:   #79c0ff;
-    --sidebar-bg:     #0d1117;
-    --sidebar-hover:  #161b22;
-    --sidebar-active: #b48efa;
-    /* Surfaces */
-    --body-bg:        #161b22;
-    --surface:        #21262d;
-    --surface-alt:    #1c2128;
-    --surface-hover:  #2d333b;
-    /* Borders */
-    --border:         #30363d;
-    --border-strong:  #484f58;
-    /* Text */
-    --text-primary:   #e6edf3;
-    --text-secondary: #848d97;
-    --text-muted:     #6e7681;
-    --text-inverse:   #12161b;
-    /* Shadows */
-    --shadow:         0 1px 3px rgba(0,0,0,0.45), 0 1px 2px rgba(0,0,0,0.35);
-    --shadow-sm:      0 1px 2px rgba(0,0,0,0.4);
-    --shadow-md:      0 4px 12px rgba(0,0,0,0.55);
-    --shadow-lg:      0 10px 30px rgba(0,0,0,0.65);
+    --primary:        #7c3aed;
+    --primary-dark:   #6d28d9;
+    --primary-light:  #ede9fe;
+    --primary-rgb:    124, 58, 237;
+    --accent:         #0ea5e9;          /* sky-blue — complementary to violet */
+    --accent-dark:    #0284c7;
+    --accent-light:   #e0f2fe;
+    --gradient-start: #7c3aed;
+    --gradient-end:   #4f46e5;          /* violet→indigo gradient */
+    --sidebar-bg:     #0d1117;          /* near-black charcoal */
+    --sidebar-hover:  #1a1f27;
+    --sidebar-active: #7c3aed;
+    /* WHITE content surfaces */
+    --body-bg:        #faf9ff;
+    --surface:        #ffffff;
+    --surface-alt:    #f5f3ff;
+    --surface-hover:  #ede9fe;
+    --border:         #e2e8f0;
+    --border-strong:  #cbd5e1;
+    --text-primary:   #1e293b;
+    --text-secondary: #475569;
+    --text-muted:     #94a3b8;
+    --text-inverse:   #ffffff;
+    --shadow:         0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-sm:      0 1px 2px rgba(0,0,0,0.05);
+    --shadow-md:      0 4px 12px rgba(0,0,0,0.08);
+    --shadow-lg:      0 10px 30px rgba(0,0,0,0.12);
 }
 
-/* ────────────────────────────────────────────────
-   🌙 AURORA — Dark teal with vivid emerald + cyan
-   Inspired by: Supabase · Vercel dark · Planetscale
-   ──────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────
+   🌙 AURORA — Dark teal sidebar · emerald on white
+   Accent: indigo-violet (green ↔ violet complement)
+   ──────────────────────────────────────────────────── */
 [data-theme="aurora"] {
-    /* Brand */
-    --primary:        #3ecf8e;
-    --primary-dark:   #32c07f;
-    --primary-light:  rgba(62,207,142,0.15);
-    --primary-rgb:    62, 207, 142;
-    --accent:         #38bdf8;
-    --accent-dark:    #22a8e5;
-    --accent-light:   rgba(56,189,248,0.18);
-    --gradient-start: #3ecf8e;
-    --gradient-end:   #38bdf8;
-    --sidebar-bg:     #020c08;
+    --primary:        #059669;
+    --primary-dark:   #047857;
+    --primary-light:  #d1fae5;
+    --primary-rgb:    5, 150, 105;
+    --accent:         #6366f1;          /* indigo — complementary to emerald */
+    --accent-dark:    #4f46e5;
+    --accent-light:   #e0e7ff;
+    --gradient-start: #059669;
+    --gradient-end:   #0d9488;          /* emerald→teal gradient */
+    --sidebar-bg:     #020c08;          /* near-black teal-black */
     --sidebar-hover:  #071a10;
-    --sidebar-active: #3ecf8e;
-    /* Surfaces */
-    --body-bg:        #0c1510;
-    --surface:        #131f17;
-    --surface-alt:    #101a13;
-    --surface-hover:  #1a2d20;
-    /* Borders */
-    --border:         #1e3328;
-    --border-strong:  #2a4a37;
-    /* Text */
-    --text-primary:   #ecfdf5;
-    --text-secondary: #71b790;
-    --text-muted:     #4a8060;
-    --text-inverse:   #061008;
-    /* Shadows */
-    --shadow:         0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
-    --shadow-sm:      0 1px 2px rgba(0,0,0,0.35);
-    --shadow-md:      0 4px 12px rgba(0,0,0,0.5);
-    --shadow-lg:      0 10px 30px rgba(0,0,0,0.6);
+    --sidebar-active: #059669;
+    /* WHITE content surfaces */
+    --body-bg:        #f0fdf9;
+    --surface:        #ffffff;
+    --surface-alt:    #f0fdf4;
+    --surface-hover:  #dcfce7;
+    --border:         #e2e8f0;
+    --border-strong:  #cbd5e1;
+    --text-primary:   #1e293b;
+    --text-secondary: #475569;
+    --text-muted:     #94a3b8;
+    --text-inverse:   #ffffff;
+    --shadow:         0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-sm:      0 1px 2px rgba(0,0,0,0.05);
+    --shadow-md:      0 4px 12px rgba(0,0,0,0.08);
+    --shadow-lg:      0 10px 30px rgba(0,0,0,0.12);
 }
 
 /* ── LINKS ────────────────────────────────────── */
@@ -858,40 +868,25 @@ td .text-warning, td .text-info,
 }
 .vc-color-dot:hover { transform: scale(1.1); }
 
-/* Default theme is indigo (no data-theme needed).
-   [data-theme="indigo"] is an explicit alias.
-   Light themes also define --body-bg so switching
-   presets changes the page background tint too. */
+/* ────────────────────────────────────────────────────
+   ☀ INDIGO — default (also explicit alias).
+   Complementary accent: amber-gold (indigo ↔ amber)
+   Sidebar: deep indigo-black (not generic dark navy)
+   ──────────────────────────────────────────────────── */
 [data-theme="indigo"] {
     --primary:        #4f46e5;
     --primary-dark:   #4338ca;
     --primary-light:  #e0e7ff;
     --primary-rgb:    79, 70, 229;
-    --accent:         #7c3aed;
-    --accent-dark:    #6d28d9;
-    --accent-light:   #ede9fe;
+    --accent:         #f59e0b;          /* amber-gold — warm complement to cool indigo */
+    --accent-dark:    #d97706;
+    --accent-light:   #fef3c7;
     --gradient-start: #4f46e5;
-    --gradient-end:   #7c3aed;
-    --sidebar-bg:     #0f172a;
-    --sidebar-hover:  #1e293b;
+    --gradient-end:   #7c3aed;          /* indigo→violet for gradient */
+    --sidebar-bg:     #1e1b4b;          /* deep indigo-black (thematic, not generic) */
+    --sidebar-hover:  #312e81;
     --sidebar-active: #4f46e5;
-    --body-bg:        #f0f2ff;   /* subtle indigo tint */
+    --body-bg:        #f0f2ff;
     --surface-alt:    #eef0ff;
-}
-
-/* ── Light theme background tints ───────────────── */
-[data-theme="azure"]  {
-    --body-bg:        #f0f4fb;
-    --surface-alt:    #e8f0fa;
-    --surface-hover:  #dde8f5;
-}
-[data-theme="sage"]   {
-    --body-bg:        #f0faf4;
-    --surface-alt:    #e8f6ed;
-    --surface-hover:  #daf0e2;
-}
-[data-theme="khata"]  {
-    --body-bg:        #fff8f6;
-    --surface-alt:    #fff1ee;
-    --surface-hover:  #ffe6e1;
+    --surface-hover:  #e0e3ff;
 }
