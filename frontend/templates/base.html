@@ -60,6 +60,11 @@
                 html.style.setProperty('--sidebar-bg',    s);
                 html.style.setProperty('--sidebar-hover', shade(s, 12));
             }
+            /* Set gradient-primary directly using restored values */
+            if(p && a && /^#[0-9a-fA-F]{6}$/.test(p) && /^#[0-9a-fA-F]{6}$/.test(a)){
+                html.style.setProperty('--gradient-primary',
+                    'linear-gradient(135deg,' + p + ',' + a + ')');
+            }
         } else if(saved && saved !== 'indigo'){
             html.setAttribute('data-theme', saved);
         }
@@ -226,7 +231,7 @@
 
                 <!-- Back to Dashboard link (outside chip) -->
                 <a href="{{ url_for('establishment.deselect_establishment') }}"
-                   style="display: inline-block; margin-top: 6px; font-size: 0.68rem; color: #a5b4fc; text-decoration: none; padding-left:2px;">
+                   style="display: inline-block; margin-top: 6px; font-size: 0.68rem; color: rgba(var(--primary-rgb),0.65); text-decoration: none; padding-left:2px;">
                     <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
                 </a>
             </div>
@@ -341,21 +346,18 @@
                 <span>Accounts</span>
             </a>
             <a href="{{ url_for('accounts.quick_expense') }}"
-               class="sidebar-link {% if request.endpoint == 'accounts.quick_expense' %}active{% endif %}"
-               style="color:#dc2626;">
-                <i class="bi bi-cash-stack" style="color:#dc2626;"></i>
+               class="sidebar-link link-danger {% if request.endpoint == 'accounts.quick_expense' %}active{% endif %}">
+                <i class="bi bi-cash-stack"></i>
                 <span>Quick Expense</span>
             </a>
             <a href="{{ url_for('loan.loan_home') }}"
-               class="sidebar-link {% if request.endpoint and request.endpoint.startswith('loan.') %}active{% endif %}"
-               style="color:#93c5fd;">
-                <i class="bi bi-bank" style="color:#93c5fd;"></i>
+               class="sidebar-link link-info {% if request.endpoint and request.endpoint.startswith('loan.') %}active{% endif %}">
+                <i class="bi bi-bank"></i>
                 <span>Loan Accounts</span>
             </a>
             <a href="{{ url_for('admin.staff_performance') }}"
-               class="sidebar-link {% if request.endpoint in ('admin.staff_performance', 'admin.reassign_staff_clients') %}active{% endif %}"
-               style="color:#a78bfa;">
-                <i class="bi bi-speedometer2" style="color:#a78bfa;"></i>
+               class="sidebar-link link-accent-soft {% if request.endpoint in ('admin.staff_performance', 'admin.reassign_staff_clients') %}active{% endif %}">
+                <i class="bi bi-speedometer2"></i>
                 <span>Staff Metrics</span>
                 <span class="admin-tag">ADMIN</span>
             </a>
@@ -375,75 +377,71 @@
                 <span>All Employees</span>
             </a>
 
-            <div style="margin: 15px 12px; padding: 12px; background: #f8fafc; border-radius: 8px; border: 1px dashed #cbd5e1; text-align: center;">
+            <div style="margin: 15px 12px; padding: 12px; background: var(--surface-alt); border-radius: var(--radius-sm); border: 1px dashed var(--border-strong); text-align: center;">
                 <i class="bi bi-info-circle text-primary" style="font-size: 1.2rem;"></i>
-                <p style="font-size: 0.72rem; color: #64748b; margin: 6px 0 0;">Select an establishment from Dashboard to access Payroll, Reports & Compliance</p>
+                <p style="font-size: 0.72rem; color: var(--text-muted); margin: 6px 0 0;">Select an establishment from Dashboard to access Payroll, Reports &amp; Compliance</p>
             </div>
             {% endif %}
         </div>
 
         <!-- UAN & ESIC TRACKER — All users -->
-        <div class="sidebar-section-title" style="font-size:0.6rem; color:#64748b; padding:6px 16px; text-transform:uppercase; letter-spacing:0.5px;">ENROLLMENT</div>
+        <div class="sidebar-section-title">ENROLLMENT</div>
         <a href="{{ url_for('enrollment.enrollment_home') }}"
-           class="sidebar-link {% if request.endpoint and 'enrollment' in (request.endpoint or '') %}active{% endif %}"
-           style="color:#7c3aed;">
-            <i class="bi bi-person-vcard" style="color:#7c3aed;"></i>
-            <span>UAN & ESIC Tracker</span>
+           class="sidebar-link link-accent {% if request.endpoint and 'enrollment' in (request.endpoint or '') %}active{% endif %}">
+            <i class="bi bi-person-vcard"></i>
+            <span>UAN &amp; ESIC Tracker</span>
         </a>
 
         <!-- DAILY MIS — All users (Admin + Staff) -->
-        <div class="sidebar-section-title" style="font-size:0.6rem; color:#64748b; padding:6px 16px; text-transform:uppercase; letter-spacing:0.5px;">DAILY MIS</div>
+        <div class="sidebar-section-title">DAILY MIS</div>
         <a href="{{ url_for('daily_mis.mis_home') }}"
-           class="sidebar-link {% if request.endpoint == 'daily_mis.mis_home' %}active{% endif %}"
-           style="color:#0891b2;">
-            <i class="bi bi-journal-check" style="color:#0891b2;"></i>
+           class="sidebar-link link-info {% if request.endpoint == 'daily_mis.mis_home' %}active{% endif %}">
+            <i class="bi bi-journal-check"></i>
             <span>Daily MIS</span>
         </a>
         <a href="{{ url_for('daily_mis.filing_matrix') }}"
-           class="sidebar-link {% if request.endpoint == 'daily_mis.filing_matrix' %}active{% endif %}"
-           style="color:#a78bfa;">
-            <i class="bi bi-grid-3x3-gap-fill" style="color:#a78bfa;"></i>
+           class="sidebar-link link-accent-soft {% if request.endpoint == 'daily_mis.filing_matrix' %}active{% endif %}">
+            <i class="bi bi-grid-3x3-gap-fill"></i>
             <span>Filing Matrix</span>
         </a>
 
         <a href="{{ url_for('manual_reimb.mr_home') }}"
-           class="sidebar-link {% if request.endpoint and request.endpoint.startswith('manual_reimb.') %}active{% endif %}"
-           style="color:#f59e0b;">
-            <i class="bi bi-envelope-plus" style="color:#f59e0b;"></i>
+           class="sidebar-link link-warning {% if request.endpoint and request.endpoint.startswith('manual_reimb.') %}active{% endif %}">
+            <i class="bi bi-envelope-plus"></i>
             <span>Manual Reimbursement</span>
         </a>
 
         <!-- TOOLS Section — Always visible -->
-        <div class="sidebar-section-title" style="font-size:0.6rem; color:#64748b; padding:6px 16px; text-transform:uppercase; letter-spacing:0.5px;">TOOLS</div>
+        <div class="sidebar-section-title">TOOLS</div>
 
         <a href="javascript:void(0)" onclick="document.getElementById('epfCalcGlobal') && new bootstrap.Modal(document.getElementById('epfCalcGlobal')).show()"
-           class="sidebar-link" style="color:#7c3aed;">
-            <i class="bi bi-calculator-fill" style="color:#7c3aed;"></i>
+           class="sidebar-link link-accent">
+            <i class="bi bi-calculator-fill"></i>
             <span>EPF Delay Calculator</span>
         </a>
 
         <a href="javascript:void(0)" onclick="document.getElementById('compCalcModal') && (document.getElementById('compCalcModal').style.display='flex')"
-           class="sidebar-link" style="color:#059669;">
-            <i class="bi bi-clipboard2-data-fill" style="color:#059669;"></i>
+           class="sidebar-link link-success">
+            <i class="bi bi-clipboard2-data-fill"></i>
             <span>Compliance Calculator</span>
         </a>
 
         <a href="javascript:void(0)" onclick="document.getElementById('quickCalcModal') && (document.getElementById('quickCalcModal').style.display='flex')"
-           class="sidebar-link" style="color:#0891b2;">
-            <i class="bi bi-plus-slash-minus" style="color:#0891b2;"></i>
+           class="sidebar-link link-info">
+            <i class="bi bi-plus-slash-minus"></i>
             <span>Calculator</span>
         </a>
 
         <!-- REPORTS Section -->
-        <div class="sidebar-section-title" style="font-size:0.6rem; color:#64748b; padding:6px 16px; text-transform:uppercase; letter-spacing:0.5px;">REPORTS</div>
+        <div class="sidebar-section-title">REPORTS</div>
 
-        <a href="{{ url_for('establishment.client_dues') }}" class="sidebar-link" style="color:#dc2626;">
-            <i class="bi bi-exclamation-diamond-fill" style="color:#dc2626;"></i>
+        <a href="{{ url_for('establishment.client_dues') }}" class="sidebar-link link-danger">
+            <i class="bi bi-exclamation-diamond-fill"></i>
             <span>Client Dues</span>
         </a>
 
-        <a href="{{ url_for('establishment.activity_log') }}" class="sidebar-link" style="color:#6366f1;">
-            <i class="bi bi-clock-history" style="color:#6366f1;"></i>
+        <a href="{{ url_for('establishment.activity_log') }}" class="sidebar-link link-primary">
+            <i class="bi bi-clock-history"></i>
             <span>Activity Log</span>
         </a>
 
@@ -1608,13 +1606,21 @@
         }
 
         /* ─────────────────────────────────────────────────
-           Hue slider → derive primary + auto-accent
+           Hue slider → full theme: primary + accent + sidebar
+           Dragging the slider changes everything at once.
+           Individual pickers can fine-tune afterward.
            ───────────────────────────────────────────────── */
         function applyHue(hue){
-            var p  = hslHex(hue,  68, 56);   // main primary
-            var ac = hslHex((hue+25)%360, 72, 50); // accent: 25° shift
+            var p  = hslHex(hue,       68, 56);   // main primary
+            var ac = hslHex((hue+25)%360, 72, 50); // accent: 25° hue shift
+            var sb = hslHex(hue,       32,  9);   // sidebar: very dark tinted
             setPrimary(p);
             setAccent(ac);
+            setSidebar(sb);
+            /* Set gradient-primary directly in addition to gradient-start/end
+               for maximum browser compatibility */
+            html.style.setProperty('--gradient-primary',
+                'linear-gradient(135deg,' + p + ',' + ac + ')');
             saveCustom();
             showSaved();
         }
@@ -1636,6 +1642,11 @@
                 updateSwatches();
                 var curLabel = document.getElementById('vcCurrentThemeName');
                 if(curLabel) curLabel.textContent = t.label;
+                /* Also set gradient-primary directly for maximum compat */
+                var p2  = lv('--gradient-start') || t.p;
+                var ac2 = lv('--gradient-end')   || t.a;
+                html.style.setProperty('--gradient-primary',
+                    'linear-gradient(135deg,' + p2 + ',' + ac2 + ')');
             }, 30);
             showSaved();
         }
@@ -1659,8 +1670,8 @@
         function clearInline(){
             ['--primary','--primary-dark','--primary-light','--primary-rgb',
              '--accent','--accent-dark','--accent-light',
-             '--gradient-start','--gradient-end','--border-focus',
-             '--link-color','--link-hover',
+             '--gradient-start','--gradient-end','--gradient-primary',
+             '--border-focus','--link-color','--link-hover',
              '--sidebar-bg','--sidebar-hover','--sidebar-active'].forEach(function(v){
                 html.style.removeProperty(v);
             });

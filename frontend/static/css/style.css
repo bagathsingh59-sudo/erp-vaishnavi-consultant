@@ -555,6 +555,55 @@ textarea.form-control { resize: vertical; min-height: 80px; }
     color: var(--text-inverse);
 }
 
+/* ── BOOTSTRAP COMPONENT OVERRIDES ───────────────
+   Map Bootstrap's per-component CSS variables to our
+   --primary token so every Bootstrap widget updates
+   automatically when the theme colour changes.
+   ─────────────────────────────────────────────── */
+.btn-primary {
+    --bs-btn-bg:                 var(--primary);
+    --bs-btn-border-color:       var(--primary);
+    --bs-btn-hover-bg:           var(--primary-dark);
+    --bs-btn-hover-border-color: var(--primary-dark);
+    --bs-btn-active-bg:          var(--primary-dark);
+    --bs-btn-active-border-color:var(--primary-dark);
+    --bs-btn-disabled-bg:        var(--primary);
+    --bs-btn-color:              var(--text-inverse);
+}
+.btn-outline-primary {
+    --bs-btn-color:              var(--primary);
+    --bs-btn-border-color:       var(--primary);
+    --bs-btn-hover-color:        var(--text-inverse);
+    --bs-btn-hover-bg:           var(--primary);
+    --bs-btn-hover-border-color: var(--primary);
+    --bs-btn-active-color:       var(--text-inverse);
+    --bs-btn-active-bg:          var(--primary);
+    --bs-btn-active-border-color:var(--primary);
+}
+.badge.bg-primary,
+.bg-primary   { background-color: var(--primary)   !important; }
+.text-primary { color:            var(--primary)   !important; }
+.border-primary { border-color:   var(--primary)   !important; }
+
+/* ── SIDEBAR SPECIAL-LINK COLOUR CLASSES ─────────
+   Remove hardcoded inline hex from HTML; use these
+   classes + CSS vars so theme changes propagate.
+   ─────────────────────────────────────────────── */
+.sidebar-link.link-danger        { color: var(--danger)      !important; }
+.sidebar-link.link-danger  i     { color: var(--danger)      !important; }
+.sidebar-link.link-accent        { color: var(--accent)      !important; }
+.sidebar-link.link-accent  i     { color: var(--accent)      !important; }
+.sidebar-link.link-info          { color: var(--info)        !important; }
+.sidebar-link.link-info    i     { color: var(--info)        !important; }
+.sidebar-link.link-warning       { color: var(--warning)     !important; }
+.sidebar-link.link-warning i     { color: var(--warning)     !important; }
+.sidebar-link.link-success       { color: var(--success)     !important; }
+.sidebar-link.link-success i     { color: var(--success)     !important; }
+.sidebar-link.link-primary       { color: var(--primary)     !important; }
+.sidebar-link.link-primary i     { color: var(--primary)     !important; }
+.sidebar-link.link-accent-soft   { color: var(--accent-light)!important; }
+.sidebar-link.link-accent-soft i { color: var(--accent-light)!important; }
+
 /* ── THEME PICKER ─────────────────────────────── */
 #themePickerBtn:hover {
     border-color: var(--primary) !important;
