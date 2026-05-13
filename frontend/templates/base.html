@@ -554,22 +554,33 @@
 
                             <!-- ── MAIN COLOUR ── -->
                             <div style="margin-bottom:13px;">
-                                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:7px;">
+                                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
                                     <div>
                                         <div style="font-size:0.62rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.08em;">Main Colour</div>
-                                        <div style="font-size:0.57rem; color:var(--text-muted); margin-top:1px;">Buttons, links, active states</div>
+                                        <div style="font-size:0.57rem; color:var(--text-muted); margin-top:1px;">Sidebar · buttons · links · headings</div>
                                     </div>
                                     <div style="display:flex; align-items:center; gap:5px;">
-                                        <div id="vcPrimaryPreview" class="vc-color-dot" onclick="document.getElementById('vcPrimaryPicker').click()" style="background:var(--primary);" title="Click to pick"></div>
+                                        <div id="vcPrimaryPreview" class="vc-color-dot" onclick="document.getElementById('vcPrimaryPicker').click()" style="background:var(--primary);" title="Click to pick colour"></div>
                                         <input type="color" id="vcPrimaryPicker" style="width:0;height:0;opacity:0;position:absolute;pointer-events:none;">
                                         <input type="text" id="vcPrimaryHex" class="vc-hex-input" maxlength="7" placeholder="#4f46e5">
                                     </div>
                                 </div>
-                                <!-- Hue slider (rainbow gradient) -->
-                                <div style="display:flex; align-items:center; gap:7px; margin-bottom:3px;">
-                                    <span style="font-size:0.57rem; color:var(--text-muted); white-space:nowrap;">Hue</span>
-                                    <input type="range" id="vcHueSlider" class="vc-hue-slider" min="0" max="359" value="240">
-                                    <span id="vcHueVal" style="font-size:0.6rem; font-weight:700; color:var(--primary); min-width:26px; text-align:right;">240°</span>
+
+                                <!-- Hue slider — thumb ring matches current --primary -->
+                                <div style="display:flex; align-items:center; gap:7px;">
+                                    <span style="font-size:0.57rem; color:var(--text-muted); white-space:nowrap; font-weight:600;">Hue</span>
+                                    <input type="range" id="vcHueSlider" class="vc-hue-slider" min="0" max="359" value="240" style="flex:1;">
+                                    <span id="vcHueVal" style="font-size:0.62rem; font-weight:700; color:var(--primary); min-width:28px; text-align:right; font-family:var(--font-mono);">240°</span>
+                                </div>
+
+                                <!-- Live colour preview strip: primary / accent / sidebar -->
+                                <div class="vc-preview-strip" style="margin-top:8px;">
+                                    <div id="vcPreviewPrimary" style="flex:2; background:var(--primary);"></div>
+                                    <div id="vcPreviewAccent"  style="flex:1.5; background:var(--accent);"></div>
+                                    <div id="vcPreviewSidebar" style="flex:1; background:var(--sidebar-bg);"></div>
+                                </div>
+                                <div class="vc-preview-labels">
+                                    <span>Primary</span><span>Accent</span><span>Sidebar</span>
                                 </div>
                             </div>
 
@@ -1606,23 +1617,35 @@
         }
 
         /* ─────────────────────────────────────────────────
-           Hue slider → full theme: primary + accent + sidebar
-           Dragging the slider changes everything at once.
-           Individual pickers can fine-tune afterward.
+           Hue slider → full theme: primary + accent + sidebar.
+           One drag = everything changes (blocks, sidebar,
+           buttons, links, section titles, badge accents).
+           Individual pickers can fine-tune each channel.
            ───────────────────────────────────────────────── */
         function applyHue(hue){
-            var p  = hslHex(hue,       68, 56);   // main primary
-            var ac = hslHex((hue+25)%360, 72, 50); // accent: 25° hue shift
-            var sb = hslHex(hue,       32,  9);   // sidebar: very dark tinted
+            var p  = hslHex(hue,           68, 56); // primary
+            var ac = hslHex((hue+25)%360,  72, 50); // accent (25° shift)
+            var sb = hslHex(hue,           32,  9); // sidebar (very dark tinted)
             setPrimary(p);
             setAccent(ac);
             setSidebar(sb);
-            /* Set gradient-primary directly in addition to gradient-start/end
-               for maximum browser compatibility */
+            /* Set --gradient-primary directly for max compat */
             html.style.setProperty('--gradient-primary',
                 'linear-gradient(135deg,' + p + ',' + ac + ')');
+            /* Update live preview strips */
+            syncPreviewStrips(p, ac, sb);
             saveCustom();
             showSaved();
+        }
+
+        /* Update the three preview colour bars under the hue slider */
+        function syncPreviewStrips(p, ac, sb){
+            var pp = document.getElementById('vcPreviewPrimary');
+            var pa = document.getElementById('vcPreviewAccent');
+            var ps = document.getElementById('vcPreviewSidebar');
+            if(pp) pp.style.background = p  || lv('--primary')    || '#4f46e5';
+            if(pa) pa.style.background = ac || lv('--accent')     || '#7c3aed';
+            if(ps) ps.style.background = sb || lv('--sidebar-bg') || '#0f172a';
         }
 
         /* ─────────────────────────────────────────────────
@@ -1695,6 +1718,7 @@
             syncPrimaryInputs(lv('--primary') || '#4f46e5');
             syncAccentInputs(lv('--accent')   || '#7c3aed');
             syncSidebarInputs(lv('--sidebar-bg') || '#0f172a');
+            syncPreviewStrips(null, null, null);
         }
         function syncPrimaryInputs(hex){
             var dot   = document.getElementById('vcPrimaryPreview');
