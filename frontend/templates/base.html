@@ -369,7 +369,7 @@
                 <span>Loan Accounts</span>
             </a>
             <a href="{{ url_for('admin.staff_performance') }}"
-               class="sidebar-link link-accent-soft {% if request.endpoint in ('admin.staff_performance', 'admin.reassign_staff_clients') %}active{% endif %}">
+               class="sidebar-link link-accent-soft {% if request.endpoint in ('admin.staff_performance', 'admin.staff_performance_drill', 'admin.reassign_staff_clients') %}active{% endif %}">
                 <i class="bi bi-speedometer2"></i>
                 <span>Staff Metrics</span>
                 <span class="admin-tag">ADMIN</span>

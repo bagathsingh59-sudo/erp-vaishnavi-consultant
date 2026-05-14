@@ -1,184 +1,462 @@
 {% extends "base.html" %}
-{% block title %}Staff Performance — Admin{% endblock %}
+{% block title %}Staff Performance Dashboard — Vaishnavi Consultant{% endblock %}
 {% block page_header %}Staff Performance Dashboard{% endblock %}
 
 {% block content %}
 <style>
+@media print {
+    body { font-size: 9px; }
+    .sp-page { box-shadow:none !important; border:none !important; }
+    .no-print { display:none !important; }
+}
+
+/* ── Page shell ── */
+.sp-page {
+    background:#fff; border:1px solid #e2e8f0; border-radius:10px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.06); overflow:hidden;
+}
+
+/* ── Hero ── */
 .sp-hero {
-    background: linear-gradient(135deg, #0f172a 0%, #312e81 100%);
-    color: #fff; padding: 22px 28px; border-radius: 10px 10px 0 0;
-    border-bottom: 3px solid #fbbf24;
+    background:linear-gradient(135deg,#0f172a 0%,#1e293b 60%,#312e81 100%);
+    color:#fff; padding:24px 28px; border-bottom:3px solid #fbbf24;
 }
-.sp-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 16px; }
+.sp-hero-label  { font-size:0.62rem; letter-spacing:2px; text-transform:uppercase; opacity:0.7; font-weight:700; }
+.sp-hero-title  { font-size:1.3rem; font-weight:800; margin-top:4px; }
+.sp-hero-period { font-size:0.72rem; opacity:0.7; margin-top:2px; }
+
+.sp-stats { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-top:18px; }
 .sp-stat {
-    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 8px; padding: 12px 14px;
+    background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15);
+    border-radius:10px; padding:12px 14px;
 }
-.sp-stat-label { font-size: 0.6rem; letter-spacing: 1px; text-transform: uppercase; opacity: 0.7; font-weight: 700; }
-.sp-stat-value { font-size: 1.4rem; font-weight: 800; margin-top: 4px; }
+.sp-stat-label { font-size:0.55rem; letter-spacing:1px; text-transform:uppercase; opacity:0.7; font-weight:700; }
+.sp-stat-value { font-size:1.45rem; font-weight:800; margin-top:4px; letter-spacing:-0.5px; }
+.sp-stat-desc  { font-size:0.58rem; opacity:0.65; margin-top:2px; }
+.sp-stat.s1 { border-left:3px solid #60a5fa; }
+.sp-stat.s2 { border-left:3px solid #34d399; }
+.sp-stat.s3 { border-left:3px solid #fbbf24; }
+.sp-stat.s4 { border-left:3px solid #f87171; }
+.sp-stat.s5 { border-left:3px solid #a78bfa; }
 
-.sp-staff-card {
-    background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
-    margin-bottom: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+/* ── Filter bar ── */
+.sp-filter-bar {
+    background:#f8fafc; padding:14px 20px; border-bottom:1px solid #e2e8f0;
+    display:flex; gap:12px; flex-wrap:wrap; align-items:center;
 }
-.sp-staff-header {
-    padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;
-    border-bottom: 1px solid #f1f5f9; flex-wrap: wrap; gap: 10px;
+.sp-quick-btn {
+    font-size:0.65rem; padding:4px 10px; border:1px solid #e2e8f0;
+    background:#fff; border-radius:6px; color:#475569; font-weight:600; cursor:pointer;
 }
-.sp-staff-name { font-size: 1rem; font-weight: 700; color: #1e293b; }
-.sp-staff-role { font-size: 0.65rem; padding: 2px 8px; border-radius: 10px; background: #e0e7ff; color: #4338ca; margin-left: 6px; }
-.sp-staff-role.admin { background: #fee2e2; color: #991b1b; }
+.sp-quick-btn:hover { background:#eef2ff; border-color:#4338ca; color:#4338ca; }
 
+/* ── Table ── */
+.sp-table-wrap { padding:14px 16px; overflow-x:auto; }
+.sp-table {
+    width:100%; border-collapse:separate; border-spacing:0;
+    font-size:0.72rem; min-width:900px;
+}
+.sp-table thead th {
+    background:#1e293b; color:#f1f5f9; padding:9px 10px;
+    font-size:0.6rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:0.3px; text-align:center; border-right:1px solid #334155;
+}
+.sp-table thead th.left { text-align:left; }
+.sp-table tbody td {
+    padding:9px 10px; border-bottom:1px solid #f1f5f9; border-right:1px solid #f1f5f9;
+    text-align:center; font-weight:600; color:#1e293b; vertical-align:middle;
+}
+.sp-table tbody td.left { text-align:left; }
+.sp-table tbody tr:hover td { background:#f8fafc; cursor:pointer; }
+.sp-table tfoot td {
+    padding:9px 10px; background:#f1f5f9; font-weight:700; font-size:0.7rem;
+    border-top:2px solid #1e293b; text-align:center;
+}
+.sp-table tfoot td.left { text-align:left; background:#1e293b; color:#fff; }
+
+/* ── Name cell ── */
+.sp-name { font-size:0.8rem; font-weight:700; color:#1e293b; }
+.sp-role-tag {
+    font-size:0.55rem; padding:2px 7px; border-radius:10px; font-weight:700;
+    background:#e0e7ff; color:#4338ca; margin-left:6px;
+}
+.sp-role-tag.admin { background:#fee2e2; color:#991b1b; }
+
+/* ── Progress bar ── */
+.sp-prog-wrap { display:flex; align-items:center; gap:6px; justify-content:center; }
+.sp-prog-bar  { flex:1; height:7px; background:#e2e8f0; border-radius:4px; min-width:50px; overflow:hidden; }
+.sp-prog-fill { height:100%; border-radius:4px; }
+.sp-prog-pct  { font-size:0.72rem; font-weight:800; min-width:34px; text-align:right; }
+
+/* ── Grade badge ── */
 .sp-grade {
-    padding: 4px 14px; border-radius: 20px; font-size: 0.65rem;
-    font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;
-    background: #fff;
+    display:inline-block; padding:3px 10px; border-radius:12px;
+    font-size:0.6rem; font-weight:800; text-transform:uppercase; letter-spacing:0.4px;
 }
 
-.sp-metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; padding: 16px 20px; }
-.sp-metric { border-left: 3px solid #e2e8f0; padding-left: 10px; }
-.sp-metric-label { font-size: 0.58rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
-.sp-metric-value { font-size: 1.2rem; font-weight: 800; color: #1e293b; margin-top: 2px; }
-.sp-metric-sub { font-size: 0.6rem; color: #94a3b8; margin-top: 1px; }
-
-.sp-metric.clients { border-left-color: #4338ca; }
-.sp-metric.filed { border-left-color: #16a34a; }
-.sp-metric.pending { border-left-color: #f59e0b; }
-.sp-metric.compliance { border-left-color: #7c3aed; }
-.sp-metric.fees { border-left-color: #059669; }
-
-.sp-footer {
-    padding: 12px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0;
-    display: flex; justify-content: space-between; align-items: center;
+/* ── Drill link ── */
+.sp-drill-btn {
+    font-size:0.65rem; padding:3px 9px; border-radius:6px;
+    background:#eef2ff; color:#4338ca; border:1px solid #c7d2fe;
+    font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px;
 }
+.sp-drill-btn:hover { background:#4338ca; color:#fff; }
+
+/* ── Amount colours ── */
+.c-short  { color:#dc2626; }
+.c-excess { color:#059669; }
+.c-muted  { color:#94a3b8; font-size:0.65rem; }
+.c-warn   { color:#f59e0b; }
 </style>
 
-<div class="sp-hero">
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;">
-        <div>
-            <div style="font-size: 0.6rem; letter-spacing: 2px; text-transform: uppercase; opacity: 0.7; font-weight: 700;">Admin Monitoring</div>
-            <div style="font-size: 1.35rem; font-weight: 800; margin-top: 2px;">Staff Performance Dashboard</div>
-            <div style="font-size: 0.7rem; opacity: 0.7; margin-top: 2px;">
-                <i class="bi bi-calendar-range me-1"></i>FY {{ fy_label }}
-            </div>
-        </div>
+<!-- Action bar -->
+<div class="no-print d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('daily_mis.mis_home') }}" class="btn btn-sm btn-outline-secondary" style="font-size:0.72rem;">
+            <i class="bi bi-arrow-left me-1"></i>Daily MIS
+        </a>
+        <a href="{{ url_for('daily_mis.filing_matrix') }}" class="btn btn-sm btn-outline-primary" style="font-size:0.72rem;">
+            <i class="bi bi-grid-3x3-gap me-1"></i>Filing Matrix
+        </a>
     </div>
-
-    <div class="sp-stats">
-        <div class="sp-stat">
-            <div class="sp-stat-label"><i class="bi bi-people me-1"></i>Total Staff</div>
-            <div class="sp-stat-value">{{ total_staff }}</div>
-        </div>
-        <div class="sp-stat">
-            <div class="sp-stat-label"><i class="bi bi-building me-1"></i>Active Clients</div>
-            <div class="sp-stat-value">{{ total_active_est }}</div>
-        </div>
-        <div class="sp-stat">
-            <div class="sp-stat-label"><i class="bi bi-question-circle me-1"></i>Unassigned</div>
-            <div class="sp-stat-value" style="color:{% if unassigned_count > 0 %}#fca5a5{% else %}#86efac{% endif %};">
-                {{ unassigned_count }}
-            </div>
-        </div>
-        <div class="sp-stat">
-            <div class="sp-stat-label"><i class="bi bi-calculator me-1"></i>Avg per Staff</div>
-            <div class="sp-stat-value">
-                {% if total_staff > 0 %}{{ (total_active_est / total_staff)|round|int }}{% else %}0{% endif %}
-            </div>
-        </div>
-    </div>
+    <button onclick="window.print()" class="btn btn-sm btn-primary" style="font-size:0.72rem;">
+        <i class="bi bi-printer me-1"></i>Print
+    </button>
 </div>
 
-<!-- Staff Cards -->
-<div style="margin-top: 16px;">
-    {% for m in staff_metrics %}
-    <div class="sp-staff-card">
-        <div class="sp-staff-header">
+<div class="sp-page">
+
+    <!-- ── Hero ── -->
+    <div class="sp-hero">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
             <div>
-                <span class="sp-staff-name">
-                    <i class="bi bi-person-circle me-1" style="color:#4338ca;"></i>
-                    {{ m.user.name or m.user.email or 'Unknown' }}
-                </span>
-                <span class="sp-staff-role {% if m.user.role == 'admin' %}admin{% endif %}">{{ m.user.role|upper }}</span>
+                <div class="sp-hero-label">Admin Monitoring</div>
+                <div class="sp-hero-title">Staff Performance Dashboard</div>
+                <div class="sp-hero-period"><i class="bi bi-calendar-range me-1"></i>{{ period_label }}</div>
             </div>
-            <div style="display:flex; gap:8px; align-items:center;">
-                <span class="sp-grade" style="background:{{ m.grade_color }}22; color:{{ m.grade_color }}; border:1px solid {{ m.grade_color }};">
-                    {% if m.grade == 'excellent' %}⭐ {% elif m.grade == 'moderate' %}⚠️ {% elif m.grade == 'attention' %}🔴 {% endif %}
-                    {{ m.grade_label }}
-                </span>
-                {% if m.est_count > 0 %}
-                <a href="{{ url_for('admin.reassign_staff_clients', clerk_user_id=m.user.clerk_user_id) }}"
-                   class="btn btn-sm btn-outline-primary" style="font-size:0.68rem;">
-                    <i class="bi bi-arrow-left-right me-1"></i>Reassign
-                </a>
-                {% endif %}
-            </div>
-        </div>
-
-        <div class="sp-metrics">
-            <div class="sp-metric clients">
-                <div class="sp-metric-label">Assigned Clients</div>
-                <div class="sp-metric-value">{{ m.est_count }}</div>
-                <div class="sp-metric-sub">establishments</div>
-            </div>
-            <div class="sp-metric filed">
-                <div class="sp-metric-label">Fully Compliant</div>
-                <div class="sp-metric-value" style="color:#16a34a;">{{ m.fully_filed }}</div>
-                <div class="sp-metric-sub">≥9 months filed</div>
-            </div>
-            <div class="sp-metric pending">
-                <div class="sp-metric-label">Partial / Pending</div>
-                <div class="sp-metric-value" style="color:#f59e0b;">{{ m.partial_filed + m.not_filed }}</div>
-                <div class="sp-metric-sub">{{ m.partial_filed }} partial + {{ m.not_filed }} none</div>
-            </div>
-            <div class="sp-metric compliance">
-                <div class="sp-metric-label">Compliance %</div>
-                <div class="sp-metric-value" style="color:{{ m.grade_color }};">
-                    {% if m.compliance_pct is not none %}{{ m.compliance_pct }}%{% else %}—{% endif %}
+            <div style="text-align:right;">
+                <div class="sp-hero-label">Office Performance</div>
+                <div style="font-size:2.2rem; font-weight:800; letter-spacing:-1px; margin-top:4px;
+                    {% if office_pct >= 90 %}color:#86efac;
+                    {% elif office_pct >= 75 %}color:#bef264;
+                    {% elif office_pct >= 50 %}color:#fbbf24;
+                    {% else %}color:#fca5a5;{% endif %}">
+                    {{ office_pct }}%
                 </div>
-                <div class="sp-metric-sub">full-filed / total</div>
-            </div>
-            <div class="sp-metric fees">
-                <div class="sp-metric-label">Fees Collected FY</div>
-                <div class="sp-metric-value" style="color:#059669;">₹ {{ "{:,.0f}".format(m.fees_collected) }}</div>
-                <div class="sp-metric-sub">Avg ₹{{ "{:,.0f}".format(m.avg_per_client) }}/client</div>
+                <div style="font-size:0.6rem; opacity:0.75;">Combined across {{ total_staff }} staff · {{ total_active_est }} clients</div>
             </div>
         </div>
 
-        {% if m.est_count == 0 %}
-        <div class="sp-footer">
-            <span style="font-size: 0.72rem; color: #94a3b8;">
-                <i class="bi bi-info-circle me-1"></i>No clients assigned yet.
-            </span>
+        <div class="sp-stats">
+            <div class="sp-stat s1">
+                <div class="sp-stat-label"><i class="bi bi-people me-1"></i>Total Staff</div>
+                <div class="sp-stat-value">{{ total_staff }}</div>
+                <div class="sp-stat-desc">Active users</div>
+            </div>
+            <div class="sp-stat s2">
+                <div class="sp-stat-label"><i class="bi bi-building me-1"></i>Active Clients</div>
+                <div class="sp-stat-value">{{ total_active_est }}</div>
+                <div class="sp-stat-desc">
+                    {% if unassigned_count > 0 %}
+                    <span style="color:#fca5a5;">⚠ {{ unassigned_count }} unassigned</span>
+                    {% else %}All assigned{% endif %}
+                </div>
+            </div>
+            <div class="sp-stat s3">
+                <div class="sp-stat-label"><i class="bi bi-currency-rupee me-1"></i>Fee Due (Period)</div>
+                <div class="sp-stat-value">₹{{ "{:,.0f}".format(office_fee_due) }}</div>
+                <div class="sp-stat-desc">Expected for {{ num_months }} month{{ 's' if num_months != 1 }}</div>
+            </div>
+            <div class="sp-stat s4">
+                <div class="sp-stat-label"><i class="bi bi-cash-coin me-1"></i>Fee Received</div>
+                <div class="sp-stat-value">₹{{ "{:,.0f}".format(office_fee_received) }}</div>
+                <div class="sp-stat-desc">
+                    {% set gap = office_fee_due - office_fee_received %}
+                    {% if gap > 0 %}<span style="color:#fca5a5;">Short ₹{{ "{:,.0f}".format(gap) }}</span>
+                    {% elif gap < 0 %}<span style="color:#86efac;">Excess ₹{{ "{:,.0f}".format(-gap) }}</span>
+                    {% else %}Settled{% endif %}
+                </div>
+            </div>
+            <div class="sp-stat s5">
+                <div class="sp-stat-label"><i class="bi bi-calendar-check me-1"></i>Period</div>
+                <div class="sp-stat-value">{{ num_months }}</div>
+                <div class="sp-stat-desc">Month{{ 's' if num_months != 1 }} selected</div>
+            </div>
         </div>
-        {% endif %}
     </div>
-    {% endfor %}
 
-    {% if not staff_metrics %}
-    <div style="text-align:center; padding:40px; color:#94a3b8;">
-        No active staff users found.
+    <!-- ── Filter bar ── -->
+    <div class="sp-filter-bar no-print">
+        <form method="get" class="d-flex gap-2 align-items-center flex-wrap" id="filterForm">
+            <label style="font-size:0.7rem; color:#64748b; font-weight:600; margin:0;">From:</label>
+            <input type="month" name="from" id="inp_from" value="{{ from_month_str }}"
+                   class="form-control form-control-sm" style="font-size:0.72rem; width:auto;">
+            <label style="font-size:0.7rem; color:#64748b; font-weight:600; margin:0;">To:</label>
+            <input type="month" name="to" id="inp_to" value="{{ to_month_str }}"
+                   class="form-control form-control-sm" style="font-size:0.72rem; width:auto;">
+            <button type="submit" class="btn btn-sm btn-primary" style="font-size:0.72rem;">
+                <i class="bi bi-funnel me-1"></i>Apply
+            </button>
+        </form>
+        <div class="d-flex gap-2 ms-auto">
+            <button type="button" class="sp-quick-btn" onclick="setRange('fy_current')">Current FY</button>
+            <button type="button" class="sp-quick-btn" onclick="setRange('fy_previous')">Previous FY</button>
+            <button type="button" class="sp-quick-btn" onclick="setRange('q_current')">Current Qtr</button>
+            <button type="button" class="sp-quick-btn" onclick="setRange('last_6')">Last 6 Months</button>
+        </div>
+    </div>
+
+    <!-- ── Legend ── -->
+    <div style="padding:10px 20px; background:#fafbfd; border-bottom:1px solid #e2e8f0;
+                display:flex; gap:16px; flex-wrap:wrap; font-size:0.65rem; color:#475569; align-items:center;">
+        <span style="display:inline-flex; align-items:center; gap:5px;">
+            <span style="width:12px;height:12px;border-radius:50%;background:#16a34a;display:inline-block;"></span>Excellent ≥90%
+        </span>
+        <span style="display:inline-flex; align-items:center; gap:5px;">
+            <span style="width:12px;height:12px;border-radius:50%;background:#65a30d;display:inline-block;"></span>Good 75–89%
+        </span>
+        <span style="display:inline-flex; align-items:center; gap:5px;">
+            <span style="width:12px;height:12px;border-radius:50%;background:#f59e0b;display:inline-block;"></span>Average 50–74%
+        </span>
+        <span style="display:inline-flex; align-items:center; gap:5px;">
+            <span style="width:12px;height:12px;border-radius:50%;background:#dc2626;display:inline-block;"></span>Needs Attention &lt;50%
+        </span>
+        <span style="margin-left:auto; font-size:0.62rem; color:#94a3b8;">
+            <i class="bi bi-info-circle me-1"></i>Sorted lowest % first · Click any row to drill down · Task = (establishment × month) where PF/ESIC code exists
+        </span>
+    </div>
+
+    <!-- ── Main table ── -->
+    <div class="sp-table-wrap">
+        <table class="sp-table">
+            <thead>
+                <tr>
+                    <th class="left" style="min-width:180px;">Staff Member</th>
+                    <th>Clients</th>
+                    <th>Tasks<br><span style="font-size:0.5rem; opacity:0.7;">Est × Months</span></th>
+                    <th>Completed</th>
+                    <th>Pending</th>
+                    <th style="min-width:160px;">Performance %</th>
+                    <th>Fee Due</th>
+                    <th>Received</th>
+                    <th>Short</th>
+                    <th>Excess</th>
+                    <th>Accts<br><span style="font-size:0.5rem; opacity:0.7;">Not Updated</span></th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in staff_metrics %}
+                <tr onclick="window.location='{{ url_for('admin.staff_performance_drill', clerk_user_id=m.user.clerk_user_id) }}?from={{ from_month_str }}&to={{ to_month_str }}'">
+                    <td class="left">
+                        <div class="sp-name">
+                            <i class="bi bi-person-circle me-1" style="color:#4338ca;"></i>
+                            {{ m.user.name or m.user.email or 'Unknown' }}
+                        </div>
+                        <span class="sp-role-tag {% if m.user.role == 'admin' %}admin{% endif %}">
+                            {{ m.user.role|upper }}
+                        </span>
+                    </td>
+                    <td>
+                        <span style="font-size:0.9rem; font-weight:800; color:#1e293b;">{{ m.est_count }}</span>
+                    </td>
+                    <td>
+                        {% if m.total_tasks > 0 %}
+                        <span style="font-size:0.78rem;">{{ m.total_tasks }}</span>
+                        {% else %}<span class="c-muted">—</span>{% endif %}
+                    </td>
+                    <td>
+                        <span style="color:#16a34a; font-weight:700;">{{ m.completed_tasks }}</span>
+                    </td>
+                    <td>
+                        <span style="color:{% if m.pending_tasks > 0 %}#dc2626{% else %}#16a34a{% endif %}; font-weight:700;">
+                            {{ m.pending_tasks }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if m.perf_pct is not none %}
+                        <div class="sp-prog-wrap">
+                            <div class="sp-prog-bar">
+                                <div class="sp-prog-fill"
+                                     style="width:{{ m.perf_pct }}%; background:{{ m.grade_color }};"></div>
+                            </div>
+                            <span class="sp-prog-pct" style="color:{{ m.grade_color }};">{{ m.perf_pct }}%</span>
+                        </div>
+                        <div style="text-align:center; margin-top:3px;">
+                            <span class="sp-grade"
+                                  style="background:{{ m.grade_color }}22; color:{{ m.grade_color }}; border:1px solid {{ m.grade_color }}55;">
+                                {{ m.grade_label }}
+                            </span>
+                        </div>
+                        {% else %}
+                        <span class="c-muted">No tasks</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if m.fee_due > 0 %}
+                        <span style="font-weight:700;">₹{{ "{:,.0f}".format(m.fee_due) }}</span>
+                        {% else %}<span class="c-muted">—</span>{% endif %}
+                    </td>
+                    <td>
+                        {% if m.fee_received > 0 %}
+                        <span style="color:#059669; font-weight:700;">₹{{ "{:,.0f}".format(m.fee_received) }}</span>
+                        {% else %}<span class="c-muted">—</span>{% endif %}
+                    </td>
+                    <td>
+                        {% if m.short > 0 %}
+                        <span class="c-short">₹{{ "{:,.0f}".format(m.short) }}</span>
+                        {% else %}<span class="c-muted">—</span>{% endif %}
+                    </td>
+                    <td>
+                        {% if m.excess > 0 %}
+                        <span class="c-excess">₹{{ "{:,.0f}".format(m.excess) }}</span>
+                        {% else %}<span class="c-muted">—</span>{% endif %}
+                    </td>
+                    <td>
+                        {% if m.not_updated > 0 %}
+                        <span class="c-warn" title="{{ m.not_updated }} establishment(s) have no account entries in this period">
+                            ⚠ {{ m.not_updated }}
+                        </span>
+                        {% else %}
+                        <span style="color:#16a34a; font-size:0.72rem;">✓ All</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a class="sp-drill-btn"
+                           href="{{ url_for('admin.staff_performance_drill', clerk_user_id=m.user.clerk_user_id) }}?from={{ from_month_str }}&to={{ to_month_str }}"
+                           onclick="event.stopPropagation()">
+                            <i class="bi bi-zoom-in"></i>Detail
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+
+                {% if not staff_metrics %}
+                <tr>
+                    <td colspan="12" style="text-align:center; padding:30px; color:#94a3b8;">
+                        <i class="bi bi-people" style="font-size:1.5rem;"></i><br>
+                        No active staff found.
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+
+            {% if staff_metrics %}
+            <tfoot>
+                <tr>
+                    <td class="left"><i class="bi bi-calculator me-1"></i>OFFICE TOTAL</td>
+                    <td>{{ total_active_est }}</td>
+                    <td>{{ staff_metrics|sum(attribute='total_tasks') }}</td>
+                    <td style="color:#86efac;">{{ staff_metrics|sum(attribute='completed_tasks') }}</td>
+                    <td style="color:#fca5a5;">{{ staff_metrics|sum(attribute='pending_tasks') }}</td>
+                    <td>
+                        <span style="font-size:0.85rem; font-weight:800;
+                            {% if office_pct >= 90 %}color:#16a34a;
+                            {% elif office_pct >= 75 %}color:#65a30d;
+                            {% elif office_pct >= 50 %}color:#f59e0b;
+                            {% else %}color:#dc2626;{% endif %}">
+                            {{ office_pct }}%
+                        </span>
+                    </td>
+                    <td>₹{{ "{:,.0f}".format(office_fee_due) }}</td>
+                    <td style="color:#86efac;">₹{{ "{:,.0f}".format(office_fee_received) }}</td>
+                    <td style="color:#fca5a5;">
+                        {% set tot_short = office_fee_due - office_fee_received %}
+                        {% if tot_short > 0 %}₹{{ "{:,.0f}".format(tot_short) }}{% else %}—{% endif %}
+                    </td>
+                    <td style="color:#86efac;">
+                        {% set tot_excess = office_fee_received - office_fee_due %}
+                        {% if tot_excess > 0 %}₹{{ "{:,.0f}".format(tot_excess) }}{% else %}—{% endif %}
+                    </td>
+                    <td>—</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+
+    <!-- ── Insights ── -->
+    {% if staff_metrics %}
+    <div style="padding:16px 20px; background:#fefce8; border-top:1px solid #fde68a; font-size:0.72rem; color:#78350f; line-height:1.7;">
+        <div style="font-size:0.72rem; font-weight:700; color:#92400e; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">
+            <i class="bi bi-lightbulb me-1"></i>Strategic Insights
+        </div>
+        {% set attention_list = staff_metrics|selectattr('grade','equalto','attention')|list %}
+        {% set excellent_list = staff_metrics|selectattr('grade','equalto','excellent')|list %}
+        {% set warn_accts = staff_metrics|selectattr('not_updated','gt',0)|list %}
+
+        {% if office_pct >= 90 %}
+            <strong>Excellent!</strong> The team is at {{ office_pct }}% performance across {{ num_months }} month{{ 's' if num_months != 1 }}. Consider appreciation for top performers.
+        {% elif office_pct >= 75 %}
+            <strong>Good performance</strong> — {{ office_pct }}% across all staff.
+            {% if attention_list %}Focus on: <strong>{{ attention_list|map(attribute='user')|map(attribute='name')|join(', ') }}</strong> who need immediate attention.{% endif %}
+        {% else %}
+            <strong>⚠ Action needed.</strong> Office at {{ office_pct }}%. {{ staff_metrics|sum(attribute='pending_tasks') }} tasks still pending. Review workload distribution.
+        {% endif %}
+
+        {% if warn_accts %}
+        <br><strong>⚠ Accounts not updated</strong> for {{ warn_accts|sum(attribute='not_updated') }} establishment(s) across
+        {{ warn_accts|length }} staff — follow up to ensure fee entries are posted in accounts.
+        {% endif %}
+
+        {% if excellent_list %}
+        <br><strong>⭐ Top performers:</strong> {{ excellent_list|map(attribute='user')|map(attribute='name')|join(', ') }}
+        {% endif %}
+
+        {% if unassigned_count > 0 %}
+        <br><strong>📋 {{ unassigned_count }} establishment(s) unassigned</strong> — assign to a staff member for accountability tracking.
+        {% endif %}
     </div>
     {% endif %}
+
+    <!-- ── Footer ── -->
+    <div style="background:#f8fafc; padding:10px 20px; border-top:1px solid #e2e8f0;
+                display:flex; justify-content:space-between; font-size:0.6rem; color:#94a3b8;">
+        <span><i class="bi bi-info-circle me-1"></i>Performance % = finalized payrolls ÷ (applicable establishments × months selected). Fee received from Accounts module (Sundry Debtor credits). Click any row to view establishment-level detail.</span>
+        <span><i class="bi bi-building me-1"></i>Vaishnavi Consultant ERP</span>
+    </div>
 </div>
 
-<!-- Insights -->
-<div style="background: #fefce8; border-left: 4px solid #d97706; border-radius: 8px; padding: 16px 20px; margin-top: 20px;">
-    <div style="font-size: 0.72rem; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 0.5px;">
-        <i class="bi bi-lightbulb me-1"></i>Strategic Insights
-    </div>
-    <div style="font-size: 0.78rem; color: #78350f; margin-top: 6px; line-height: 1.7;">
-        {% if unassigned_count > 0 %}
-            <strong>⚠️ {{ unassigned_count }} establishment(s) are unassigned</strong> — please assign them to staff for accountability.<br>
-        {% endif %}
-        {% set attention_staff = staff_metrics|selectattr('grade', 'equalto', 'attention')|list %}
-        {% if attention_staff %}
-            <strong>🔴 Action needed:</strong> {{ attention_staff|length }} staff member(s) have compliance below 70%. Consider workload review or training.<br>
-        {% endif %}
-        {% set excellent_staff = staff_metrics|selectattr('grade', 'equalto', 'excellent')|list %}
-        {% if excellent_staff %}
-            <strong>⭐ Top performers:</strong>
-            {{ excellent_staff|map(attribute='user.name')|join(', ') }} — consider appreciation / incentive.<br>
-        {% endif %}
-    </div>
-</div>
+<script>
+function getWageMonth() {
+    const now = new Date();
+    let y = now.getFullYear(), m = now.getMonth() + 1;
+    m = m - 1;
+    if (m < 1) { m = 12; y = y - 1; }
+    return { year: y, month: m };
+}
+
+function setRange(preset) {
+    const now   = new Date();
+    const year  = now.getFullYear();
+    const month = now.getMonth() + 1;
+    const wage  = getWageMonth();
+    let fromY, fromM, toY, toM;
+
+    if (preset === 'fy_current') {
+        const fyStart = month >= 4 ? year : year - 1;
+        fromY = fyStart; fromM = 4;
+        toY = wage.year; toM = wage.month;
+        if (toY < fromY || (toY === fromY && toM < fromM)) { toY = fromY; toM = fromM; }
+    } else if (preset === 'fy_previous') {
+        const fyStart = month >= 4 ? year - 1 : year - 2;
+        fromY = fyStart; fromM = 4;
+        toY = fyStart + 1; toM = 3;
+    } else if (preset === 'q_current') {
+        const qStart = Math.floor((month - 1) / 3) * 3 + 1;
+        fromY = year; fromM = qStart;
+        toY = wage.year; toM = wage.month;
+        if (toY < fromY || (toY === fromY && toM < fromM)) { toY = fromY; toM = fromM; }
+    } else if (preset === 'last_6') {
+        toY = wage.year; toM = wage.month;
+        const d = new Date(toY, toM - 6, 1);
+        fromY = d.getFullYear(); fromM = d.getMonth() + 1;
+    }
+    const pad = n => n.toString().padStart(2, '0');
+    document.getElementById('inp_from').value = `${fromY}-${pad(fromM)}`;
+    document.getElementById('inp_to').value   = `${toY}-${pad(toM)}`;
+    document.getElementById('filterForm').submit();
+}
+</script>
 {% endblock %}

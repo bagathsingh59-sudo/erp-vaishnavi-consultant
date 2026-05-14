@@ -1,0 +1,510 @@
+{% extends "base.html" %}
+{% block title %}{{ staff_user.name or staff_user.email }} — Staff Detail{% endblock %}
+{% block page_header %}Staff Detail — {{ staff_user.name or staff_user.email }}{% endblock %}
+
+{% block content %}
+<style>
+@media print {
+    body { font-size: 9px; }
+    .no-print { display:none !important; }
+    .spd-page { box-shadow:none !important; border:none !important; }
+    .spd-table { font-size:7.5px !important; }
+}
+
+/* ── Page shell ── */
+.spd-page {
+    background:#fff; border:1px solid #e2e8f0; border-radius:10px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.06); overflow:hidden;
+}
+
+/* ── Hero ── */
+.spd-hero {
+    background:linear-gradient(135deg,#0f172a 0%,#1e293b 60%,#312e81 100%);
+    color:#fff; padding:24px 28px; border-bottom:3px solid #fbbf24;
+}
+.spd-hero-label  { font-size:0.62rem; letter-spacing:2px; text-transform:uppercase; opacity:0.7; font-weight:700; }
+.spd-hero-title  { font-size:1.3rem; font-weight:800; margin-top:4px; }
+.spd-hero-period { font-size:0.72rem; opacity:0.7; margin-top:2px; }
+
+.spd-stats { display:grid; grid-template-columns:repeat(6,1fr); gap:12px; margin-top:18px; }
+.spd-stat {
+    background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15);
+    border-radius:10px; padding:12px 14px;
+}
+.spd-stat-label { font-size:0.55rem; letter-spacing:1px; text-transform:uppercase; opacity:0.7; font-weight:700; }
+.spd-stat-value { font-size:1.35rem; font-weight:800; margin-top:4px; letter-spacing:-0.5px; }
+.spd-stat-desc  { font-size:0.58rem; opacity:0.65; margin-top:2px; }
+.spd-stat.s1 { border-left:3px solid #60a5fa; }
+.spd-stat.s2 { border-left:3px solid #34d399; }
+.spd-stat.s3 { border-left:3px solid #fca5a5; }
+.spd-stat.s4 { border-left:3px solid #a78bfa; }
+.spd-stat.s5 { border-left:3px solid #fbbf24; }
+.spd-stat.s6 { border-left:3px solid #f87171; }
+
+/* ── Filter bar ── */
+.spd-filter-bar {
+    background:#f8fafc; padding:14px 20px; border-bottom:1px solid #e2e8f0;
+    display:flex; gap:12px; flex-wrap:wrap; align-items:center;
+}
+.spd-quick-btn {
+    font-size:0.65rem; padding:4px 10px; border:1px solid #e2e8f0;
+    background:#fff; border-radius:6px; color:#475569; font-weight:600; cursor:pointer;
+}
+.spd-quick-btn:hover { background:#eef2ff; border-color:#4338ca; color:#4338ca; }
+
+/* ── Matrix table ── */
+.spd-table-wrap { padding:14px 16px; overflow-x:auto; }
+.spd-table {
+    width:100%; border-collapse:separate; border-spacing:0;
+    font-size:0.68rem; min-width:800px;
+}
+.spd-table thead th {
+    background:#1e293b; color:#f1f5f9; padding:8px 6px;
+    font-size:0.58rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:0.3px; text-align:center;
+    border-right:1px solid #334155; position:sticky; top:0; z-index:10;
+}
+.spd-table thead th.sticky-col {
+    left:0; z-index:20; background:#0f172a; text-align:left; padding-left:12px; min-width:220px;
+}
+.spd-table tbody td {
+    padding:5px 4px; border-bottom:1px solid #f1f5f9; border-right:1px solid #f1f5f9;
+    text-align:center; font-weight:600; color:#1e293b; vertical-align:middle;
+}
+.spd-table tbody td.sticky-col {
+    position:sticky; left:0; z-index:5; background:#fff;
+    text-align:left; padding:7px 12px; min-width:220px;
+    border-right:2px solid #e2e8f0;
+}
+.spd-table tbody tr:hover td { background:#fafbfd; }
+.spd-table tbody tr:hover td.sticky-col { background:#eef2ff; }
+
+/* ── Summary (tfoot) ── */
+.spd-summary-row td { background:#f8fafc !important; border-top:2px solid #1e293b !important; font-weight:700; }
+.spd-summary-row td.sticky-col { background:#1e293b !important; color:#fff; }
+
+/* ── Filing cells — same as filing matrix ── */
+.spd-cell {
+    width:34px; height:28px; display:inline-flex; align-items:center;
+    justify-content:center; border-radius:4px; font-weight:700; font-size:0.75rem;
+}
+.spd-cell.done { background:#dcfce7; color:#166534; border:1px solid #86efac; }
+.spd-cell.pend { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
+.spd-cell.na   { background:#f1f5f9; color:#94a3b8; border:1px solid #e2e8f0; }
+
+/* ── Client name cell ── */
+.spd-client-name  { font-weight:700; font-size:0.72rem; color:#1e293b; }
+.spd-client-codes { font-size:0.55rem; color:#94a3b8; margin-top:2px; }
+
+/* ── Compliance % cell ── */
+.spd-pct { font-weight:700; font-size:0.75rem; }
+
+/* ── Accounts status badge ── */
+.acct-badge {
+    display:inline-block; padding:2px 7px; border-radius:8px;
+    font-size:0.58rem; font-weight:700; letter-spacing:0.3px;
+}
+.acct-settled    { background:#dcfce7; color:#166534; }
+.acct-short      { background:#fee2e2; color:#991b1b; }
+.acct-excess     { background:#fef3c7; color:#92400e; }
+.acct-updated    { background:#e0e7ff; color:#3730a3; }
+.acct-not-updated{ background:#fef9c3; color:#713f12; }
+.acct-no-fee     { background:#f1f5f9; color:#94a3b8; }
+
+/* ── Progress bar (inline) ── */
+.spd-prog { display:flex; align-items:center; gap:5px; }
+.spd-prog-bar { flex:1; height:6px; background:#e2e8f0; border-radius:3px; min-width:40px; overflow:hidden; }
+.spd-prog-fill { height:100%; border-radius:3px; }
+
+/* ── Amount colours ── */
+.c-short  { color:#dc2626; font-weight:700; }
+.c-excess { color:#059669; font-weight:700; }
+.c-recv   { color:#0891b2; font-weight:700; }
+.c-muted  { color:#94a3b8; font-weight:400; font-size:0.65rem; }
+</style>
+
+<!-- Action bar -->
+<div class="no-print d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('admin.staff_performance') }}?from={{ from_month_str }}&to={{ to_month_str }}"
+           class="btn btn-sm btn-outline-secondary" style="font-size:0.72rem;">
+            <i class="bi bi-arrow-left me-1"></i>All Staff
+        </a>
+        <a href="{{ url_for('daily_mis.filing_matrix') }}" class="btn btn-sm btn-outline-primary" style="font-size:0.72rem;">
+            <i class="bi bi-grid-3x3-gap me-1"></i>Filing Matrix
+        </a>
+    </div>
+    <button onclick="window.print()" class="btn btn-sm btn-primary" style="font-size:0.72rem;">
+        <i class="bi bi-printer me-1"></i>Print
+    </button>
+</div>
+
+<div class="spd-page">
+
+    <!-- ── Hero ── -->
+    <div class="spd-hero">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+            <div>
+                <div class="spd-hero-label">Staff Detail View</div>
+                <div class="spd-hero-title">
+                    <i class="bi bi-person-circle me-2"></i>{{ staff_user.name or staff_user.email }}
+                    <span style="font-size:0.65rem; padding:3px 9px; border-radius:10px; margin-left:8px;
+                        {% if staff_user.role == 'admin' %}background:#fee2e2; color:#fca5a5;
+                        {% else %}background:#e0e7ff; color:#a5b4fc;{% endif %}">
+                        {{ staff_user.role|upper }}
+                    </span>
+                </div>
+                <div class="spd-hero-period">
+                    <i class="bi bi-calendar-range me-1"></i>{{ period_label }}
+                    &nbsp;·&nbsp; {{ num_months }} month{{ 's' if num_months != 1 }}
+                </div>
+            </div>
+            <div style="text-align:right;">
+                <div class="spd-hero-label">Performance</div>
+                {% if perf_pct is not none %}
+                <div style="font-size:2.2rem; font-weight:800; letter-spacing:-1px; margin-top:4px;
+                    color:{{ grade_color }};">{{ perf_pct }}%</div>
+                <div style="font-size:0.65rem; opacity:0.8; margin-top:2px;">
+                    <span style="background:{{ grade_color }}33; color:{{ grade_color }}; padding:2px 9px; border-radius:10px; font-weight:700;">
+                        {{ grade_label }}
+                    </span>
+                </div>
+                {% else %}
+                <div style="font-size:1.2rem; opacity:0.6; margin-top:4px;">No Tasks</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="spd-stats">
+            <div class="spd-stat s1">
+                <div class="spd-stat-label"><i class="bi bi-building me-1"></i>Clients</div>
+                <div class="spd-stat-value">{{ est_rows|length }}</div>
+                <div class="spd-stat-desc">assigned establishments</div>
+            </div>
+            <div class="spd-stat s2">
+                <div class="spd-stat-label"><i class="bi bi-check2-circle me-1"></i>Completed</div>
+                <div class="spd-stat-value" style="color:#86efac;">{{ completed_tasks }}</div>
+                <div class="spd-stat-desc">payrolls finalized</div>
+            </div>
+            <div class="spd-stat s3">
+                <div class="spd-stat-label"><i class="bi bi-clock me-1"></i>Pending</div>
+                <div class="spd-stat-value" style="color:#fca5a5;">{{ pending_tasks }}</div>
+                <div class="spd-stat-desc">filings still due</div>
+            </div>
+            <div class="spd-stat s4">
+                <div class="spd-stat-label"><i class="bi bi-currency-rupee me-1"></i>Fee Due</div>
+                <div class="spd-stat-value">₹{{ "{:,.0f}".format(total_fee_due) }}</div>
+                <div class="spd-stat-desc">for {{ num_months }} month{{ 's' if num_months != 1 }}</div>
+            </div>
+            <div class="spd-stat s5">
+                <div class="spd-stat-label"><i class="bi bi-cash-coin me-1"></i>Received</div>
+                <div class="spd-stat-value" style="color:#86efac;">₹{{ "{:,.0f}".format(total_fee_received) }}</div>
+                <div class="spd-stat-desc">from accounts</div>
+            </div>
+            <div class="spd-stat s6">
+                <div class="spd-stat-label"><i class="bi bi-exclamation-triangle me-1"></i>Accts Pending</div>
+                <div class="spd-stat-value" style="color:{% if not_updated > 0 %}#fca5a5{% else %}#86efac{% endif %};">
+                    {{ not_updated }}
+                </div>
+                <div class="spd-stat-desc">not updated in accounts</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Filter bar ── -->
+    <div class="spd-filter-bar no-print">
+        <form method="get" class="d-flex gap-2 align-items-center flex-wrap" id="filterForm">
+            <label style="font-size:0.7rem; color:#64748b; font-weight:600; margin:0;">From:</label>
+            <input type="month" name="from" id="inp_from" value="{{ from_month_str }}"
+                   class="form-control form-control-sm" style="font-size:0.72rem; width:auto;">
+            <label style="font-size:0.7rem; color:#64748b; font-weight:600; margin:0;">To:</label>
+            <input type="month" name="to" id="inp_to" value="{{ to_month_str }}"
+                   class="form-control form-control-sm" style="font-size:0.72rem; width:auto;">
+            <button type="submit" class="btn btn-sm btn-primary" style="font-size:0.72rem;">
+                <i class="bi bi-funnel me-1"></i>Apply
+            </button>
+        </form>
+        <div class="d-flex gap-2 ms-auto">
+            <button type="button" class="spd-quick-btn" onclick="setRange('fy_current')">Current FY</button>
+            <button type="button" class="spd-quick-btn" onclick="setRange('fy_previous')">Previous FY</button>
+            <button type="button" class="spd-quick-btn" onclick="setRange('q_current')">Current Qtr</button>
+            <button type="button" class="spd-quick-btn" onclick="setRange('last_6')">Last 6 Months</button>
+        </div>
+    </div>
+
+    <!-- ── Legend ── -->
+    <div style="padding:10px 20px; background:#fafbfd; border-bottom:1px solid #e2e8f0;
+                display:flex; gap:16px; flex-wrap:wrap; font-size:0.65rem; color:#475569; align-items:center;">
+        <span style="display:inline-flex;align-items:center;gap:5px;">
+            <span style="width:14px;height:14px;border-radius:3px;background:#dcfce7;border:1px solid #86efac;display:inline-block;"></span>✓ Finalized
+        </span>
+        <span style="display:inline-flex;align-items:center;gap:5px;">
+            <span style="width:14px;height:14px;border-radius:3px;background:#fee2e2;border:1px solid #fca5a5;display:inline-block;"></span>✗ Pending
+        </span>
+        <span style="display:inline-flex;align-items:center;gap:5px;">
+            <span style="width:14px;height:14px;border-radius:3px;background:#f1f5f9;border:1px solid #e2e8f0;display:inline-block;"></span>— Not Applicable
+        </span>
+        <span style="margin-left:12px; display:inline-flex; align-items:center; gap:5px;">
+            <span class="acct-badge acct-settled">Settled</span>
+            <span class="acct-badge acct-short">Short</span>
+            <span class="acct-badge acct-excess">Excess</span>
+            <span class="acct-badge acct-not-updated">⚠ Not Updated</span>
+        </span>
+        <span style="margin-left:auto; font-size:0.62rem; color:#94a3b8;">
+            <i class="bi bi-info-circle me-1"></i>Sorted by compliance % (lowest first)
+        </span>
+    </div>
+
+    <!-- ── Matrix Table ── -->
+    <div class="spd-table-wrap">
+        <table class="spd-table">
+            <thead>
+                <tr>
+                    <th class="sticky-col">Establishment</th>
+                    {% for wm in wage_months %}
+                    <th>{{ wm.strftime('%b') }}<br><span style="font-size:0.5rem;opacity:0.7;">{{ wm.strftime('%Y') }}</span></th>
+                    {% endfor %}
+                    <th style="background:#312e81; min-width:55px;">%</th>
+                    <th style="min-width:75px;">Fee Due</th>
+                    <th style="min-width:75px;">Received</th>
+                    <th style="min-width:65px;">Short</th>
+                    <th style="min-width:65px;">Excess</th>
+                    <th style="min-width:90px;">Accounts</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set sorted_rows = est_rows|sort(attribute='est_pct', reverse=False) %}
+                {% for r in sorted_rows %}
+                <tr>
+                    <td class="sticky-col">
+                        <div class="spd-client-name">{{ r.est.display_name }}</div>
+                        <div class="spd-client-codes">
+                            {% if r.has_pf %}<span style="color:#4338ca;">PF: {{ r.est.pf_code }}</span>{% endif %}
+                            {% if r.has_pf and r.has_esic %} · {% endif %}
+                            {% if r.has_esic %}<span style="color:#0891b2;">ESIC: {{ r.est.esic_code }}</span>{% endif %}
+                            {% if not r.has_pf and not r.has_esic %}<span style="color:#94a3b8;">No codes</span>{% endif %}
+                        </div>
+                    </td>
+
+                    {% for cell in r.cells %}
+                    <td>
+                        {% if cell.applicable %}
+                            {% if cell.finalized %}
+                            <span class="spd-cell done" title="{{ cell.wm.strftime('%B %Y') }} — Finalized ✓">✓</span>
+                            {% else %}
+                            <span class="spd-cell pend" title="{{ cell.wm.strftime('%B %Y') }} — Pending ✗">✗</span>
+                            {% endif %}
+                        {% else %}
+                        <span class="spd-cell na" title="{{ cell.wm.strftime('%B %Y') }} — No EPF/ESIC code">—</span>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+
+                    <!-- Compliance % -->
+                    <td>
+                        {% if r.est_pct is not none %}
+                        <div class="spd-prog" style="flex-direction:column; gap:2px;">
+                            <div class="spd-prog-bar" style="width:100%; min-width:35px;">
+                                <div class="spd-prog-fill" style="width:{{ r.est_pct }}%; background:
+                                    {% if r.est_pct >= 90 %}#16a34a{% elif r.est_pct >= 75 %}#65a30d
+                                    {% elif r.est_pct >= 50 %}#f59e0b{% else %}#dc2626{% endif %};"></div>
+                            </div>
+                            <span class="spd-pct" style="color:
+                                {% if r.est_pct >= 90 %}#16a34a{% elif r.est_pct >= 75 %}#65a30d
+                                {% elif r.est_pct >= 50 %}#f59e0b{% else %}#dc2626{% endif %};">
+                                {{ r.est_pct }}%
+                            </span>
+                        </div>
+                        {% else %}
+                        <span class="c-muted">N/A</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Fee Due -->
+                    <td>
+                        {% if r.fee_due > 0 %}
+                        <span style="font-weight:700; font-size:0.72rem;">₹{{ "{:,.0f}".format(r.fee_due) }}</span>
+                        {% else %}<span class="c-muted">—</span>{% endif %}
+                    </td>
+
+                    <!-- Received -->
+                    <td>
+                        {% if r.fee_received > 0 %}
+                        <span class="c-recv">₹{{ "{:,.0f}".format(r.fee_received) }}</span>
+                        {% else %}<span class="c-muted">—</span>{% endif %}
+                    </td>
+
+                    <!-- Short -->
+                    <td>
+                        {% if r.short > 0 %}
+                        <span class="c-short">₹{{ "{:,.0f}".format(r.short) }}</span>
+                        {% else %}<span class="c-muted">—</span>{% endif %}
+                    </td>
+
+                    <!-- Excess -->
+                    <td>
+                        {% if r.excess > 0 %}
+                        <span class="c-excess">₹{{ "{:,.0f}".format(r.excess) }}</span>
+                        {% else %}<span class="c-muted">—</span>{% endif %}
+                    </td>
+
+                    <!-- Accounts Status -->
+                    <td>
+                        {% if r.acct_status == 'settled' %}
+                        <span class="acct-badge acct-settled">✓ Settled</span>
+                        {% elif r.acct_status == 'short' %}
+                        <span class="acct-badge acct-short">Short</span>
+                        {% elif r.acct_status == 'excess' %}
+                        <span class="acct-badge acct-excess">Excess</span>
+                        {% elif r.acct_status == 'updated' %}
+                        <span class="acct-badge acct-updated">Updated</span>
+                        {% elif r.acct_status == 'not_updated' %}
+                        <span class="acct-badge acct-not-updated">⚠ Not Updated</span>
+                        {% else %}
+                        <span class="acct-badge acct-no-fee" style="background:#f1f5f9;color:#94a3b8;">No Fee Set</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+
+                {% if not est_rows %}
+                <tr>
+                    <td colspan="{{ wage_months|length + 7 }}" style="text-align:center; padding:30px; color:#94a3b8;">
+                        <i class="bi bi-building" style="font-size:1.5rem;"></i><br>
+                        No establishments assigned to this staff member.
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+
+            {% if est_rows %}
+            <tfoot>
+                <tr class="spd-summary-row">
+                    <td class="sticky-col"><i class="bi bi-calculator me-1"></i>TOTALS ({{ est_rows|length }} Clients)</td>
+                    {% for wm in wage_months %}
+                    <td>
+                        {% set done_in_wm = est_rows|selectattr('cells')|list %}
+                        {% set cnt_done = namespace(v=0) %}
+                        {% set cnt_total = namespace(v=0) %}
+                        {% for r in est_rows %}
+                          {% for c in r.cells %}
+                            {% if c.wm == wm and c.applicable %}
+                              {% set cnt_total.v = cnt_total.v + 1 %}
+                              {% if c.finalized %}{% set cnt_done.v = cnt_done.v + 1 %}{% endif %}
+                            {% endif %}
+                          {% endfor %}
+                        {% endfor %}
+                        <div style="font-size:0.65rem;">
+                            <span style="color:#34d399; font-weight:700;">{{ cnt_done.v }}</span>
+                            <span style="color:#94a3b8;">/</span>
+                            <span style="color:#64748b;">{{ cnt_total.v }}</span>
+                        </div>
+                    </td>
+                    {% endfor %}
+                    <td>
+                        <span style="font-weight:800; font-size:0.8rem; color:{{ grade_color }};">
+                            {% if perf_pct is not none %}{{ perf_pct }}%{% else %}—{% endif %}
+                        </span>
+                    </td>
+                    <td style="font-weight:700;">₹{{ "{:,.0f}".format(total_fee_due) }}</td>
+                    <td style="color:#34d399; font-weight:700;">₹{{ "{:,.0f}".format(total_fee_received) }}</td>
+                    <td style="color:#fca5a5; font-weight:700;">
+                        {% if total_short > 0 %}₹{{ "{:,.0f}".format(total_short) }}{% else %}—{% endif %}
+                    </td>
+                    <td style="color:#34d399; font-weight:700;">
+                        {% if total_excess > 0 %}₹{{ "{:,.0f}".format(total_excess) }}{% else %}—{% endif %}
+                    </td>
+                    <td>
+                        {% if not_updated > 0 %}
+                        <span style="color:#fbbf24; font-size:0.68rem; font-weight:700;">⚠ {{ not_updated }} pending</span>
+                        {% else %}
+                        <span style="color:#34d399; font-size:0.68rem; font-weight:700;">✓ All updated</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+
+    <!-- ── Fee summary panel ── -->
+    {% if total_fee_due > 0 or total_fee_received > 0 %}
+    <div style="padding:14px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; gap:24px; flex-wrap:wrap; align-items:center;">
+        <div style="font-size:0.65rem; color:#475569; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">
+            <i class="bi bi-wallet2 me-1"></i>Fee Summary ({{ period_label }})
+        </div>
+        <div style="font-size:0.75rem; color:#1e293b;">
+            Due: <strong>₹{{ "{:,.0f}".format(total_fee_due) }}</strong>
+        </div>
+        <div style="font-size:0.75rem; color:#0891b2;">
+            Received: <strong>₹{{ "{:,.0f}".format(total_fee_received) }}</strong>
+        </div>
+        {% if total_short > 0 %}
+        <div style="font-size:0.75rem; color:#dc2626;">
+            Short: <strong>₹{{ "{:,.0f}".format(total_short) }}</strong>
+        </div>
+        {% endif %}
+        {% if total_excess > 0 %}
+        <div style="font-size:0.75rem; color:#059669;">
+            Excess: <strong>₹{{ "{:,.0f}".format(total_excess) }}</strong>
+        </div>
+        {% endif %}
+        {% if not_updated > 0 %}
+        <div style="font-size:0.72rem; color:#f59e0b; margin-left:auto;">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            {{ not_updated }} establishment(s) have no account entries in this period — ensure fees are posted in Accounts.
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- ── Footer ── -->
+    <div style="background:#f8fafc; padding:10px 20px; border-top:1px solid #e2e8f0;
+                display:flex; justify-content:space-between; font-size:0.6rem; color:#94a3b8;">
+        <span><i class="bi bi-info-circle me-1"></i>Filing status = payroll finalized in the system. Fee due = establishment fee × months selected. Received = Accounts (Sundry Debtor credits in period).</span>
+        <span><i class="bi bi-building me-1"></i>Vaishnavi Consultant ERP</span>
+    </div>
+</div>
+
+<script>
+function getWageMonth() {
+    const now = new Date();
+    let y = now.getFullYear(), m = now.getMonth() + 1;
+    m = m - 1;
+    if (m < 1) { m = 12; y = y - 1; }
+    return { year: y, month: m };
+}
+
+function setRange(preset) {
+    const now   = new Date();
+    const year  = now.getFullYear();
+    const month = now.getMonth() + 1;
+    const wage  = getWageMonth();
+    let fromY, fromM, toY, toM;
+
+    if (preset === 'fy_current') {
+        const fyStart = month >= 4 ? year : year - 1;
+        fromY = fyStart; fromM = 4;
+        toY = wage.year; toM = wage.month;
+        if (toY < fromY || (toY === fromY && toM < fromM)) { toY = fromY; toM = fromM; }
+    } else if (preset === 'fy_previous') {
+        const fyStart = month >= 4 ? year - 1 : year - 2;
+        fromY = fyStart; fromM = 4;
+        toY = fyStart + 1; toM = 3;
+    } else if (preset === 'q_current') {
+        const qStart = Math.floor((month - 1) / 3) * 3 + 1;
+        fromY = year; fromM = qStart;
+        toY = wage.year; toM = wage.month;
+        if (toY < fromY || (toY === fromY && toM < fromM)) { toY = fromY; toM = fromM; }
+    } else if (preset === 'last_6') {
+        toY = wage.year; toM = wage.month;
+        const d = new Date(toY, toM - 6, 1);
+        fromY = d.getFullYear(); fromM = d.getMonth() + 1;
+    }
+    const pad = n => n.toString().padStart(2, '0');
+    document.getElementById('inp_from').value = `${fromY}-${pad(fromM)}`;
+    document.getElementById('inp_to').value   = `${toY}-${pad(toM)}`;
+    document.getElementById('filterForm').submit();
+}
+</script>
+{% endblock %}

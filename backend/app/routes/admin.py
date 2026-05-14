@@ -257,136 +257,417 @@ def user_details(user_id):
 
 # ═════════════════════════════════════════════════════════════════
 # STAFF PERFORMANCE DASHBOARD (admin-only)
-# Shows each staff's client load, filing compliance %, fees collected
+# All-staff summary table with period-aware compliance % and fee data.
+# Clicking a staff row navigates to the drill-down page.
 # ═════════════════════════════════════════════════════════════════
 @admin_bp.route('/staff-performance')
 def staff_performance():
-    """Performance dashboard for all staff — admin's primary monitoring tool."""
+    """All-staff overview: period-aware compliance %, tasks, fee due/received."""
     from app.models.establishment import Establishment
     from app.models.payroll import MonthlyPayroll
     from app.models.accounts import Voucher, VoucherEntry, AccountHead
+    from app.utils.date_helpers import current_wage_month, current_fy_start_year
     from datetime import date
+    from calendar import monthrange
+    from sqlalchemy import func
 
-    # All active users (both admin + regular, so admin also sees own load)
-    users = AppUser.query.filter_by(is_active=True).order_by(AppUser.name).all()
-
-    # Current FY for performance window
     today = date.today()
-    fy_start_year = today.year if today.month >= 4 else today.year - 1
-    fy_start = date(fy_start_year, 4, 1)
-    fy_end = date(fy_start_year + 1, 3, 31)
-    fy_label = f'{fy_start_year}-{fy_start_year + 1}'
+    fy_start_year = current_fy_start_year(today)
+    wage_y, wage_m = current_wage_month(today)
 
-    # For fees collected — we compute per staff
-    fee_heads = AccountHead.query.filter(
-        AccountHead.name.in_(['Professional Fees', 'IP & UAN Charges', 'Other Income'])
-    ).all()
-    fee_head_ids = [h.id for h in fee_heads]
+    from_str = request.args.get('from', '')
+    to_str   = request.args.get('to', '')
 
+    default_from = date(fy_start_year, 4, 1)
+    default_to   = date(wage_y, wage_m, 1)
+    if default_to < default_from:
+        default_to = default_from
+
+    try:
+        from_month = date(int(from_str.split('-')[0]), int(from_str.split('-')[1]), 1) if from_str else default_from
+    except (ValueError, IndexError):
+        from_month = default_from
+
+    try:
+        to_month = date(int(to_str.split('-')[0]), int(to_str.split('-')[1]), 1) if to_str else default_to
+    except (ValueError, IndexError):
+        to_month = default_to
+
+    # Build list of wage months in the selected range
+    wage_months = []
+    cur = from_month
+    while cur <= to_month:
+        wage_months.append(cur)
+        cur = date(cur.year + 1, 1, 1) if cur.month == 12 else date(cur.year, cur.month + 1, 1)
+    num_months = len(wage_months)
+
+    # Period end date (last calendar day of the to_month)
+    last_wm   = wage_months[-1] if wage_months else to_month
+    last_day  = monthrange(last_wm.year, last_wm.month)[1]
+    period_end = date(last_wm.year, last_wm.month, last_day)
+
+    # All active establishments and users
+    all_ests = Establishment.query.filter_by(is_active=True).order_by(Establishment.company_name).all()
+    est_ids  = [e.id for e in all_ests]
+    users    = AppUser.query.filter_by(is_active=True).order_by(AppUser.name).all()
+
+    # Pre-fetch all finalized payrolls in range (one batch query)
+    finalized_index = {}
+    if wage_months and est_ids:
+        min_year = min(wm.year for wm in wage_months)
+        max_year = max(wm.year for wm in wage_months)
+        for p in MonthlyPayroll.query.filter(
+            MonthlyPayroll.status == 'finalized',
+            MonthlyPayroll.year  >= min_year,
+            MonthlyPayroll.year  <= max_year,
+            MonthlyPayroll.establishment_id.in_(est_ids),
+        ).all():
+            finalized_index[(p.establishment_id, p.year, p.month)] = True
+
+    # Pre-fetch fee received per establishment (credits to Sundry Debtor account)
+    fee_received_by_est = {}
+    voucher_est_ids     = set()
+    if est_ids:
+        ah_rows = AccountHead.query.filter(
+            AccountHead.establishment_id.in_(est_ids)
+        ).all()
+        if ah_rows:
+            rows = db.session.query(
+                AccountHead.establishment_id,
+                func.sum(VoucherEntry.amount)
+            ).join(VoucherEntry, VoucherEntry.account_id == AccountHead.id)\
+             .join(Voucher, VoucherEntry.voucher_id == Voucher.id)\
+             .filter(
+                 AccountHead.establishment_id.in_(est_ids),
+                 VoucherEntry.entry_type == 'credit',
+                 Voucher.voucher_date >= from_month,
+                 Voucher.voucher_date <= period_end,
+             ).group_by(AccountHead.establishment_id).all()
+            for est_id, total in rows:
+                fee_received_by_est[est_id] = float(total or 0)
+
+        for (vid,) in Voucher.query.filter(
+            Voucher.establishment_id.in_(est_ids),
+            Voucher.voucher_date >= from_month,
+            Voucher.voucher_date <= period_end,
+        ).with_entities(Voucher.establishment_id).all():
+            if vid:
+                voucher_est_ids.add(vid)
+
+    def _monthly_fee(est):
+        """Normalise establishment fee to a per-month amount."""
+        if not est.fee_amount:
+            return 0.0
+        if est.fee_type == 'Quarterly':
+            return est.fee_amount / 3.0
+        if est.fee_type == 'Yearly':
+            return est.fee_amount / 12.0
+        return float(est.fee_amount)  # Monthly (default)
+
+    # Build per-staff metrics
     staff_metrics = []
-    unassigned_count = Establishment.query.filter(
-        Establishment.is_active == True,
-        Establishment.assigned_to_id.is_(None)
-    ).count()
-
-    total_active_est = Establishment.query.filter_by(is_active=True).count()
+    off_tasks = off_done = off_due = off_recv = 0
 
     for user in users:
-        # Establishments assigned to this user
-        assigned_ests = Establishment.query.filter(
-            Establishment.is_active == True,
-            Establishment.assigned_to_id == user.clerk_user_id,
-        ).all()
-        est_count = len(assigned_ests)
+        assigned = [e for e in all_ests if e.assigned_to_id == user.clerk_user_id]
 
-        # Filing compliance — count finalized monthly payrolls in FY
-        fully_filed = 0
-        partial_filed = 0
-        not_filed = 0
+        total_tasks = completed_tasks = 0
+        fee_due = fee_recv = 0.0
+        not_updated = 0
 
-        for est in assigned_ests:
-            # Has any finalized payroll in this FY?
-            finalized_count = MonthlyPayroll.query.filter(
-                MonthlyPayroll.establishment_id == est.id,
-                MonthlyPayroll.status == 'finalized',
-                MonthlyPayroll.year == fy_start_year,
-            ).count() + MonthlyPayroll.query.filter(
-                MonthlyPayroll.establishment_id == est.id,
-                MonthlyPayroll.status == 'finalized',
-                MonthlyPayroll.year == fy_start_year + 1,
-                MonthlyPayroll.month <= 3,
-            ).count()
+        for est in assigned:
+            applicable = bool(est.pf_code) or bool(est.esic_code)
+            if applicable:
+                for wm in wage_months:
+                    total_tasks += 1
+                    if finalized_index.get((est.id, wm.year, wm.month)):
+                        completed_tasks += 1
 
-            # Rough classification
-            if finalized_count >= 9:
-                fully_filed += 1
-            elif finalized_count >= 3:
-                partial_filed += 1
-            else:
-                not_filed += 1
+            mf = _monthly_fee(est)
+            fee_due  += mf * num_months
+            fee_recv += fee_received_by_est.get(est.id, 0.0)
 
-        # Compliance %
-        if est_count > 0:
-            compliance_pct = round((fully_filed / est_count) * 100)
+            if mf > 0 and est.id not in voucher_est_ids:
+                not_updated += 1
+
+        perf_pct = round(completed_tasks / total_tasks * 100) if total_tasks else None
+        short  = max(0.0, fee_due - fee_recv)
+        excess = max(0.0, fee_recv - fee_due)
+
+        if perf_pct is None:
+            grade, grade_label, grade_color = 'new',       'No Data',          '#94a3b8'
+        elif perf_pct >= 90:
+            grade, grade_label, grade_color = 'excellent', 'Excellent',         '#16a34a'
+        elif perf_pct >= 75:
+            grade, grade_label, grade_color = 'good',      'Good',              '#65a30d'
+        elif perf_pct >= 50:
+            grade, grade_label, grade_color = 'average',   'Average',           '#f59e0b'
         else:
-            compliance_pct = None
+            grade, grade_label, grade_color = 'attention', 'Needs Attention',   '#dc2626'
 
-        # Fees collected by this staff (vouchers created by them, fee account credits)
-        fees_collected = 0
-        if fee_head_ids:
-            q = db.session.query(db.func.sum(VoucherEntry.amount))\
-                .join(Voucher, VoucherEntry.voucher_id == Voucher.id)\
-                .filter(
-                    VoucherEntry.account_id.in_(fee_head_ids),
-                    VoucherEntry.entry_type == 'credit',
-                    Voucher.voucher_date >= fy_start,
-                    Voucher.voucher_date <= fy_end,
-                    Voucher.owner_id == user.clerk_user_id,
-                )
-            fees_collected = q.scalar() or 0
-
-        # Grade
-        if compliance_pct is None:
-            grade = 'new'
-            grade_label = 'No Assignment'
-            grade_color = '#94a3b8'
-        elif compliance_pct >= 90:
-            grade = 'excellent'
-            grade_label = 'Excellent'
-            grade_color = '#16a34a'
-        elif compliance_pct >= 70:
-            grade = 'moderate'
-            grade_label = 'Moderate'
-            grade_color = '#f59e0b'
-        else:
-            grade = 'attention'
-            grade_label = 'Needs Attention'
-            grade_color = '#dc2626'
+        off_tasks += total_tasks
+        off_done  += completed_tasks
+        off_due   += fee_due
+        off_recv  += fee_recv
 
         staff_metrics.append({
-            'user': user,
-            'est_count': est_count,
-            'fully_filed': fully_filed,
-            'partial_filed': partial_filed,
-            'not_filed': not_filed,
-            'compliance_pct': compliance_pct,
-            'fees_collected': fees_collected,
-            'grade': grade,
-            'grade_label': grade_label,
-            'grade_color': grade_color,
-            'avg_per_client': round(fees_collected / est_count) if est_count > 0 else 0,
+            'user':            user,
+            'est_count':       len(assigned),
+            'total_tasks':     total_tasks,
+            'completed_tasks': completed_tasks,
+            'pending_tasks':   total_tasks - completed_tasks,
+            'perf_pct':        perf_pct,
+            'grade':           grade,
+            'grade_label':     grade_label,
+            'grade_color':     grade_color,
+            'fee_due':         round(fee_due),
+            'fee_received':    round(fee_recv),
+            'short':           round(short),
+            'excess':          round(excess),
+            'not_updated':     not_updated,
         })
 
-    # Sort by compliance % descending (best performer first)
-    staff_metrics.sort(key=lambda m: m['compliance_pct'] if m['compliance_pct'] is not None else -1,
-                       reverse=True)
+    # Sort: lowest % first (worst performers at top — same logic as filing matrix)
+    staff_metrics.sort(key=lambda m: m['perf_pct'] if m['perf_pct'] is not None else -1)
 
-    return render_template('admin/staff_performance.html',
-                           staff_metrics=staff_metrics,
-                           fy_label=fy_label,
-                           unassigned_count=unassigned_count,
-                           total_active_est=total_active_est,
-                           total_staff=len(users))
+    unassigned_count = sum(1 for e in all_ests if not e.assigned_to_id)
+    office_pct = round(off_done / off_tasks * 100) if off_tasks else 0
+
+    return render_template(
+        'admin/staff_performance.html',
+        staff_metrics=staff_metrics,
+        from_month=from_month,
+        to_month=to_month,
+        from_month_str=from_month.strftime('%Y-%m'),
+        to_month_str=to_month.strftime('%Y-%m'),
+        period_label=f"{from_month.strftime('%b %Y')} to {to_month.strftime('%b %Y')}",
+        num_months=num_months,
+        unassigned_count=unassigned_count,
+        total_active_est=len(all_ests),
+        total_staff=len(users),
+        office_pct=office_pct,
+        office_fee_due=round(off_due),
+        office_fee_received=round(off_recv),
+    )
+
+
+# ═════════════════════════════════════════════════════════════════
+# STAFF PERFORMANCE DRILL-DOWN (admin-only)
+# Establishment-by-establishment breakdown for one staff member.
+# Shows monthly filing cells + fee due / received / short / excess.
+# ═════════════════════════════════════════════════════════════════
+@admin_bp.route('/staff-performance/<clerk_user_id>')
+def staff_performance_drill(clerk_user_id):
+    """Per-staff drill-down: establishment table with monthly cells + fee columns."""
+    from app.models.establishment import Establishment
+    from app.models.payroll import MonthlyPayroll
+    from app.models.accounts import Voucher, VoucherEntry, AccountHead
+    from app.utils.date_helpers import current_wage_month, current_fy_start_year
+    from datetime import date
+    from calendar import monthrange
+    from sqlalchemy import func
+
+    staff_user = AppUser.query.filter_by(
+        clerk_user_id=clerk_user_id, is_active=True
+    ).first_or_404()
+
+    today = date.today()
+    fy_start_year = current_fy_start_year(today)
+    wage_y, wage_m = current_wage_month(today)
+
+    from_str = request.args.get('from', '')
+    to_str   = request.args.get('to', '')
+
+    default_from = date(fy_start_year, 4, 1)
+    default_to   = date(wage_y, wage_m, 1)
+    if default_to < default_from:
+        default_to = default_from
+
+    try:
+        from_month = date(int(from_str.split('-')[0]), int(from_str.split('-')[1]), 1) if from_str else default_from
+    except (ValueError, IndexError):
+        from_month = default_from
+
+    try:
+        to_month = date(int(to_str.split('-')[0]), int(to_str.split('-')[1]), 1) if to_str else default_to
+    except (ValueError, IndexError):
+        to_month = default_to
+
+    wage_months = []
+    cur = from_month
+    while cur <= to_month:
+        wage_months.append(cur)
+        cur = date(cur.year + 1, 1, 1) if cur.month == 12 else date(cur.year, cur.month + 1, 1)
+    num_months = len(wage_months)
+
+    last_wm   = wage_months[-1] if wage_months else to_month
+    last_day  = monthrange(last_wm.year, last_wm.month)[1]
+    period_end = date(last_wm.year, last_wm.month, last_day)
+
+    # This staff's active establishments
+    assigned_ests = Establishment.query.filter(
+        Establishment.is_active == True,
+        Establishment.assigned_to_id == clerk_user_id,
+    ).order_by(Establishment.company_name).all()
+    est_ids = [e.id for e in assigned_ests]
+
+    # Finalized payrolls (batch)
+    finalized_index = {}
+    if wage_months and est_ids:
+        min_year = min(wm.year for wm in wage_months)
+        max_year = max(wm.year for wm in wage_months)
+        for p in MonthlyPayroll.query.filter(
+            MonthlyPayroll.status == 'finalized',
+            MonthlyPayroll.year  >= min_year,
+            MonthlyPayroll.year  <= max_year,
+            MonthlyPayroll.establishment_id.in_(est_ids),
+        ).all():
+            finalized_index[(p.establishment_id, p.year, p.month)] = True
+
+    # Fee received per establishment (batch)
+    fee_received_by_est = {}
+    voucher_est_ids     = set()
+    if est_ids:
+        ah_rows = AccountHead.query.filter(
+            AccountHead.establishment_id.in_(est_ids)
+        ).all()
+        if ah_rows:
+            rows = db.session.query(
+                AccountHead.establishment_id,
+                func.sum(VoucherEntry.amount)
+            ).join(VoucherEntry, VoucherEntry.account_id == AccountHead.id)\
+             .join(Voucher, VoucherEntry.voucher_id == Voucher.id)\
+             .filter(
+                 AccountHead.establishment_id.in_(est_ids),
+                 VoucherEntry.entry_type == 'credit',
+                 Voucher.voucher_date >= from_month,
+                 Voucher.voucher_date <= period_end,
+             ).group_by(AccountHead.establishment_id).all()
+            for est_id, total in rows:
+                fee_received_by_est[est_id] = float(total or 0)
+
+        for (vid,) in Voucher.query.filter(
+            Voucher.establishment_id.in_(est_ids),
+            Voucher.voucher_date >= from_month,
+            Voucher.voucher_date <= period_end,
+        ).with_entities(Voucher.establishment_id).all():
+            if vid:
+                voucher_est_ids.add(vid)
+
+    def _monthly_fee(est):
+        if not est.fee_amount:
+            return 0.0
+        if est.fee_type == 'Quarterly':
+            return est.fee_amount / 3.0
+        if est.fee_type == 'Yearly':
+            return est.fee_amount / 12.0
+        return float(est.fee_amount)
+
+    # Build per-establishment rows
+    est_rows = []
+    total_tasks = completed_tasks = 0
+    total_due = total_recv = 0.0
+
+    for est in assigned_ests:
+        has_pf   = bool(est.pf_code)
+        has_esic = bool(est.esic_code)
+        applicable = has_pf or has_esic
+
+        cells = []
+        est_done = est_total = 0
+        for wm in wage_months:
+            is_fin = finalized_index.get((est.id, wm.year, wm.month), False)
+            if applicable:
+                est_total += 1
+                if is_fin:
+                    est_done += 1
+            cells.append({'wm': wm, 'finalized': is_fin, 'applicable': applicable})
+
+        total_tasks    += est_total
+        completed_tasks += est_done
+
+        mf       = _monthly_fee(est)
+        fee_due  = round(mf * num_months)
+        fee_recv = round(fee_received_by_est.get(est.id, 0.0))
+        short    = max(0, fee_due - fee_recv)
+        excess   = max(0, fee_recv - fee_due)
+        total_due  += fee_due
+        total_recv += fee_recv
+
+        # Accounts status
+        has_any_voucher = est.id in voucher_est_ids
+        if fee_recv > 0 and short == 0 and excess == 0:
+            acct_status = 'settled'
+        elif fee_recv > 0 and short > 0:
+            acct_status = 'short'
+        elif fee_recv > 0 and excess > 0:
+            acct_status = 'excess'
+        elif has_any_voucher:
+            acct_status = 'updated'
+        elif mf > 0:
+            acct_status = 'not_updated'
+        else:
+            acct_status = 'no_fee'
+
+        est_pct = round(est_done / est_total * 100) if est_total else None
+
+        est_rows.append({
+            'est':           est,
+            'has_pf':        has_pf,
+            'has_esic':      has_esic,
+            'applicable':    applicable,
+            'cells':         cells,
+            'est_total':     est_total,
+            'est_done':      est_done,
+            'est_pending':   est_total - est_done,
+            'est_pct':       est_pct,
+            'fee_due':       fee_due,
+            'fee_received':  fee_recv,
+            'short':         short,
+            'excess':        excess,
+            'acct_status':   acct_status,
+        })
+
+    perf_pct = round(completed_tasks / total_tasks * 100) if total_tasks else None
+    total_short  = max(0, round(total_due - total_recv))
+    total_excess = max(0, round(total_recv - total_due))
+    not_updated  = sum(1 for r in est_rows if r['acct_status'] == 'not_updated')
+
+    if perf_pct is None:
+        grade, grade_label, grade_color = 'new',       'No Data',          '#94a3b8'
+    elif perf_pct >= 90:
+        grade, grade_label, grade_color = 'excellent', 'Excellent',         '#16a34a'
+    elif perf_pct >= 75:
+        grade, grade_label, grade_color = 'good',      'Good',              '#65a30d'
+    elif perf_pct >= 50:
+        grade, grade_label, grade_color = 'average',   'Average',           '#f59e0b'
+    else:
+        grade, grade_label, grade_color = 'attention', 'Needs Attention',   '#dc2626'
+
+    return render_template(
+        'admin/staff_performance_drill.html',
+        staff_user=staff_user,
+        est_rows=est_rows,
+        wage_months=wage_months,
+        num_months=num_months,
+        total_tasks=total_tasks,
+        completed_tasks=completed_tasks,
+        pending_tasks=total_tasks - completed_tasks,
+        perf_pct=perf_pct,
+        grade=grade,
+        grade_label=grade_label,
+        grade_color=grade_color,
+        total_fee_due=round(total_due),
+        total_fee_received=round(total_recv),
+        total_short=total_short,
+        total_excess=total_excess,
+        not_updated=not_updated,
+        from_month=from_month,
+        to_month=to_month,
+        from_month_str=from_month.strftime('%Y-%m'),
+        to_month_str=to_month.strftime('%Y-%m'),
+        period_label=f"{from_month.strftime('%b %Y')} to {to_month.strftime('%b %Y')}",
+    )
 
 
 # ═════════════════════════════════════════════
