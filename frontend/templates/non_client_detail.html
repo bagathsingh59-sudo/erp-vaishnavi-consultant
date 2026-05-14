@@ -182,10 +182,15 @@
                             <p style="font-size:0.7rem; color:#64748b; margin-bottom:8px;">
                                 Get a blank Excel file pre-labelled for this establishment &amp; period.
                             </p>
-                            <a href="{{ url_for('non_client.nc_download_template', record_id=rec.id) }}"
+                                    <a href="{{ url_for('non_client.nc_download_template', record_id=rec.id) }}"
                                class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;">
                                 <i class="bi bi-download me-1"></i>Download Template (.xlsx)
                             </a>
+                            <div class="mt-2" style="font-size:0.65rem; color:#64748b;">
+                                3 sheets: <strong>Configuration</strong> (salary type, OT settings)
+                                · <strong>Employee Data</strong> (MF / DW / MH / OT / Holiday)
+                                · <strong>Notes &amp; Help</strong>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -410,7 +415,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for e in employees if e.has_esic and e.esic_covered %}
+                        {% for e in employees if e.has_esic %}
                         <tr>
                             <td class="text-muted">{{ loop.index }}</td>
                             <td style="font-weight:600;">{{ e.name }}</td>
@@ -476,12 +481,12 @@
                                 <i class="bi bi-shield-check text-primary me-2"></i>EPF Rates (used automatically)
                             </div>
                             <table class="table table-sm mb-0" style="font-size:0.72rem;">
-                                <tr><td>Employee Contribution</td><td class="text-end fw-600">12%</td></tr>
-                                <tr><td>EPS (Employer)</td><td class="text-end fw-600">8.33%</td></tr>
+                                <tr><td>Employee Contribution</td><td class="text-end fw-600">12% of actual wages</td></tr>
+                                <tr><td>EPS (Employer)</td><td class="text-end fw-600">8.33% (pension ≤ ₹15k)</td></tr>
                                 <tr><td>EPF AC-I (Employer)</td><td class="text-end fw-600">3.67%</td></tr>
                                 <tr><td>Admin Charges</td><td class="text-end fw-600">0.5% (min ₹500)</td></tr>
                                 <tr><td>EDLI</td><td class="text-end fw-600">0.5%</td></tr>
-                                <tr><td class="text-muted">EPF Wage Ceiling</td><td class="text-end text-muted">₹15,000</td></tr>
+                                <tr><td style="color:#059669; font-weight:600;">No EPF wage ceiling</td><td class="text-end" style="color:#059669; font-weight:600;">Dynamic</td></tr>
                             </table>
                         </div>
                     </div>
@@ -491,10 +496,10 @@
                                 <i class="bi bi-hospital text-success me-2"></i>ESIC Rates (used automatically)
                             </div>
                             <table class="table table-sm mb-0" style="font-size:0.72rem;">
-                                <tr><td>Employee Contribution</td><td class="text-end fw-600">0.75%</td></tr>
-                                <tr><td>Employer Contribution</td><td class="text-end fw-600">3.25%</td></tr>
-                                <tr><td class="text-muted">ESIC Wage Ceiling</td><td class="text-end text-muted">₹21,000</td></tr>
-                                <tr><td class="text-muted" colspan="2" style="font-size:0.65rem;">Employees above ceiling — excluded automatically</td></tr>
+                                <tr><td>Employee Contribution</td><td class="text-end fw-600">0.75% — round UP ↑</td></tr>
+                                <tr><td>Employer Contribution</td><td class="text-end fw-600">3.25% — round UP ↑</td></tr>
+                                <tr><td style="color:#059669; font-weight:600;">No ESIC wage ceiling</td><td class="text-end" style="color:#059669; font-weight:600;">Dynamic</td></tr>
+                                <tr><td colspan="2" style="font-size:0.65rem; color:#059669;">All employees with IP included regardless of wages</td></tr>
                             </table>
                         </div>
                     </div>
