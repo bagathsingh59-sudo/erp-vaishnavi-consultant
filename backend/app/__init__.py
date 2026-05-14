@@ -326,6 +326,10 @@ def create_app():
     from app.routes.loan import loan_bp
     app.register_blueprint(loan_bp)
 
+    # Register Non-Client Quick Returns blueprint
+    from app.routes.non_client import non_client_bp
+    app.register_blueprint(non_client_bp)
+
     # Register Vault blueprint — disabled for now, re-enable later
     # from app.routes.vault import vault_bp
     # app.register_blueprint(vault_bp)
@@ -358,6 +362,7 @@ def create_app():
         from app.models.loan import LoanAccount, LoanPayment
         from app.models.assignment_log import EstablishmentAssignmentLog
         from app.models.backup_file import BackupFile   # persistent backup storage
+        from app.models.non_client import NonClientReturn   # non-client quick returns
         db.create_all()
 
         # Auto-migrate: add new columns to existing tables (PostgreSQL won't add via create_all)

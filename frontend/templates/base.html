@@ -424,6 +424,14 @@
             <span>Manual Reimbursement</span>
         </a>
 
+        <!-- NON-CLIENT QUICK RETURNS — All users -->
+        <div class="sidebar-section-title">QUICK RETURNS</div>
+        <a href="{{ url_for('non_client.nc_list') }}"
+           class="sidebar-link link-accent {% if request.endpoint and request.endpoint.startswith('non_client.') %}active{% endif %}">
+            <i class="bi bi-file-earmark-arrow-up"></i>
+            <span>Non-Client Returns</span>
+        </a>
+
         <!-- TOOLS Section — Always visible -->
         <div class="sidebar-section-title">TOOLS</div>
 

@@ -1,0 +1,397 @@
+{% extends "base.html" %}
+{% block title %}Non-Client Quick Returns{% endblock %}
+{% block page_header %}Non-Client Quick Returns{% endblock %}
+
+{% block content %}
+<style>
+    .nc-badge-processed { background:#d1fae5; color:#065f46; }
+    .nc-badge-pending   { background:#fef3c7; color:#92400e; }
+    .nc-badge-error     { background:#fee2e2; color:#991b1b; }
+    .nc-badge { font-size:0.6rem; padding:3px 9px; border-radius:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.3px; }
+    .nc-table th { font-size:0.68rem; text-transform:uppercase; letter-spacing:0.3px; color:#64748b; white-space:nowrap; }
+    .nc-table td { font-size:0.76rem; vertical-align:middle; }
+    .nc-table tr:hover { background:rgba(var(--primary-rgb),0.03); }
+    .stat-mini { text-align:center; padding:14px 10px; }
+    .stat-mini .val { font-size:1.5rem; font-weight:700; line-height:1; }
+    .stat-mini .lbl { font-size:0.65rem; color:#64748b; text-transform:uppercase; letter-spacing:0.4px; margin-top:4px; }
+    .how-step { display:flex; align-items:flex-start; gap:12px; padding:10px 0; }
+    .how-step-num { width:26px; height:26px; border-radius:50%; background:var(--primary); color:#fff; font-size:0.7rem; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px; }
+    .how-step-body strong { font-size:0.78rem; display:block; margin-bottom:2px; }
+    .how-step-body span   { font-size:0.7rem; color:#64748b; }
+</style>
+
+<!-- ── PAGE HEADER ─────────────────────────────────────────────────────── -->
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+    <div>
+        <h5 class="mb-0" style="font-weight:700; font-size:1.1rem;">
+            <i class="bi bi-file-earmark-arrow-up text-primary me-2"></i>Non-Client Quick Returns
+        </h5>
+        <small class="text-muted" style="font-size:0.72rem;">
+            Process EPF ECR &amp; ESIC returns for one-time filers — no client registration needed
+        </small>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-brand btn-sm" data-bs-toggle="modal" data-bs-target="#ncCreateModal"
+                style="font-size:0.75rem;">
+            <i class="bi bi-plus-lg me-1"></i>New Filing
+        </button>
+    </div>
+</div>
+
+<!-- ── FLASH MESSAGES ─────────────────────────────────────────────────── -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="mb-3">
+    {% for cat, msg in messages %}
+    <div class="alert alert-{{ cat }} alert-dismissible fade show py-2" role="alert"
+         style="font-size:0.78rem;">
+        <i class="bi bi-{% if cat == 'success' %}check-circle-fill{% elif cat == 'danger' %}x-circle-fill{% elif cat == 'warning' %}exclamation-triangle-fill{% else %}info-circle-fill{% endif %} me-2"></i>
+        {{ msg }}
+        <button type="button" class="btn-close btn-sm" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<!-- ── STATS ROW ──────────────────────────────────────────────────────── -->
+<div class="row g-2 mb-3">
+    {% set total   = records | length %}
+    {% set done    = records | selectattr('status', 'equalto', 'processed') | list | length %}
+    {% set pending = records | selectattr('status', 'equalto', 'pending')   | list | length %}
+    {% set fee_total = records | sum(attribute='fee_charged') %}
+    <div class="col-6 col-md-3">
+        <div class="card" style="border:none; box-shadow:0 1px 4px rgba(0,0,0,0.06); border-radius:10px;">
+            <div class="stat-mini"><div class="val text-primary">{{ total }}</div><div class="lbl">Total Filings</div></div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card" style="border:none; box-shadow:0 1px 4px rgba(0,0,0,0.06); border-radius:10px;">
+            <div class="stat-mini"><div class="val" style="color:#059669;">{{ done }}</div><div class="lbl">Processed</div></div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card" style="border:none; box-shadow:0 1px 4px rgba(0,0,0,0.06); border-radius:10px;">
+            <div class="stat-mini"><div class="val" style="color:#d97706;">{{ pending }}</div><div class="lbl">Pending Upload</div></div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card" style="border:none; box-shadow:0 1px 4px rgba(0,0,0,0.06); border-radius:10px;">
+            <div class="stat-mini"><div class="val" style="color:#7c3aed;">₹{{ '{:,.0f}'.format(fee_total) }}</div><div class="lbl">Fee Collected</div></div>
+        </div>
+    </div>
+</div>
+
+<!-- ── HOW IT WORKS (shown when no records yet) ────────────────────────── -->
+{% if not records %}
+<div class="row g-3 mb-3">
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-lightbulb me-2 text-warning"></i>How Non-Client Quick Returns Work</div>
+            <div class="card-body">
+                <div class="how-step">
+                    <div class="how-step-num">1</div>
+                    <div class="how-step-body">
+                        <strong>Create a new filing</strong>
+                        <span>Enter the establishment name, PF code, ESIC code, month, year and fee.</span>
+                    </div>
+                </div>
+                <div class="how-step">
+                    <div class="how-step-num">2</div>
+                    <div class="how-step-body">
+                        <strong>Download blank template</strong>
+                        <span>Get an Excel template pre-labelled for that establishment and period.</span>
+                    </div>
+                </div>
+                <div class="how-step">
+                    <div class="how-step-num">3</div>
+                    <div class="how-step-body">
+                        <strong>Fill in employee data</strong>
+                        <span>Add employee names, UANs, ESIC IPs, days present and gross wages. No DB records created.</span>
+                    </div>
+                </div>
+                <div class="how-step">
+                    <div class="how-step-num">4</div>
+                    <div class="how-step-body">
+                        <strong>Upload filled Excel</strong>
+                        <span>System auto-calculates EPF/ESIC contributions using standard rates.</span>
+                    </div>
+                </div>
+                <div class="how-step">
+                    <div class="how-step-num">5</div>
+                    <div class="how-step-body">
+                        <strong>Download ECR + ESIC files</strong>
+                        <span>Ready-to-upload ECR text file (EPFO portal) and ESIC MC Template (.xls).</span>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <button class="btn btn-brand btn-sm" data-bs-toggle="modal" data-bs-target="#ncCreateModal">
+                        <i class="bi bi-plus-lg me-1"></i>Create First Filing
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-5">
+        <div class="card h-100">
+            <div class="card-header"><i class="bi bi-info-circle me-2 text-primary"></i>Rates Used</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0" style="font-size:0.75rem;">
+                    <thead><tr><th>Component</th><th class="text-end">Rate</th></tr></thead>
+                    <tbody>
+                        <tr><td>EPF Employee</td><td class="text-end fw-500">12% of EPF wages</td></tr>
+                        <tr><td>EPS (Employer)</td><td class="text-end fw-500">8.33% of EPF wages</td></tr>
+                        <tr><td>EPF AC-I (Employer diff)</td><td class="text-end fw-500">3.67% of EPF wages</td></tr>
+                        <tr><td>Admin Charges</td><td class="text-end fw-500">0.5% (min ₹500)</td></tr>
+                        <tr><td>EDLI</td><td class="text-end fw-500">0.5% of EPF wages</td></tr>
+                        <tr><td colspan="2"><hr class="my-1"></td></tr>
+                        <tr><td>ESIC Employee</td><td class="text-end fw-500">0.75% of wages</td></tr>
+                        <tr><td>ESIC Employer</td><td class="text-end fw-500">3.25% of wages</td></tr>
+                        <tr><td colspan="2" class="text-muted" style="font-size:0.65rem;">EPF ceiling: ₹15,000 · ESIC ceiling: ₹21,000</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+
+<!-- ── SEARCH ──────────────────────────────────────────────────────────── -->
+<div class="d-flex align-items-center gap-2 mb-3">
+    <form method="get" class="d-flex gap-2 flex-wrap align-items-center">
+        <div class="search-box" style="min-width:220px;">
+            <i class="bi bi-search"></i>
+            <input type="text" name="search" value="{{ search }}" class="form-control"
+                   placeholder="Search establishment…" autocomplete="off">
+        </div>
+        {% if search %}
+        <a href="{{ url_for('non_client.nc_list') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-x"></i> Clear
+        </a>
+        {% endif %}
+    </form>
+    <div class="ms-auto text-muted" style="font-size:0.72rem;">
+        {{ records|length }} record{{ 's' if records|length != 1 else '' }}
+    </div>
+</div>
+
+<!-- ── RECORDS TABLE ──────────────────────────────────────────────────── -->
+<div class="table-container">
+    <div class="table-header">
+        <div class="table-title"><i class="bi bi-list-ul"></i> Filing History</div>
+    </div>
+    {% if records %}
+    <div class="table-responsive">
+        <table class="table nc-table mb-0">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Establishment</th>
+                    <th>PF Code</th>
+                    <th>ESIC Code</th>
+                    <th>Period</th>
+                    <th>Status</th>
+                    <th>Employees</th>
+                    <th class="text-end">Fee (₹)</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rec in records %}
+                {% set emps = rec.get_employees() %}
+                {% set tots = rec.get_totals() %}
+                <tr>
+                    <td class="text-muted" style="font-size:0.65rem;">{{ rec.id }}</td>
+                    <td>
+                        <a href="{{ url_for('non_client.nc_detail', record_id=rec.id) }}"
+                           style="font-weight:600; font-size:0.8rem; color:var(--primary); text-decoration:none;">
+                            {{ rec.est_name }}
+                        </a>
+                        {% if rec.notes %}
+                        <br><small class="text-muted" style="font-size:0.65rem;">{{ rec.notes[:40] }}{% if rec.notes|length > 40 %}…{% endif %}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if rec.pf_code %}
+                        <code style="font-size:0.7rem; background:#f1f5f9; padding:2px 5px; border-radius:4px;">{{ rec.pf_code }}</code>
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td>
+                        {% if rec.esic_code %}
+                        <code style="font-size:0.7rem; background:#f0fdf4; padding:2px 5px; border-radius:4px;">{{ rec.esic_code }}</code>
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td style="white-space:nowrap;">
+                        <span style="font-size:0.76rem; font-weight:600;">{{ rec.period_label }}</span>
+                    </td>
+                    <td>
+                        <span class="nc-badge nc-badge-{{ rec.status }}">
+                            {% if rec.status == 'processed' %}<i class="bi bi-check-circle-fill me-1"></i>Processed
+                            {% elif rec.status == 'error' %}<i class="bi bi-x-circle-fill me-1"></i>Error
+                            {% else %}<i class="bi bi-hourglass-split me-1"></i>Pending{% endif %}
+                        </span>
+                    </td>
+                    <td class="text-center">
+                        {% if emps %}
+                        <span style="font-size:0.76rem; font-weight:600;">{{ emps|length }}</span>
+                        <small class="text-muted" style="font-size:0.65rem;"> emp{{ 's' if emps|length != 1 else '' }}</small>
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td class="text-end">
+                        {% if rec.fee_charged %}
+                        <span style="font-weight:600; color:#059669;">{{ '{:,.0f}'.format(rec.fee_charged) }}</span>
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td class="text-muted" style="font-size:0.68rem; white-space:nowrap;">
+                        {{ rec.created_at.strftime('%d %b %Y') }}
+                    </td>
+                    <td>
+                        <div class="d-flex gap-1 flex-wrap">
+                            <a href="{{ url_for('non_client.nc_detail', record_id=rec.id) }}"
+                               class="btn btn-outline-primary btn-sm" style="font-size:0.65rem; padding:3px 8px;" title="View Details">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            {% if rec.status == 'processed' %}
+                            <a href="{{ url_for('non_client.nc_download_ecr', record_id=rec.id) }}"
+                               class="btn btn-outline-success btn-sm" style="font-size:0.65rem; padding:3px 8px;" title="Download ECR">
+                                <i class="bi bi-filetype-txt"></i>
+                            </a>
+                            <a href="{{ url_for('non_client.nc_download_esic', record_id=rec.id) }}"
+                               class="btn btn-outline-info btn-sm" style="font-size:0.65rem; padding:3px 8px;" title="Download ESIC">
+                                <i class="bi bi-file-earmark-excel"></i>
+                            </a>
+                            {% endif %}
+                            <form method="post" action="{{ url_for('non_client.nc_delete', record_id=rec.id) }}"
+                                  onsubmit="return confirm('Delete this record? This cannot be undone.');" style="display:inline;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-outline-danger btn-sm"
+                                        style="font-size:0.65rem; padding:3px 8px;" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state py-5">
+        <div class="empty-state-icon"><i class="bi bi-inbox"></i></div>
+        <h5>No records found</h5>
+        <p>{% if search %}No filings match "{{ search }}".{% else %}No filings yet. Create one above.{% endif %}</p>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- ══════════════════════════════════════════════════════
+     CREATE NEW FILING MODAL
+══════════════════════════════════════════════════════ -->
+<div class="modal fade" id="ncCreateModal" tabindex="-1" aria-labelledby="ncCreateModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header" style="background:linear-gradient(135deg, var(--primary), var(--accent,#7c3aed)); color:#fff;">
+                <h5 class="modal-title fw-700" id="ncCreateModalLabel" style="font-size:0.95rem;">
+                    <i class="bi bi-file-earmark-plus me-2"></i>New Non-Client Filing
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{{ url_for('non_client.nc_create') }}" autocomplete="off">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+
+                    <div class="row g-3">
+                        <!-- Establishment Name -->
+                        <div class="col-12">
+                            <label class="form-label fw-600" style="font-size:0.78rem;">Establishment Name <span class="text-danger">*</span></label>
+                            <input type="text" name="est_name" class="form-control form-control-sm"
+                                   placeholder="e.g. Sunrise Textiles Pvt. Ltd." required
+                                   style="font-size:0.82rem;">
+                        </div>
+
+                        <!-- PF Code + ESIC Code -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-600" style="font-size:0.78rem;">
+                                <i class="bi bi-shield-check text-primary me-1"></i>PF Code
+                            </label>
+                            <input type="text" name="pf_code" class="form-control form-control-sm"
+                                   placeholder="e.g. TN/CHEN/12345"
+                                   style="font-size:0.82rem; font-family:monospace;">
+                            <div class="form-text" style="font-size:0.65rem;">Required for EPF ECR file generation</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-600" style="font-size:0.78rem;">
+                                <i class="bi bi-hospital text-success me-1"></i>ESIC Code
+                            </label>
+                            <input type="text" name="esic_code" class="form-control form-control-sm"
+                                   placeholder="e.g. 41000123456789"
+                                   style="font-size:0.82rem; font-family:monospace;">
+                            <div class="form-text" style="font-size:0.65rem;">Required for ESIC MC Template file</div>
+                        </div>
+
+                        <!-- Month + Year -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-600" style="font-size:0.78rem;">Month <span class="text-danger">*</span></label>
+                            <select name="month" class="form-select form-select-sm" required style="font-size:0.82rem;">
+                                <option value="">Select month…</option>
+                                {% for i in range(1, 13) %}
+                                <option value="{{ i }}" {% if i == now.month %}selected{% endif %}>
+                                    {{ MONTHS[i-1] }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-600" style="font-size:0.78rem;">Year <span class="text-danger">*</span></label>
+                            <select name="year" class="form-select form-select-sm" required style="font-size:0.82rem;">
+                                {% for y in range(now.year, now.year - 4, -1) %}
+                                <option value="{{ y }}" {% if loop.first %}selected{% endif %}>{{ y }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-600" style="font-size:0.78rem;">
+                                <i class="bi bi-currency-rupee text-warning me-1"></i>Fee Charged (₹)
+                            </label>
+                            <input type="number" name="fee_charged" class="form-control form-control-sm"
+                                   placeholder="0.00" min="0" step="0.01"
+                                   style="font-size:0.82rem;">
+                        </div>
+
+                        <!-- Notes -->
+                        <div class="col-12">
+                            <label class="form-label fw-600" style="font-size:0.78rem;">Notes (optional)</label>
+                            <textarea name="notes" class="form-control form-control-sm" rows="2"
+                                      placeholder="Any notes about this filing…"
+                                      style="font-size:0.78rem;"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info py-2 mt-3 mb-0" style="font-size:0.72rem;">
+                        <i class="bi bi-info-circle-fill me-2"></i>
+                        After creating, you can download a blank Excel template, fill in employee
+                        data, and upload it back to generate ECR &amp; ESIC files.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-brand btn-sm">
+                        <i class="bi bi-plus-lg me-1"></i>Create Filing
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Pass today's date to template for default month/year selection
+document.addEventListener('DOMContentLoaded', function(){
+    // Preselect current month (already done via Jinja — this is a fallback)
+});
+</script>
+
+{% endblock %}

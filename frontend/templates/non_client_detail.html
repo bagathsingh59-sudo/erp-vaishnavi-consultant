@@ -1,0 +1,509 @@
+{% extends "base.html" %}
+{% block title %}{{ rec.est_name }} — Non-Client Return{% endblock %}
+{% block page_header %}Non-Client Return — {{ rec.est_name }}{% endblock %}
+
+{% block content %}
+<style>
+    .nc-badge-processed { background:#d1fae5; color:#065f46; }
+    .nc-badge-pending   { background:#fef3c7; color:#92400e; }
+    .nc-badge-error     { background:#fee2e2; color:#991b1b; }
+    .nc-badge { font-size:0.62rem; padding:3px 10px; border-radius:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.3px; }
+
+    .detail-card { border:none; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,0.07); }
+    .detail-card .card-header { font-size:0.8rem; font-weight:700; border-bottom:1px solid var(--border); }
+
+    .info-row { display:flex; gap:6px; align-items:baseline; margin-bottom:4px; }
+    .info-lbl { font-size:0.65rem; color:#64748b; text-transform:uppercase; letter-spacing:0.4px; min-width:90px; }
+    .info-val { font-size:0.82rem; font-weight:600; color:var(--text-primary); }
+
+    .step-card { border-radius:10px; border:2px dashed var(--border); padding:16px 18px; }
+    .step-card.active { border-color:var(--primary); border-style:solid; }
+    .step-badge { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:var(--primary); color:#fff; font-size:0.68rem; font-weight:700; margin-right:8px; flex-shrink:0; }
+
+    .emp-table th { font-size:0.65rem; text-transform:uppercase; letter-spacing:0.3px; color:#64748b; white-space:nowrap; padding:8px 10px; }
+    .emp-table td { font-size:0.72rem; vertical-align:middle; padding:6px 10px; }
+    .emp-table tbody tr:hover { background:rgba(var(--primary-rgb),0.03); }
+
+    .totals-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:10px; }
+    .tot-card { text-align:center; padding:12px; background:var(--surface-alt); border-radius:8px; border:1px solid var(--border); }
+    .tot-card .tot-val { font-size:1.15rem; font-weight:700; line-height:1.1; }
+    .tot-card .tot-lbl { font-size:0.62rem; color:#64748b; margin-top:3px; text-transform:uppercase; letter-spacing:0.3px; }
+
+    .download-btn { min-width:160px; }
+    .ecr-preview { font-family:monospace; font-size:0.68rem; background:#0f172a; color:#4ade80; padding:14px; border-radius:8px;
+                   max-height:200px; overflow-y:auto; white-space:pre; line-height:1.6; }
+</style>
+
+<!-- ── BREADCRUMB ──────────────────────────────────────────────────────── -->
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb" style="font-size:0.72rem; background:none; padding:0; margin:0;">
+        <li class="breadcrumb-item">
+            <a href="{{ url_for('non_client.nc_list') }}" style="color:var(--primary); text-decoration:none;">
+                <i class="bi bi-file-earmark-arrow-up me-1"></i>Non-Client Returns
+            </a>
+        </li>
+        <li class="breadcrumb-item active">{{ rec.est_name }}</li>
+    </ol>
+</nav>
+
+<!-- ── FLASH MESSAGES ─────────────────────────────────────────────────── -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="mb-3">
+    {% for cat, msg in messages %}
+    <div class="alert alert-{{ cat }} alert-dismissible fade show py-2" role="alert" style="font-size:0.78rem;">
+        <i class="bi bi-{% if cat == 'success' %}check-circle-fill{% elif cat == 'danger' %}x-circle-fill{% elif cat == 'warning' %}exclamation-triangle-fill{% else %}info-circle-fill{% endif %} me-2"></i>
+        {{ msg }}
+        <button type="button" class="btn-close btn-sm" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<!-- ── PAGE HEADER ROW ────────────────────────────────────────────────── -->
+<div class="d-flex flex-wrap justify-content-between align-items-start mb-3 gap-2">
+    <div>
+        <h5 class="mb-1" style="font-weight:700; font-size:1.05rem;">
+            <i class="bi bi-building text-primary me-2"></i>{{ rec.est_name }}
+        </h5>
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+            <span class="nc-badge nc-badge-{{ rec.status }}">
+                {% if rec.status == 'processed' %}<i class="bi bi-check-circle-fill me-1"></i>Processed
+                {% elif rec.status == 'error' %}<i class="bi bi-x-circle-fill me-1"></i>Error
+                {% else %}<i class="bi bi-hourglass-split me-1"></i>Pending Upload{% endif %}
+            </span>
+            <span style="font-size:0.72rem; color:#64748b;">
+                <i class="bi bi-calendar3 me-1"></i>{{ rec.period_label }}
+            </span>
+            {% if rec.pf_code %}
+            <code style="font-size:0.68rem; background:#eef2ff; color:#4338ca; padding:2px 6px; border-radius:4px;">PF: {{ rec.pf_code }}</code>
+            {% endif %}
+            {% if rec.esic_code %}
+            <code style="font-size:0.68rem; background:#f0fdf4; color:#15803d; padding:2px 6px; border-radius:4px;">ESIC: {{ rec.esic_code }}</code>
+            {% endif %}
+        </div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('non_client.nc_list') }}" class="btn btn-outline-secondary btn-sm" style="font-size:0.72rem;">
+            <i class="bi bi-arrow-left me-1"></i>Back
+        </a>
+        <form method="post" action="{{ url_for('non_client.nc_delete', record_id=rec.id) }}"
+              onsubmit="return confirm('Delete this filing permanently?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-danger btn-sm" style="font-size:0.72rem;">
+                <i class="bi bi-trash me-1"></i>Delete
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="row g-3">
+
+    <!-- ════════════════════════════════════════
+         LEFT COLUMN — Info + Workflow Steps
+    ════════════════════════════════════════ -->
+    <div class="col-md-4">
+
+        <!-- Establishment Info Card -->
+        <div class="card detail-card mb-3">
+            <div class="card-header"><i class="bi bi-info-circle me-2 text-primary"></i>Filing Info</div>
+            <div class="card-body py-3">
+                <div class="info-row">
+                    <span class="info-lbl">Period</span>
+                    <span class="info-val">{{ rec.period_label }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-lbl">PF Code</span>
+                    <span class="info-val" style="font-family:monospace; font-size:0.78rem;">
+                        {{ rec.pf_code or '—' }}
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="info-lbl">ESIC Code</span>
+                    <span class="info-val" style="font-family:monospace; font-size:0.78rem;">
+                        {{ rec.esic_code or '—' }}
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="info-lbl">Fee Charged</span>
+                    <span class="info-val" style="color:#059669;">
+                        ₹{{ '{:,.2f}'.format(rec.fee_charged or 0) }}
+                    </span>
+                </div>
+                {% if rec.source_filename %}
+                <div class="info-row">
+                    <span class="info-lbl">File</span>
+                    <span class="info-val" style="font-size:0.72rem; word-break:break-all;">
+                        <i class="bi bi-file-earmark-excel text-success me-1"></i>{{ rec.source_filename }}
+                    </span>
+                </div>
+                {% endif %}
+                <div class="info-row">
+                    <span class="info-lbl">Created</span>
+                    <span class="info-val" style="font-size:0.72rem;">
+                        {{ rec.created_at.strftime('%d %b %Y, %I:%M %p') }}
+                    </span>
+                </div>
+                {% if rec.notes %}
+                <hr class="my-2">
+                <div style="font-size:0.72rem; color:#475569;">
+                    <i class="bi bi-chat-text me-1 text-muted"></i>{{ rec.notes }}
+                </div>
+                {% endif %}
+
+                <!-- Update fee inline -->
+                <hr class="my-2">
+                <form method="post" action="{{ url_for('non_client.nc_update_fee', record_id=rec.id) }}"
+                      class="d-flex gap-2 align-items-center">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="number" name="fee_charged" class="form-control form-control-sm"
+                           value="{{ rec.fee_charged or '' }}" placeholder="Update fee ₹"
+                           step="0.01" min="0" style="font-size:0.72rem; max-width:120px;">
+                    <button type="submit" class="btn btn-outline-primary btn-sm" style="font-size:0.7rem; white-space:nowrap;">
+                        <i class="bi bi-pencil me-1"></i>Update
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Workflow Steps Card -->
+        <div class="card detail-card">
+            <div class="card-header"><i class="bi bi-list-check me-2 text-primary"></i>Steps</div>
+            <div class="card-body py-3" style="display:flex; flex-direction:column; gap:12px;">
+
+                <!-- Step 1: Download template -->
+                <div class="step-card {% if rec.status == 'pending' %}active{% endif %}">
+                    <div class="d-flex align-items-start gap-2">
+                        <div>
+                            <div style="font-size:0.78rem; font-weight:700; margin-bottom:4px;">
+                                <span class="step-badge">1</span>Download Input Template
+                            </div>
+                            <p style="font-size:0.7rem; color:#64748b; margin-bottom:8px;">
+                                Get a blank Excel file pre-labelled for this establishment &amp; period.
+                            </p>
+                            <a href="{{ url_for('non_client.nc_download_template', record_id=rec.id) }}"
+                               class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;">
+                                <i class="bi bi-download me-1"></i>Download Template (.xlsx)
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2: Upload filled file -->
+                <div class="step-card {% if rec.status == 'pending' or rec.status == 'error' %}active{% endif %}">
+                    <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px;">
+                        <span class="step-badge">2</span>Upload Filled Excel
+                    </div>
+                    <form method="post" action="{{ url_for('non_client.nc_upload_process', record_id=rec.id) }}"
+                          enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-2">
+                            <input type="file" name="data_file" class="form-control form-control-sm"
+                                   accept=".xlsx,.xls" required style="font-size:0.72rem;">
+                            <div class="form-text" style="font-size:0.65rem;">
+                                Use the template above. Fill rows from row 5 onwards.
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-brand btn-sm w-100" style="font-size:0.72rem;">
+                            <i class="bi bi-cloud-upload me-1"></i>
+                            {% if rec.status == 'processed' %}Re-Process File{% else %}Process File{% endif %}
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Step 3: Download outputs -->
+                <div class="step-card {% if rec.status == 'processed' %}active{% endif %}">
+                    <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px;">
+                        <span class="step-badge" {% if rec.status != 'processed' %}style="background:#94a3b8"{% endif %}>3</span>
+                        Download Output Files
+                    </div>
+                    {% if rec.status == 'processed' %}
+                    <div class="d-flex flex-column gap-2">
+                        <a href="{{ url_for('non_client.nc_download_ecr', record_id=rec.id) }}"
+                           class="btn btn-sm btn-success download-btn" style="font-size:0.72rem;">
+                            <i class="bi bi-filetype-txt me-1"></i>Download ECR File (.txt)
+                        </a>
+                        <a href="{{ url_for('non_client.nc_download_esic', record_id=rec.id) }}"
+                           class="btn btn-sm btn-info download-btn" style="font-size:0.72rem; color:#fff;">
+                            <i class="bi bi-file-earmark-excel me-1"></i>Download ESIC Template (.xls)
+                        </a>
+                    </div>
+                    {% else %}
+                    <p style="font-size:0.7rem; color:#94a3b8; margin:0;">
+                        Upload and process an Excel file first.
+                    </p>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ════════════════════════════════════════
+         RIGHT COLUMN — Results
+    ════════════════════════════════════════ -->
+    <div class="col-md-8">
+
+        {% if rec.status == 'processed' and employees %}
+
+        <!-- Summary Totals -->
+        <div class="card detail-card mb-3">
+            <div class="card-header"><i class="bi bi-bar-chart-fill me-2 text-success"></i>Summary — {{ rec.period_label }}</div>
+            <div class="card-body">
+                <div class="totals-grid">
+                    <div class="tot-card">
+                        <div class="tot-val" style="color:#1e40af;">{{ totals.count_total }}</div>
+                        <div class="tot-lbl">Total Employees</div>
+                    </div>
+                    <div class="tot-card">
+                        <div class="tot-val" style="color:#4338ca;">{{ totals.count_epf }}</div>
+                        <div class="tot-lbl">EPF Members</div>
+                    </div>
+                    <div class="tot-card">
+                        <div class="tot-val" style="color:#0891b2;">{{ totals.count_esic }}</div>
+                        <div class="tot-lbl">ESIC Members</div>
+                    </div>
+                    <div class="tot-card">
+                        <div class="tot-val" style="color:#059669;">₹{{ '{:,.0f}'.format(totals.epf_ee) }}</div>
+                        <div class="tot-lbl">EPF EE (12%)</div>
+                    </div>
+                    <div class="tot-card">
+                        <div class="tot-val" style="color:#7c3aed;">₹{{ '{:,.0f}'.format(totals.eps) }}</div>
+                        <div class="tot-lbl">EPS (8.33%)</div>
+                    </div>
+                    <div class="tot-card">
+                        <div class="tot-val" style="color:#0d9488;">₹{{ '{:,.0f}'.format(totals.er_diff) }}</div>
+                        <div class="tot-lbl">EPF AC-I (3.67%)</div>
+                    </div>
+                    <div class="tot-card">
+                        <div class="tot-val" style="color:#b45309;">₹{{ '{:,.0f}'.format(totals.admin_charges) }}</div>
+                        <div class="tot-lbl">Admin Charges</div>
+                    </div>
+                    <div class="tot-card">
+                        <div class="tot-val" style="color:#be123c;">₹{{ '{:,.2f}'.format(totals.esic_ee) }}</div>
+                        <div class="tot-lbl">ESIC EE (0.75%)</div>
+                    </div>
+                    <div class="tot-card">
+                        <div class="tot-val" style="color:#9333ea;">₹{{ '{:,.2f}'.format(totals.esic_er) }}</div>
+                        <div class="tot-lbl">ESIC ER (3.25%)</div>
+                    </div>
+                </div>
+
+                <!-- EPF Total payable row -->
+                <div class="mt-3 p-3 rounded" style="background:var(--surface-alt); border:1px solid var(--border);">
+                    <div class="row g-2 text-center">
+                        <div class="col-6 col-md-3">
+                            <div style="font-size:0.65rem; color:#64748b; text-transform:uppercase; letter-spacing:0.3px;">Total EPF Payable</div>
+                            <div style="font-size:1rem; font-weight:700; color:#1e40af;">
+                                ₹{{ '{:,.0f}'.format(totals.epf_ee + totals.eps + totals.er_diff + totals.admin_charges) }}
+                            </div>
+                            <div style="font-size:0.6rem; color:#94a3b8;">EE + EPS + AC-I + Admin</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div style="font-size:0.65rem; color:#64748b; text-transform:uppercase; letter-spacing:0.3px;">Total ESIC Payable</div>
+                            <div style="font-size:1rem; font-weight:700; color:#0891b2;">
+                                ₹{{ '{:,.2f}'.format(totals.esic_ee + totals.esic_er) }}
+                            </div>
+                            <div style="font-size:0.6rem; color:#94a3b8;">EE + Employer</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div style="font-size:0.65rem; color:#64748b; text-transform:uppercase; letter-spacing:0.3px;">Gross Wages Total</div>
+                            <div style="font-size:1rem; font-weight:700; color:#059669;">
+                                ₹{{ '{:,.0f}'.format(totals.gross_total) }}
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div style="font-size:0.65rem; color:#64748b; text-transform:uppercase; letter-spacing:0.3px;">Fee Charged</div>
+                            <div style="font-size:1rem; font-weight:700; color:#7c3aed;">
+                                ₹{{ '{:,.2f}'.format(rec.fee_charged or 0) }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Employee-wise Table (EPF) -->
+        {% if totals.count_epf > 0 %}
+        <div class="card detail-card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-shield-check me-2 text-primary"></i>EPF Details — {{ totals.count_epf }} members</span>
+                <a href="{{ url_for('non_client.nc_download_ecr', record_id=rec.id) }}"
+                   class="btn btn-success btn-sm" style="font-size:0.68rem;">
+                    <i class="bi bi-filetype-txt me-1"></i>Download ECR
+                </a>
+            </div>
+            <div class="table-responsive">
+                <table class="table emp-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th>UAN</th>
+                            <th class="text-end">Gross</th>
+                            <th class="text-end">EPF Wages</th>
+                            <th class="text-end">EE (12%)</th>
+                            <th class="text-end">EPS</th>
+                            <th class="text-end">AC-I</th>
+                            <th class="text-center">NCP Days</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for e in employees if e.has_epf %}
+                        <tr>
+                            <td class="text-muted">{{ loop.index }}</td>
+                            <td style="font-weight:600;">{{ e.name }}</td>
+                            <td><code style="font-size:0.68rem; background:#eef2ff; padding:1px 4px; border-radius:3px;">{{ e.uan }}</code></td>
+                            <td class="text-end">{{ '{:,.0f}'.format(e.gross) }}</td>
+                            <td class="text-end">{{ e.epf_wages }}</td>
+                            <td class="text-end fw-600" style="color:#1e40af;">{{ e.epf_ee }}</td>
+                            <td class="text-end" style="color:#7c3aed;">{{ e.eps }}</td>
+                            <td class="text-end" style="color:#0891b2;">{{ e.er_diff }}</td>
+                            <td class="text-center">
+                                {% if e.ncp_days > 0 %}
+                                <span style="background:#fee2e2; color:#991b1b; font-size:0.65rem; padding:2px 6px; border-radius:10px; font-weight:700;">{{ e.ncp_days }}</span>
+                                {% else %}
+                                <span class="text-muted">0</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background:var(--surface-alt); font-weight:700;">
+                            <td colspan="5" class="text-end" style="font-size:0.72rem;">TOTAL</td>
+                            <td class="text-end" style="color:#1e40af;">{{ totals.epf_ee }}</td>
+                            <td class="text-end" style="color:#7c3aed;">{{ totals.eps }}</td>
+                            <td class="text-end" style="color:#0891b2;">{{ totals.er_diff }}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Employee-wise Table (ESIC) -->
+        {% if totals.count_esic > 0 %}
+        <div class="card detail-card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-hospital me-2 text-success"></i>ESIC Details — {{ esic_rows|length }} covered</span>
+                <a href="{{ url_for('non_client.nc_download_esic', record_id=rec.id) }}"
+                   class="btn btn-info btn-sm" style="font-size:0.68rem; color:#fff;">
+                    <i class="bi bi-file-earmark-excel me-1"></i>Download MC Template
+                </a>
+            </div>
+            <div class="table-responsive">
+                <table class="table emp-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th>IP Number</th>
+                            <th class="text-end">Days</th>
+                            <th class="text-end">ESIC Wages</th>
+                            <th class="text-end">EE (0.75%)</th>
+                            <th class="text-end">ER (3.25%)</th>
+                            <th class="text-end">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for e in employees if e.has_esic and e.esic_covered %}
+                        <tr>
+                            <td class="text-muted">{{ loop.index }}</td>
+                            <td style="font-weight:600;">{{ e.name }}</td>
+                            <td><code style="font-size:0.68rem; background:#f0fdf4; padding:1px 4px; border-radius:3px;">{{ e.ip_no }}</code></td>
+                            <td class="text-end">{{ e.days }}</td>
+                            <td class="text-end">{{ '{:,.2f}'.format(e.esic_wages) }}</td>
+                            <td class="text-end fw-600" style="color:#be123c;">{{ '{:,.2f}'.format(e.esic_ee) }}</td>
+                            <td class="text-end" style="color:#9333ea;">{{ '{:,.2f}'.format(e.esic_er) }}</td>
+                            <td class="text-end fw-600">{{ '{:,.2f}'.format(e.esic_ee + e.esic_er) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background:var(--surface-alt); font-weight:700;">
+                            <td colspan="5" class="text-end" style="font-size:0.72rem;">TOTAL</td>
+                            <td class="text-end" style="color:#be123c;">₹{{ '{:,.2f}'.format(totals.esic_ee) }}</td>
+                            <td class="text-end" style="color:#9333ea;">₹{{ '{:,.2f}'.format(totals.esic_er) }}</td>
+                            <td class="text-end">₹{{ '{:,.2f}'.format(totals.esic_ee + totals.esic_er) }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- ECR text preview -->
+        {% if rec.ecr_text %}
+        <div class="card detail-card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-code-square me-2 text-muted"></i>ECR File Preview</span>
+                <span style="font-size:0.65rem; color:#64748b;">Pipe-delimited format for EPFO portal</span>
+            </div>
+            <div class="card-body py-2">
+                <div class="ecr-preview">{{ rec.ecr_text }}</div>
+                <div class="mt-2" style="font-size:0.65rem; color:#64748b;">
+                    Format: UAN #~# Name #~# Gross #~# EPF Wages #~# EPS Wages #~# EDLI Wages #~# EE #~# EPS #~# ER Diff #~# NCP Days #~# 0
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% elif rec.status == 'error' %}
+        <div class="alert alert-danger" style="font-size:0.8rem;">
+            <i class="bi bi-x-circle-fill me-2"></i>
+            <strong>Processing Error.</strong> The last upload failed.
+            Please check your Excel file format and try again using the Upload step on the left.
+        </div>
+
+        {% else %}
+        <!-- Pending state — show instructions -->
+        <div class="card detail-card">
+            <div class="card-header"><i class="bi bi-info-circle me-2 text-primary"></i>Get Started</div>
+            <div class="card-body">
+                <div class="alert alert-info py-2 mb-3" style="font-size:0.78rem;">
+                    <i class="bi bi-download me-2"></i>
+                    Start by downloading the blank Excel template, filling in employee data,
+                    then uploading it back here.
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div style="background:var(--surface-alt); border-radius:8px; padding:14px;">
+                            <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px;">
+                                <i class="bi bi-shield-check text-primary me-2"></i>EPF Rates (used automatically)
+                            </div>
+                            <table class="table table-sm mb-0" style="font-size:0.72rem;">
+                                <tr><td>Employee Contribution</td><td class="text-end fw-600">12%</td></tr>
+                                <tr><td>EPS (Employer)</td><td class="text-end fw-600">8.33%</td></tr>
+                                <tr><td>EPF AC-I (Employer)</td><td class="text-end fw-600">3.67%</td></tr>
+                                <tr><td>Admin Charges</td><td class="text-end fw-600">0.5% (min ₹500)</td></tr>
+                                <tr><td>EDLI</td><td class="text-end fw-600">0.5%</td></tr>
+                                <tr><td class="text-muted">EPF Wage Ceiling</td><td class="text-end text-muted">₹15,000</td></tr>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div style="background:var(--surface-alt); border-radius:8px; padding:14px;">
+                            <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px;">
+                                <i class="bi bi-hospital text-success me-2"></i>ESIC Rates (used automatically)
+                            </div>
+                            <table class="table table-sm mb-0" style="font-size:0.72rem;">
+                                <tr><td>Employee Contribution</td><td class="text-end fw-600">0.75%</td></tr>
+                                <tr><td>Employer Contribution</td><td class="text-end fw-600">3.25%</td></tr>
+                                <tr><td class="text-muted">ESIC Wage Ceiling</td><td class="text-end text-muted">₹21,000</td></tr>
+                                <tr><td class="text-muted" colspan="2" style="font-size:0.65rem;">Employees above ceiling — excluded automatically</td></tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+    </div><!-- end right column -->
+</div>
+
+{% endblock %}
