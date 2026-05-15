@@ -21,218 +21,152 @@
         /* ===== EDITABLE FIELDS ===== */
         .editable { border: none; border-bottom: 1px dotted #888; outline: none; font-family: 'Times New Roman', serif; font-size: 11.5px; color: #000; background: transparent; padding: 1px 4px; min-width: 220px; }
         .editable:focus { background: #fffde7; border-bottom-color: #555; }
-        .order-field { border: none; border-bottom: 1px solid #000; outline: none; min-width: 200px; font-family: 'Times New Roman', serif; font-size: 11.5px; background: transparent; padding: 0 4px; }
 
         /* =================================================
-           FORMAT VISIBILITY TOGGLES
+           SHARED LAYOUT
         ================================================= */
-        .fmt1-block, .fmt23-block, .fmt2-block, .fmt3-block { display: none; }
-
-        .page[data-format="1"] .fmt1-block  { display: block; }
-        .page[data-format="2"] .fmt23-block { display: block; }
-        .page[data-format="3"] .fmt23-block { display: block; }
-        .page[data-format="2"] .fmt2-block  { display: block; }
-        .page[data-format="3"] .fmt3-block  { display: block; }
-
-        /* Tables */
-        .trad-table, .std-table { display: none; width: 100%; border-collapse: collapse; }
-        .page[data-format="1"] .trad-table { display: table; }
-        .page[data-format="2"] .std-table  { display: table; }
-        .page[data-format="3"] .std-table  { display: table; }
-
-        /* Grand total blocks */
-        .gt-arrow-wrap, .gt-box-wrap { display: none; }
-        .page[data-format="1"] .gt-arrow-wrap  { display: block; }
-        .page[data-format="2"] .gt-box-wrap    { display: block; }
-        .page[data-format="3"] .gt-box-wrap    { display: block; }
-
-        /* EPF/ESIC sub-total boxes below table */
-        .epf-esic-subtotals { display: none; }
-        .page[data-format="2"] .epf-esic-subtotals,
-        .page[data-format="3"] .epf-esic-subtotals { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 6px; }
-
-        /* Letter title strip */
-        .letter-title { display: none; margin: 8px 0; text-align: center; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1.5px; padding: 4px 0; }
-        .page[data-format="2"] .letter-title { display: block; border-top: 1px solid #000; border-bottom: 1px solid #000; }
-        .page[data-format="3"] .letter-title { display: block; border-top: 1px dashed #9ca3af; border-bottom: 1px dashed #9ca3af; color: #1e3a8a; letter-spacing: 2px; }
-
-        /* Ref date row */
-        .ref-date-row { display: none; justify-content: space-between; font-size: 11px; margin-bottom: 6px; }
-        .page[data-format="2"] .ref-date-row,
-        .page[data-format="3"] .ref-date-row { display: flex; }
-
-        /* Subject line */
-        .subject-line { display: none; font-size: 11.5px; font-weight: bold; margin: 5px 0; }
-        .page[data-format="2"] .subject-line,
-        .page[data-format="3"] .subject-line { display: block; }
-
-        /* Code line (format 1 only) */
-        .code-line { display: none; justify-content: space-between; font-size: 11.5px; margin: 8px 0 6px; font-weight: 600; }
-        .page[data-format="1"] .code-line { display: flex; }
-
-        /* Note (format 1 only) */
-        .note-section { display: none; font-size: 11px; margin: 10px 0 4px; line-height: 1.7; }
-        .page[data-format="1"] .note-section { display: block; }
-
-        /* Particulars boxes (format 2 & 3 only) */
-        .particulars { display: none; grid-template-columns: 1fr 1fr; gap: 8px; margin: 6px 0; }
-        .page[data-format="2"] .particulars,
-        .page[data-format="3"] .particulars { display: grid; }
-
+        .ref-date-row { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 8px; }
+        .letter-to { font-size: 11.5px; line-height: 1.75; margin: 8px 0; }
+        .subject-line { font-size: 11.5px; font-weight: bold; margin: 6px 0 4px; }
+        .body-text { text-align: justify; font-size: 11.5px; line-height: 1.55; margin: 6px 0; text-indent: 18px; }
+        .particulars { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 6px 0; }
         .part-body { padding: 5px 10px; font-size: 11px; }
         .part-row { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px dotted #d1d5db; }
         .part-row:last-child { border-bottom: none; }
         .part-value { font-weight: bold; font-family: 'Courier New', monospace; }
+        .reim-table { width: 100%; border-collapse: collapse; font-size: 10.5px; margin: 6px 0; }
+        .reim-table td { font-size: 11px; }
+        .reim-table .amt  { text-align: right; font-family: 'Courier New', monospace; }
+        .reim-table .bold-amt { text-align: right; font-weight: bold; font-family: 'Courier New', monospace; }
+        .epf-esic-subtotals { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 6px; }
+        .epf-esic-box { font-size: 10.5px; padding: 4px 10px; }
+        .closing { font-size: 11.5px; margin-top: 10px; }
+        .closing .sign-space { margin-top: 28px; }
 
         /* =================================================
-           FORMAT 1: TRADITIONAL LETTERHEAD
+           FORMAT 1 — FORMAL
+           Boxed letterhead · charcoal table header · zebra rows · right grand total
         ================================================= */
-        .page[data-format="1"] .letterhead { text-align: center; margin-bottom: 8px; }
+        .page[data-format="1"] .letterhead {
+            border: 1.5px solid #000; padding: 12px 16px; text-align: center; margin-bottom: 10px;
+        }
         .page[data-format="1"] .co-name {
-            display: block; background: #b8cce4; font-style: italic; font-weight: bold;
-            font-size: 17px; letter-spacing: 1px; text-transform: uppercase;
-            padding: 5px 16px; border: 1px solid #8aaac8; text-decoration: underline;
+            font-size: 19px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase;
+            display: block; border-bottom: 1.5px solid #000; padding-bottom: 6px; margin-bottom: 5px;
         }
-        .page[data-format="1"] .co-address {
-            display: block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.3px;
-            text-transform: uppercase; padding: 4px 12px; margin-top: 3px;
-            border-top: 2px solid #000; border-bottom: 2px solid #000;
+        .page[data-format="1"] .co-address { display: block; font-size: 11px; color: #333; margin-bottom: 3px; }
+        .page[data-format="1"] .co-codes { display: block; font-size: 11px; font-weight: 600; }
+
+        .page[data-format="1"] .letter-title {
+            font-size: 11.5px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
+            margin: 8px 0 6px; text-align: center;
+            border-bottom: 2px solid #000; padding-bottom: 4px;
         }
-        .page[data-format="1"] .co-codes { display: none; }
-        .page[data-format="1"] .lh-divider { display: none; }
+        .page[data-format="1"] .subject-line { text-decoration: underline; }
+        .page[data-format="1"] .period-hl { font-weight: bold; }
 
-        /* Format 1 "To" section: To on left, Date on right */
-        .page[data-format="1"] .to-wrapper { display: flex; justify-content: space-between; align-items: flex-start; margin: 12px 0 8px; font-size: 11.5px; }
-        .page[data-format="2"] .to-wrapper,
-        .page[data-format="3"] .to-wrapper { display: block; font-size: 11.5px; line-height: 1.7; margin: 8px 0; }
+        /* Formal particulars */
+        .page[data-format="1"] .part-box { border: 1px solid #555; }
+        .page[data-format="1"] .part-head { background: #2d3748; color: #fff; padding: 3px 10px; font-size: 10.5px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; text-align: center; }
 
-        .page[data-format="1"] .to-date-right { text-align: right; white-space: nowrap; font-size: 11.5px; }
-        .page[data-format="2"] .to-date-right,
-        .page[data-format="3"] .to-date-right { display: none; }
+        /* Formal table */
+        .page[data-format="1"] .reim-table th,
+        .page[data-format="1"] .reim-table td { border: 1px solid #555; padding: 3px 5px; text-align: center; vertical-align: middle; }
+        .page[data-format="1"] .reim-table thead th { background: #2d3748; color: #fff; font-weight: bold; font-size: 10px; text-transform: uppercase; }
+        .page[data-format="1"] .reim-table thead th.sub-h { background: #3d4f63; color: #fff; font-size: 10px; }
+        .page[data-format="1"] .reim-table tbody tr:nth-child(even) td { background: #f4f6f8; }
+        .page[data-format="1"] .reim-table .total-row td { background: #e8ecf0; font-weight: bold; border-top: 2px solid #2d3748; }
 
-        .page[data-format="1"] .fmt23-salutation { display: none; }
-        .page[data-format="2"] .fmt23-salutation,
-        .page[data-format="3"] .fmt23-salutation { display: block; margin-top: 4px; font-size: 11.5px; }
+        /* Formal EPF/ESIC boxes */
+        .page[data-format="1"] .epf-esic-box { border: 1px solid #555; background: #f4f6f8; }
+
+        /* Formal grand total — right-aligned */
+        .page[data-format="1"] .gt-wrap { margin: 8px 0; display: flex; justify-content: flex-end; }
+        .page[data-format="1"] .gt-inner { border: 2px solid #2d3748; padding: 7px 24px; text-align: right; min-width: 260px; }
+        .page[data-format="1"] .gt-label-box { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; color: #2d3748; margin-bottom: 2px; }
+        .page[data-format="1"] .gt-amt-box { font-size: 18px; font-weight: bold; font-family: 'Courier New', monospace; }
+
+        .page[data-format="1"] .co-sign { font-weight: bold; font-size: 12.5px; }
 
         /* =================================================
-           FORMAT 2: PROFESSIONAL LETTERHEAD
+           FORMAT 2 — PROFESSIONAL
+           Double-underline letterhead · grey table headers · centered grand total
         ================================================= */
-        .page[data-format="2"] .letterhead { text-align: center; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 3px double #000; }
-        .page[data-format="2"] .co-name {
-            display: block; font-weight: bold; font-size: 19px; letter-spacing: 2px;
-            text-transform: uppercase; font-variant: small-caps; margin-bottom: 3px;
+        .page[data-format="2"] .letterhead {
+            text-align: center; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 3px double #000;
         }
+        .page[data-format="2"] .co-name { display: block; font-weight: bold; font-size: 19px; letter-spacing: 2px; text-transform: uppercase; font-variant: small-caps; margin-bottom: 3px; }
         .page[data-format="2"] .co-address { display: block; font-size: 11px; color: #333; margin-top: 2px; }
         .page[data-format="2"] .co-codes { display: block; font-size: 11px; font-weight: 600; margin-top: 4px; }
-        .page[data-format="2"] .lh-divider { display: none; }
+
+        .page[data-format="2"] .letter-title {
+            display: block; text-align: center; margin: 8px 0; font-size: 12px; font-weight: bold;
+            text-transform: uppercase; letter-spacing: 1.5px;
+            border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 4px 0;
+        }
+        .page[data-format="2"] .period-hl { font-weight: bold; text-decoration: underline; }
+
+        .page[data-format="2"] .part-box { border: 1px solid #333; }
+        .page[data-format="2"] .part-head { background: #d0d0d0; color: #000; padding: 3px 10px; font-size: 10.5px; font-weight: bold; text-transform: uppercase; text-align: center; }
+
+        .page[data-format="2"] .reim-table th,
+        .page[data-format="2"] .reim-table td { border: 1px solid #333; padding: 3px 5px; text-align: center; vertical-align: middle; }
+        .page[data-format="2"] .reim-table thead th { background: #d0d0d0; font-weight: bold; font-size: 10px; text-transform: uppercase; }
+        .page[data-format="2"] .reim-table thead th.sub-h { background: #e4e4e4; }
+        .page[data-format="2"] .reim-table .total-row td { background: #f2f2f2; font-weight: bold; border-top: 2px solid #333; }
+        .page[data-format="2"] .epf-esic-box { border: 1px solid #333; background: #f8f8f8; }
+
+        .page[data-format="2"] .gt-wrap { text-align: center; margin: 8px 0; }
+        .page[data-format="2"] .gt-inner { display: inline-block; border: 2px solid #000; padding: 8px 40px; }
+        .page[data-format="2"] .gt-label-box { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; margin-bottom: 2px; }
+        .page[data-format="2"] .gt-amt-box { font-size: 18px; font-weight: bold; font-family: 'Courier New', monospace; }
+
+        .page[data-format="2"] .co-sign { font-weight: bold; font-size: 12.5px; }
 
         /* =================================================
-           FORMAT 3: CORPORATE LETTERHEAD (current blue)
+           FORMAT 3 — CORPORATE
+           Blue letterhead · blue table headers · blue grand total
         ================================================= */
         .page[data-format="3"] .letterhead {
             text-align: center; margin-bottom: 4px; padding-bottom: 8px;
             border-bottom: 2px solid #1e3a8a; position: relative;
         }
         .page[data-format="3"] .letterhead::after { content: ''; position: absolute; bottom: -4px; left: 0; right: 0; height: 1px; background: #1e3a8a; }
-        .page[data-format="3"] .co-name {
-            display: block; font-size: 22px; font-weight: bold; letter-spacing: 2.5px;
-            color: #1e3a8a; font-variant: small-caps; margin-bottom: 2px;
-        }
+        .page[data-format="3"] .co-name { display: block; font-size: 22px; font-weight: bold; letter-spacing: 2.5px; color: #1e3a8a; font-variant: small-caps; margin-bottom: 2px; }
         .page[data-format="3"] .co-address { display: block; font-size: 11.5px; color: #374151; font-style: italic; }
         .page[data-format="3"] .co-codes { display: block; font-size: 11px; color: #1e3a8a; margin-top: 6px; font-weight: 600; }
-        .page[data-format="3"] .lh-divider { display: none; }
 
-        /* =================================================
-           TRADITIONAL TABLE (Format 1)
-        ================================================= */
-        .trad-table { font-size: 10.5px; margin: 4px 0; }
-        .trad-table th, .trad-table td { border: 1px solid #000; padding: 3px 4px; text-align: center; vertical-align: middle; }
-        .trad-table thead th { font-weight: bold; font-size: 9.5px; background: #fff; line-height: 1.3; }
-        .trad-table .data-r1 td, .trad-table .data-r2 td, .trad-table .empty-r td { background: #fce4d6; }
-        .trad-table .total-r td { font-weight: bold; background: #fff; }
-        .trad-table .amt { text-align: right; font-family: 'Courier New', monospace; }
-        .trad-table .period-cell { color: #c00000; font-weight: 700; }
+        .page[data-format="3"] .letter-title {
+            display: block; text-align: center; margin: 8px 0; font-size: 12px; font-weight: bold;
+            text-transform: uppercase; letter-spacing: 2px; color: #1e3a8a;
+            border-top: 1px dashed #9ca3af; border-bottom: 1px dashed #9ca3af; padding: 3px 0;
+        }
+        .page[data-format="3"] .period-hl { font-weight: bold; text-decoration: underline; color: #1e3a8a; }
 
-        /* =================================================
-           STANDARD TABLE (Format 2 & 3)
-        ================================================= */
-        .std-table { font-size: 10.5px; margin: 6px 0; }
-        .std-table th, .std-table td { padding: 3px 5px; text-align: center; vertical-align: middle; }
-        .std-table td { font-size: 11px; }
-        .std-table .amt { text-align: right; font-family: 'Courier New', monospace; }
-        .std-table .bold-amt { text-align: right; font-weight: bold; font-family: 'Courier New', monospace; }
-
-        /* Format 2 table colors */
-        .page[data-format="2"] .std-table th,
-        .page[data-format="2"] .std-table td { border: 1px solid #333; }
-        .page[data-format="2"] .std-table thead th { background: #d0d0d0; font-weight: bold; font-size: 10px; text-transform: uppercase; }
-        .page[data-format="2"] .std-table thead th.sub-h { background: #e4e4e4; }
-        .page[data-format="2"] .std-table .total-row td { background: #f2f2f2; font-weight: bold; border-top: 2px solid #333; }
-        .page[data-format="2"] .epf-esic-box { border: 1px solid #333; padding: 4px 10px; background: #f8f8f8; font-size: 10.5px; }
-
-        /* Format 3 table colors */
-        .page[data-format="3"] .std-table th,
-        .page[data-format="3"] .std-table td { border: 1px solid #374151; }
-        .page[data-format="3"] .std-table thead th { background: #1e3a8a; color: #fff; font-weight: bold; font-size: 10px; text-transform: uppercase; }
-        .page[data-format="3"] .std-table thead th.sub-h { background: #3b4a89; color: #fff; }
-        .page[data-format="3"] .std-table .total-row td { background: #fef3c7; font-weight: bold; border-top: 2px solid #1e3a8a; }
-        .page[data-format="3"] .epf-esic-box { border: 1px solid #1e3a8a; padding: 4px 10px; background: #eff6ff; font-size: 10.5px; }
-
-        /* Format 2 particulars */
-        .page[data-format="2"] .part-box { border: 1px solid #333; }
-        .page[data-format="2"] .part-head { background: #d0d0d0; color: #000; padding: 3px 10px; font-size: 10.5px; font-weight: bold; text-transform: uppercase; text-align: center; }
-
-        /* Format 3 particulars */
         .page[data-format="3"] .part-box { border: 1.5px solid #1e3a8a; border-radius: 4px; overflow: hidden; }
         .page[data-format="3"] .part-head { background: #1e3a8a; color: #fff; padding: 3px 10px; font-size: 10.5px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.8px; text-align: center; }
 
-        /* =================================================
-           BODY TEXT
-        ================================================= */
-        .body-text { text-align: justify; font-size: 11.5px; line-height: 1.55; margin: 6px 0; }
-        .page[data-format="2"] .body-text,
-        .page[data-format="3"] .body-text { text-indent: 18px; }
-        .page[data-format="3"] .period-hl { font-weight: bold; text-decoration: underline; color: #1e3a8a; }
-        .page[data-format="1"] .period-hl,
-        .page[data-format="2"] .period-hl { font-weight: bold; text-decoration: underline; }
+        .page[data-format="3"] .reim-table th,
+        .page[data-format="3"] .reim-table td { border: 1px solid #374151; padding: 3px 5px; text-align: center; vertical-align: middle; }
+        .page[data-format="3"] .reim-table thead th { background: #1e3a8a; color: #fff; font-weight: bold; font-size: 10px; text-transform: uppercase; }
+        .page[data-format="3"] .reim-table thead th.sub-h { background: #3b4a89; color: #fff; }
+        .page[data-format="3"] .reim-table .total-row td { background: #fef3c7; font-weight: bold; border-top: 2px solid #1e3a8a; }
+        .page[data-format="3"] .epf-esic-box { border: 1px solid #1e3a8a; background: #eff6ff; }
 
-        /* =================================================
-           GRAND TOTAL — FORMAT 1 ARROW STYLE
-        ================================================= */
-        .gt-arrow-wrap { font-size: 12px; margin: 10px 0 6px; display: flex; align-items: baseline; gap: 12px; }
-        .gt-arrow-wrap .gt-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; line-height: 1.4; max-width: 210px; }
-        .gt-arrow-wrap .gt-arr { font-size: 18px; }
-        .gt-arrow-wrap .gt-amt { font-style: italic; font-size: 17px; font-weight: bold; }
-
-        /* =================================================
-           GRAND TOTAL — FORMAT 2 & 3 BOX STYLE
-        ================================================= */
-        .gt-box-wrap { text-align: center; margin: 8px 0; }
-        .page[data-format="2"] .gt-inner { display: inline-block; border: 2px solid #000; padding: 8px 40px; }
+        .page[data-format="3"] .gt-wrap { text-align: center; margin: 8px 0; }
         .page[data-format="3"] .gt-inner { display: inline-block; border: 2px solid #1e3a8a; padding: 6px 36px; border-radius: 4px; background: linear-gradient(180deg, #fff 0%, #eff6ff 100%); }
-        .page[data-format="2"] .gt-label-box { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; margin-bottom: 2px; }
         .page[data-format="3"] .gt-label-box { font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 2px; color: #1e3a8a; }
-        .page[data-format="2"] .gt-amt-box { font-size: 18px; font-weight: bold; font-family: 'Courier New', monospace; }
         .page[data-format="3"] .gt-amt-box { font-size: 18px; font-weight: bold; font-family: 'Courier New', monospace; color: #1e3a8a; }
 
-        /* =================================================
-           CLOSING
-        ================================================= */
-        .closing { font-size: 11.5px; margin-top: 10px; }
-        .page[data-format="1"] .closing { text-align: right; }
-        .closing .sign-space { margin-top: 28px; }
-        .page[data-format="1"] .co-sign { font-style: italic; font-weight: bold; font-size: 13px; }
-        .page[data-format="2"] .co-sign { font-weight: bold; font-size: 12.5px; }
         .page[data-format="3"] .co-sign { font-weight: bold; font-size: 12.5px; color: #1e3a8a; }
-        .sign-role { font-style: italic; font-size: 10.5px; margin-top: 2px; color: #555; }
 
-        /* =================================================
-           PRINT
-        ================================================= */
+        /* letter-title hidden by default; each format sets display:block above */
+        .letter-title { display: none; }
+
         @media print {
             body { background: #fff; }
             .no-print { display: none !important; }
-            .editable, .order-field { border-bottom: 1px solid #aaa; }
+            .editable { border-bottom: 1px solid #aaa; }
             .page { box-shadow: none; margin: 0; max-width: 100%; padding: 8px 16px; }
         }
     </style>
@@ -248,7 +182,7 @@
     <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
         <div style="display:flex; align-items:center; gap:6px;">
             <span style="font-size:0.72rem; opacity:0.75;">Format:</span>
-            <button class="fmt-btn active" onclick="setFmt(1,this)">1 – Traditional</button>
+            <button class="fmt-btn active" onclick="setFmt(1,this)">1 – Formal</button>
             <button class="fmt-btn" onclick="setFmt(2,this)">2 – Professional</button>
             <button class="fmt-btn" onclick="setFmt(3,this)">3 – Corporate</button>
         </div>
@@ -259,82 +193,47 @@
 
 <div class="page" data-format="1" id="letter-page">
 
-    <!-- ===================================================
-         LETTERHEAD  (shared HTML — format-specific CSS)
-    ==================================================== -->
+    <!-- ===== LETTERHEAD ===== -->
     <div class="letterhead">
         <div class="co-name">{{ entry.client_name | upper }}</div>
-        {% if entry.client_address %}
-        <div class="co-address">{{ entry.client_address }}</div>
-        {% endif %}
+        {% if entry.client_address %}<div class="co-address">{{ entry.client_address }}</div>{% endif %}
         {% if entry.pf_code_display or entry.esic_code_display %}
         <div class="co-codes">
-            {% if entry.pf_code_display %}<span>EPF: <strong>{{ entry.pf_code_display }}</strong></span>{% endif %}
+            {% if entry.pf_code_display %}EPF: <strong>{{ entry.pf_code_display }}</strong>{% endif %}
             {% if entry.pf_code_display and entry.esic_code_display %}&nbsp;&nbsp;|&nbsp;&nbsp;{% endif %}
-            {% if entry.esic_code_display %}<span>ESIC: <strong>{{ entry.esic_code_display }}</strong></span>{% endif %}
+            {% if entry.esic_code_display %}ESIC: <strong>{{ entry.esic_code_display }}</strong>{% endif %}
         </div>
         {% endif %}
     </div>
 
-    <!-- Letter Title (Formats 2 & 3) -->
+    <!-- ===== LETTER TITLE STRIP ===== -->
     <div class="letter-title">Application for Reimbursement of Statutory Contributions</div>
 
-    <!-- Ref & Date Row (Formats 2 & 3) -->
+    <!-- ===== REF & DATE ===== -->
     <div class="ref-date-row">
         <div>Ref. No.: <strong>{{ entry.ref_no or '__________' }}</strong></div>
         <div><strong>Date:</strong> {{ entry.letter_date.strftime('%d-%b-%Y') }}</div>
     </div>
 
-    <!-- ===================================================
-         TO SECTION  (Format 1 has date on right side)
-    ==================================================== -->
-    <div class="to-wrapper">
-        <div style="line-height:1.8;">
-            To,<br>
-            <input type="text" class="editable" style="min-width:200px;" placeholder="The Head (HR&amp;A)"><br>
-            <input type="text" class="editable" style="min-width:200px;" placeholder="Company / Department Name"><br>
-            <input type="text" class="editable" style="min-width:200px;" placeholder="Address"><br>
-            Respected Sir
-        </div>
-        <div class="to-date-right">
-            DATE: &nbsp;<strong>{{ entry.letter_date.strftime('%d-%b-%y') }}</strong>
-        </div>
+    <!-- ===== TO SECTION ===== -->
+    <div class="letter-to">
+        To,<br>
+        <input type="text" class="editable" placeholder="The Manager / HR Department"><br>
+        <input type="text" class="editable" placeholder="Department / Company Name"><br>
+        <input type="text" class="editable" placeholder="Address Line 1"><br>
+        <input type="text" class="editable" style="min-width:200px;" placeholder="City, State — PIN">
     </div>
+    <div style="margin-top:4px; font-size:11.5px;"><strong>Respected Sir / Madam,</strong></div>
 
-    <!-- Salutation (Formats 2 & 3) -->
-    <div class="fmt23-salutation"><strong>Respected Sir / Madam,</strong></div>
-
-    <!-- ===================================================
-         FORMAT 1 SPECIFIC: Order No + SUB line
-    ==================================================== -->
-    <div class="fmt1-block">
-        <div style="text-align:center; margin:10px 0 5px; font-size:11.5px;">
-            EPF FRAME ORDER NO.:- &nbsp;
-            <input type="text" class="order-field" placeholder="________________________">
-        </div>
-        <div style="font-size:11.5px; margin:5px 0 8px;"><strong>SUB:-</strong> &nbsp; Employers Refund</div>
-    </div>
-
-    <!-- ===================================================
-         SUBJECT LINE (Formats 2 & 3)
-    ==================================================== -->
+    <!-- ===== SUBJECT ===== -->
     {% if entry.period_label %}
     <div class="subject-line">
         Subject: Reimbursement of Employer's Share of EPF &amp; ESIC for <u>{{ entry.period_label }}</u>
     </div>
     {% endif %}
 
-    <!-- ===================================================
-         BODY TEXT
-    ==================================================== -->
-    <div class="fmt1-block body-text">
-        Application for the Re-imbursement of Employer Shares for EPF &amp; ESI
-        {% if entry.pf_code_display %}under {{ entry.pf_code_display }},{% endif %}
-        we request you to please re-imbursement of EPF and ESI for the below said period and the
-        details of the summary/statement for the said period is given below.
-    </div>
-
-    <div class="fmt23-block body-text">
+    <!-- ===== BODY ===== -->
+    <div class="body-text">
         We have duly remitted the statutory contributions towards <strong>Employees' Provident Fund (EPF)</strong>
         and <strong>Employees' State Insurance Corporation (ESIC)</strong>
         {% if entry.period_label %}for the wage period <span class="period-hl">{{ entry.period_label }}</span>,{% endif %}
@@ -342,109 +241,26 @@
         reimburse the <strong>Employer's Share</strong> as per the details furnished below.
     </div>
 
-    <!-- ===================================================
-         EPF / ESIC NUMBERS (Format 1 only)
-    ==================================================== -->
-    <div class="code-line">
-        <span>EPF NUMBER:&nbsp;&nbsp;<strong>{{ entry.pf_code_display or '________________' }}</strong></span>
-        <span>ESIC NUMBER:&nbsp;&nbsp;<strong>{{ entry.esic_code_display or '________________' }}</strong></span>
-    </div>
-
-    <!-- ===================================================
-         PARTICULARS BOXES (Formats 2 & 3)
-    ==================================================== -->
+    <!-- ===== PARTICULARS ===== -->
     <div class="particulars">
         <div class="part-box">
             <div class="part-head">EPF Particulars</div>
             <div class="part-body">
-                <div class="part-row">
-                    <span>EPF Covered Employees:</span>
-                    <span class="part-value">{{ entry.epf_count }}</span>
-                </div>
-                <div class="part-row">
-                    <span>Salary Disbursed (EPF Wages):</span>
-                    <span class="part-value">&#8377; {{ "{:,.0f}".format(entry.epf_wages) }}</span>
-                </div>
+                <div class="part-row"><span>EPF Covered Employees:</span><span class="part-value">{{ entry.epf_count }}</span></div>
+                <div class="part-row"><span>Salary Disbursed (EPF Wages):</span><span class="part-value">&#8377; {{ "{:,.0f}".format(entry.epf_wages) }}</span></div>
             </div>
         </div>
         <div class="part-box">
             <div class="part-head">ESIC Particulars</div>
             <div class="part-body">
-                <div class="part-row">
-                    <span>ESIC Covered Employees:</span>
-                    <span class="part-value">{{ entry.esic_count }}</span>
-                </div>
-                <div class="part-row">
-                    <span>Salary Disbursed (ESIC Wages):</span>
-                    <span class="part-value">&#8377; {{ "{:,.0f}".format(entry.esic_wages) }}</span>
-                </div>
+                <div class="part-row"><span>ESIC Covered Employees:</span><span class="part-value">{{ entry.esic_count }}</span></div>
+                <div class="part-row"><span>Salary Disbursed (ESIC Wages):</span><span class="part-value">&#8377; {{ "{:,.0f}".format(entry.esic_wages) }}</span></div>
             </div>
         </div>
     </div>
 
-    <!-- ===================================================
-         TABLE — FORMAT 1: TRADITIONAL (10-column + dual rows)
-    ==================================================== -->
-    <table class="trad-table">
-        <thead>
-            <tr>
-                <th style="width:5%;">SL<br>NO</th>
-                <th style="width:10%;">MONTH</th>
-                <th style="width:8%;">MAN<br>POWER</th>
-                <th style="width:11%;">TOTAL<br>WAGES</th>
-                <th style="width:9%;">EPF<br>Amont</th>
-                <th style="width:9%;">EPS<br>Amount</th>
-                <th style="width:9%;">DLI<br>Amount</th>
-                <th style="width:10%;">E P F<br>TOTAL</th>
-                <th style="width:10%;">ESI<br>TOTAL</th>
-                <th style="width:12%;">REFUND<br>EPF&amp;ESI</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- Row 1: EPF wages row -->
-            <tr class="data-r1">
-                <td class="period-cell">1</td>
-                <td class="period-cell">{{ entry.period_label }}</td>
-                <td>{{ entry.epf_count }}</td>
-                <td class="amt">{{ "{:,.0f}".format(entry.epf_wages) }}</td>
-                <td class="amt">{{ "{:,.0f}".format(entry.epf_ac01) }}</td>
-                <td class="amt">{{ "{:,.0f}".format(entry.epf_eps) }}</td>
-                <td class="amt">{{ "{:,.0f}".format(entry.epf_edli) }}</td>
-                <td class="amt"><strong>{{ "{:,.0f}".format(entry.epf_employer_refund) }}</strong></td>
-                <td class="amt"><strong>{{ "{:,.0f}".format(entry.esic_employer) }}</strong></td>
-                <td class="amt"><strong>{{ "{:,.0f}".format(entry.total_refund) }}</strong></td>
-            </tr>
-            <!-- Row 2: ESIC wages sub-row -->
-            <tr class="data-r2">
-                <td></td><td></td>
-                <td>{{ entry.esic_count }}</td>
-                <td class="amt">{{ "{:,.0f}".format(entry.esic_wages) }}</td>
-                <td></td><td></td><td></td><td></td><td></td><td></td>
-            </tr>
-            <!-- Empty entry row 2 -->
-            <tr class="empty-r"><td>2</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-            <tr class="empty-r"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-            <!-- Empty entry row 3 -->
-            <tr class="empty-r"><td>3</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-            <tr class="empty-r"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-            <!-- Total row -->
-            <tr class="total-r">
-                <td colspan="3"></td>
-                <td class="amt">{{ "{:,.0f}".format(entry.epf_wages + entry.esic_wages) }}</td>
-                <td class="amt">{{ "{:,.0f}".format(entry.epf_ac01) }}</td>
-                <td class="amt">{{ "{:,.0f}".format(entry.epf_eps) }}</td>
-                <td class="amt">{{ "{:,.0f}".format(entry.epf_edli) }}</td>
-                <td class="amt">{{ "{:,.0f}".format(entry.epf_employer_refund) }}</td>
-                <td class="amt">{{ "{:,.0f}".format(entry.esic_employer) }}</td>
-                <td class="amt">{{ "{:,.0f}".format(entry.total_refund) }}</td>
-            </tr>
-        </tbody>
-    </table>
-
-    <!-- ===================================================
-         TABLE — FORMAT 2 & 3: STANDARD (8-column)
-    ==================================================== -->
-    <table class="std-table">
+    <!-- ===== BREAKUP TABLE ===== -->
+    <table class="reim-table">
         <thead>
             <tr>
                 <th rowspan="2" style="width:4%;">Sr.</th>
@@ -484,7 +300,7 @@
         </tbody>
     </table>
 
-    <!-- EPF + ESIC sub-totals (Formats 2 & 3) -->
+    <!-- ===== EPF / ESIC SUB-TOTALS ===== -->
     <div class="epf-esic-subtotals">
         <div class="epf-esic-box">
             <strong>EPF Employer Refund:</strong>
@@ -498,48 +314,22 @@
         </div>
     </div>
 
-    <!-- ===================================================
-         GRAND TOTAL — FORMAT 1: Arrow style
-    ==================================================== -->
-    <div class="gt-arrow-wrap">
-        <div class="gt-label">TOTAL REFUND OF EMPLOYER'S<br>CONTRIBUTION (EPF &amp; ESI)</div>
-        <div class="gt-arr">&#8658;</div>
-        <div class="gt-amt"><em>{{ "{:,.2f}".format(entry.total_refund) }}</em></div>
-    </div>
-
-    <!-- ===================================================
-         GRAND TOTAL — FORMAT 2 & 3: Box style
-    ==================================================== -->
-    <div class="gt-box-wrap">
+    <!-- ===== GRAND TOTAL ===== -->
+    <div class="gt-wrap">
         <div class="gt-inner">
             <div class="gt-label-box">Total Reimbursement Claimed</div>
             <div class="gt-amt-box">&#8377; {{ "{:,.2f}".format(entry.total_refund) }}</div>
         </div>
     </div>
 
-    <!-- ===================================================
-         NOTE (Format 1 only)
-    ==================================================== -->
-    <div class="note-section">
-        Note:- Non Seeded Aadhar Employees will Be paid in Next Month<br>
-        <span style="padding-left:42px;">Thanking you sir</span>
-    </div>
-
-    <!-- ===================================================
-         CLOSING
-    ==================================================== -->
+    <!-- ===== CLOSING ===== -->
     <div class="closing">
-        <div class="fmt1-block">
-            <div style="margin-bottom:6px;">yours faith fully</div>
-        </div>
-        <div class="fmt23-block">
-            <p>We shall be grateful if the above reimbursement is processed at the earliest convenience.</p>
-            <p style="margin-top:8px;">Thanking you,</p>
-            <p style="margin-top:4px;">Yours faithfully,</p>
-        </div>
+        <p>We shall be grateful if the above reimbursement is processed at the earliest convenience.</p>
+        <p style="margin-top:8px;">Thanking you,</p>
+        <p style="margin-top:4px;">Yours faithfully,</p>
         <div class="sign-space">
             <div class="co-sign">{{ entry.client_name }}</div>
-            <div class="sign-role">Proprietor / Authorized Signatory</div>
+            <div style="font-style:italic; font-size:10.5px; margin-top:2px; color:#555;">Proprietor / Authorized Signatory</div>
         </div>
     </div>
 
