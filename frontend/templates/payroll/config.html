@@ -176,18 +176,25 @@
                         </label>
                     </div>
                     <div id="otSettings" class="row g-2 mt-1" style="display:{% if config and config.ot_applicable %}flex{% else %}none{% endif %};">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label" style="font-size:0.8rem;">OT Rate</label>
                             <select name="ot_rate_type" class="form-select form-select-sm">
                                 <option value="single" {% if config and config.ot_rate_type == 'single' %}selected{% endif %}>Single (1x)</option>
                                 <option value="double" {% if config and config.ot_rate_type == 'double' %}selected{% endif %}>Double (2x)</option>
                             </select>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label" style="font-size:0.8rem;">OT Unit</label>
                             <select name="ot_unit" class="form-select form-select-sm">
                                 <option value="hours" {% if config and config.ot_unit == 'hours' %}selected{% endif %}>Hours</option>
                                 <option value="days" {% if config and config.ot_unit == 'days' %}selected{% endif %}>Days</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" style="font-size:0.8rem;">OT Base Wage</label>
+                            <select name="ot_base_wage" class="form-select form-select-sm">
+                                <option value="gross" {% if not config or not config.ot_base_wage or config.ot_base_wage == 'gross' %}selected{% endif %}>Full Gross (Basic + HRA + All)</option>
+                                <option value="basic_only" {% if config and config.ot_base_wage == 'basic_only' %}selected{% endif %}>Basic Only (Exclude HRA)</option>
                             </select>
                         </div>
                     </div>

@@ -447,6 +447,8 @@ def _auto_migrate_columns(db):
         ('monthly_payrolls', 'is_nil', 'BOOLEAN DEFAULT FALSE'),
         ('monthly_payrolls', 'nil_epf_admin', 'FLOAT DEFAULT 0'),
         ('monthly_payrolls', 'nil_fee_amount', 'FLOAT DEFAULT 0'),
+        # OT base wage — 'gross' (default) or 'basic_only'
+        ('payroll_configs', 'ot_base_wage', "VARCHAR(15) DEFAULT 'gross'"),
     ]
     for table, column, col_def in migrations:
         try:

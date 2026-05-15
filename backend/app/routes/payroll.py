@@ -71,9 +71,11 @@ def payroll_config(est_id):
         if config.ot_applicable:
             config.ot_rate_type = request.form.get('ot_rate_type', 'double')
             config.ot_unit = request.form.get('ot_unit', 'hours')
+            config.ot_base_wage = request.form.get('ot_base_wage', 'gross')
         else:
             config.ot_rate_type = None
             config.ot_unit = None
+            config.ot_base_wage = 'gross'
 
         # Rest Day
         config.rest_day_type = request.form.get('rest_day_type', 'sunday')
@@ -1902,17 +1904,29 @@ def save_attendance(payroll_id):
 
                 if config.ot_applicable and entry.ot_hours > 0 and working_days > 0:
                     rate_multiplier = 2.0 if config.ot_rate_type == 'double' else 1.0
+
+                    # Determine OT base: full gross (default) or Basic only
+                    ot_base = full_gross
+                    if getattr(config, 'ot_base_wage', 'gross') == 'basic_only' and _use_head_values:
+                        basic_amt = next(
+                            (hv['amount'] for hv in _use_head_values
+                             if hv['salary_head'] and hv['salary_head'].short_code == 'BASIC'),
+                            None
+                        )
+                        if basic_amt:
+                            ot_base = basic_amt
+
                     if config.ot_unit == 'hours':
                         if is_daily_wages and _eff_daily_rate:
                             per_hour = _eff_daily_rate / 8
                         else:
-                            per_hour = (full_gross / working_days) / 8
+                            per_hour = (ot_base / working_days) / 8
                         entry.ot_amount += round(per_hour * entry.ot_hours * rate_multiplier)
                     else:
                         if is_daily_wages and _eff_daily_rate:
                             per_day = _eff_daily_rate
                         else:
-                            per_day = full_gross / working_days
+                            per_day = ot_base / working_days
                         entry.ot_amount += round(per_day * entry.ot_hours * rate_multiplier)
             else:
                 entry.paid_holidays = 0

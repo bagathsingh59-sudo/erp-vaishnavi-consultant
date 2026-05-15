@@ -55,6 +55,9 @@ class PayrollConfig(db.Model):
     # 'hours' = OT entered in hours
     # 'days'  = OT entered in days
     ot_unit = db.Column(db.String(10), nullable=True, default='hours')
+    # 'gross'      = Use full gross salary as OT base (default — all components)
+    # 'basic_only' = Use Basic wage only as OT base (excludes HRA and other allowances)
+    ot_base_wage = db.Column(db.String(15), nullable=True, default='gross')
 
     # --- Rest Day / Weekly Off Settings ---
     # 'sunday'    = Fixed Sunday rest (default)
