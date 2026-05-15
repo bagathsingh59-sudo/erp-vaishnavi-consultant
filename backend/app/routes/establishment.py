@@ -434,6 +434,7 @@ def _save_establishment_form(est, is_new=False):
     if industry == 'Other':
         industry = request.form.get('other_industry', '').strip() or 'Other'
     est.company_name = request.form['company_name'].strip()
+    est.branch_name = request.form.get('branch_name', '').strip() or None
     est.pan_number = request.form.get('pan_number', '').strip().upper() or None
     est.type_of_industry = industry or None
     est.address = request.form.get('address', '').strip() or None
@@ -441,6 +442,13 @@ def _save_establishment_form(est, is_new=False):
         try:
             est.date_of_registration = datetime.strptime(request.form['date_of_registration'], '%Y-%m-%d').date()
         except ValueError:
+            pass
+    # Sub-unit parent link
+    parent_id_str = request.form.get('parent_id', '').strip()
+    if parent_id_str:
+        try:
+            est.parent_id = int(parent_id_str)
+        except (ValueError, TypeError):
             pass
 
     # --- Section 2: Contact ---
@@ -665,6 +673,80 @@ def establishment_add():
         return redirect(url_for('establishment.client_dashboard'))
 
     return render_template('establishments/form.html', est=None, config=None, sf={}, mode='add')
+
+
+@establishment_bp.route('/establishments/<int:id>/add-branch', methods=['GET', 'POST'])
+def establishment_add_branch(id):
+    """Create a sub-unit / branch of an existing establishment.
+
+    GET : Renders the form pre-filled from the parent.
+          PF/ESIC codes cloned (editable — branch may share or have its own code).
+          Address and fee are cleared (branch has its own location; fee often
+          charged on the parent establishment only).
+
+    POST: Saves the new establishment with parent_id set, then clones the
+          parent's PayrollConfig so the branch inherits all statutory settings.
+    """
+    parent = Establishment.query.get_or_404(id)
+    verify_est_ownership(parent)
+
+    parent_config = PayrollConfig.query.filter_by(establishment_id=parent.id).first()
+    sf = _build_stat_flags(parent_config)
+
+    if request.method == 'POST':
+        est = Establishment()
+        _save_establishment_form(est, is_new=True)
+
+        # Clone PayrollConfig from parent so branch inherits all statutory settings
+        if parent_config:
+            from sqlalchemy.inspection import inspect as sa_inspect
+            branch_config = PayrollConfig.query.filter_by(establishment_id=est.id).first()
+            if not branch_config:
+                branch_config = PayrollConfig(establishment_id=est.id)
+                db.session.add(branch_config)
+            skip = {'id', 'establishment_id'}
+            for col in sa_inspect(PayrollConfig).mapper.columns:
+                if col.key not in skip:
+                    setattr(branch_config, col.key, getattr(parent_config, col.key))
+
+        log_activity('created', 'establishment', entity_id=est.id,
+                     entity_name=est.display_name,
+                     details=f'Branch of #{parent.id} {parent.company_name}')
+        db.session.commit()
+
+        session['selected_est_id'] = est.id
+        flash(f'Branch "{est.display_name}" created successfully!', 'success')
+        return redirect(url_for('establishment.establishment_view', id=est.id))
+
+    # GET — build a pre-filled (unsaved) shell from parent data
+    prefill = Establishment()
+    prefill.id               = None
+    prefill.company_name     = parent.company_name
+    prefill.branch_name      = ''
+    prefill.type_of_industry = parent.type_of_industry
+    prefill.pan_number       = parent.pan_number
+    prefill.contact_person   = parent.contact_person
+    prefill.contact_phone    = parent.contact_phone
+    prefill.contact_email    = parent.contact_email
+    prefill.pf_code          = parent.pf_code        # cloned — editable
+    prefill.esic_code        = parent.esic_code      # cloned — editable
+    prefill.gst_number       = parent.gst_number
+    prefill.service_type     = parent.service_type
+    prefill.tds_applicable   = parent.tds_applicable
+    prefill.tds_rate         = parent.tds_rate
+    prefill.compliance_payment_mode = parent.compliance_payment_mode
+    # Cleared — must be entered fresh for the branch
+    prefill.address          = None
+    prefill.fee_amount       = None
+    prefill.fee_type         = None
+    prefill.date_of_registration = None
+
+    return render_template('establishments/form.html',
+                           est=prefill,
+                           config=parent_config,
+                           sf=sf,
+                           mode='branch',
+                           parent_est=parent)
 
 
 @establishment_bp.route('/establishments/<int:id>')

@@ -38,14 +38,26 @@
     <ol class="breadcrumb" style="font-size:0.85rem;">
         <li class="breadcrumb-item"><a href="{{ url_for('establishment.dashboard') }}" class="text-decoration-none">Dashboard</a></li>
         <li class="breadcrumb-item"><a href="{{ url_for('establishment.establishment_list') }}" class="text-decoration-none">Establishments</a></li>
-        <li class="breadcrumb-item active">{{ est.company_name }}</li>
+        {% if est.parent %}
+        <li class="breadcrumb-item">
+            <a href="{{ url_for('establishment.establishment_view', id=est.parent.id) }}" class="text-decoration-none">{{ est.parent.company_name }}</a>
+        </li>
+        {% endif %}
+        <li class="breadcrumb-item active">{{ est.display_name }}</li>
     </ol>
 </nav>
 
 <!-- Header Card -->
-<div style="background:linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color:#fff; border-radius:12px; padding:20px 24px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
+<div style="background:linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color:#fff; border-radius:12px; padding:20px 24px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
     <div>
-        <div style="font-size:1.2rem; font-weight:700;">{{ est.company_name }}</div>
+        {% if est.parent %}
+        <div style="font-size:0.65rem; opacity:0.75; font-weight:600; letter-spacing:0.5px; margin-bottom:4px;">
+            <i class="bi bi-diagram-2 me-1"></i>Branch of
+            <a href="{{ url_for('establishment.establishment_view', id=est.parent.id) }}"
+               style="color:#c4b5fd; text-decoration:none; font-weight:700;">{{ est.parent.company_name }}</a>
+        </div>
+        {% endif %}
+        <div style="font-size:1.2rem; font-weight:700;">{{ est.display_name }}</div>
         <div style="opacity:0.85; font-size:0.8rem; margin-top:4px;">
             {% if est.type_of_industry %}<i class="bi bi-tag me-1"></i>{{ est.type_of_industry }}{% endif %}
             {% if est.date_of_registration %}
@@ -56,7 +68,7 @@
             {% endif %}
         </div>
     </div>
-    <div class="d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
         {% if est.is_active %}
             <span class="badge bg-success bg-opacity-25 text-white px-3 py-2" style="border-radius:20px; font-size:0.8rem;">
                 <i class="bi bi-circle-fill" style="font-size:0.4rem"></i> Active
@@ -69,7 +81,12 @@
         <a href="{{ url_for('establishment.establishment_edit', id=est.id) }}" class="btn btn-light btn-sm" style="font-weight:600;">
             <i class="bi bi-pencil me-1"></i> Edit
         </a>
-        {# Documents Vault button — disabled for now #}
+        {% if not est.parent_id %}
+        <a href="{{ url_for('establishment.establishment_add_branch', id=est.id) }}"
+           class="btn btn-sm" style="background:#fbbf24; color:#1e293b; font-weight:700; border:none;">
+            <i class="bi bi-diagram-2 me-1"></i> Add Branch / Sub-Unit
+        </a>
+        {% endif %}
     </div>
 </div>
 
@@ -434,6 +451,104 @@
     {% endif %}
 
 </div>
+
+<!-- ===== BRANCHES / SUB-UNITS PANEL ===== -->
+{% if not est.parent_id %}
+<div class="view-card" style="margin-bottom:20px;">
+    <div class="view-section" style="background:linear-gradient(135deg, #fffbeb 0%, #fef9ee 100%); border-radius:12px 12px 0 0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div class="section-title">
+                <i class="bi bi-diagram-2 me-2" style="color:#d97706; font-size:1rem;"></i>
+                <span style="color:#92400e;">Branches / Sub-Units</span>
+                {% if est.sub_units %}
+                    <span style="margin-left:8px; background:#fde68a; color:#92400e; font-size:0.7rem; font-weight:700; padding:2px 10px; border-radius:12px;">
+                        {{ est.sub_units|length }}
+                    </span>
+                {% endif %}
+            </div>
+            <a href="{{ url_for('establishment.establishment_add_branch', id=est.id) }}"
+               class="btn btn-sm" style="background:#fbbf24; color:#1e293b; font-weight:700; border:none;">
+                <i class="bi bi-plus-circle me-1"></i> Add Branch / Sub-Unit
+            </a>
+        </div>
+    </div>
+    {% if est.sub_units %}
+    <div class="view-section" style="padding:0;">
+        <div class="table-responsive">
+            <table class="cred-table">
+                <thead>
+                    <tr style="background:#fffbeb;">
+                        <th style="padding-left:20px;">Branch Name</th>
+                        <th>EPF Code</th>
+                        <th>ESIC Code</th>
+                        <th>Fee</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for branch in est.sub_units %}
+                    <tr style="cursor:pointer;" onclick="window.location='{{ url_for('establishment.establishment_view', id=branch.id) }}'">
+                        <td style="padding-left:20px;">
+                            <div style="font-weight:600; color:#1e293b;">
+                                <i class="bi bi-diagram-3 me-1" style="color:#d97706; font-size:0.78rem;"></i>
+                                {{ branch.branch_name or branch.company_name }}
+                            </div>
+                            {% if branch.address %}
+                            <div style="font-size:0.73rem; color:#94a3b8; margin-top:2px;">{{ branch.address }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if branch.pf_code %}
+                                <code style="font-size:0.8rem; background:#e0f2fe; padding:2px 8px; border-radius:4px; color:#0c4a6e;">{{ branch.pf_code }}</code>
+                            {% else %}
+                                <span style="color:#cbd5e1; font-size:0.8rem;">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if branch.esic_code %}
+                                <code style="font-size:0.8rem; background:#dcfce7; padding:2px 8px; border-radius:4px; color:#14532d;">{{ branch.esic_code }}</code>
+                            {% else %}
+                                <span style="color:#cbd5e1; font-size:0.8rem;">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if branch.fee_amount %}
+                                <span style="font-weight:700; color:#059669;">₹{{ "{:,.0f}".format(branch.fee_amount) }}</span>
+                                {% if branch.fee_type %}<small style="color:#94a3b8;"> / {{ branch.fee_type }}</small>{% endif %}
+                            {% else %}
+                                <span style="color:#cbd5e1; font-size:0.8rem; font-style:italic;">Lump-sum on parent</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if branch.is_active %}
+                                <span class="badge" style="background:#d1fae5; color:#065f46; font-size:0.72rem; padding:3px 10px; border-radius:12px;">Active</span>
+                            {% else %}
+                                <span class="badge" style="background:#fee2e2; color:#991b1b; font-size:0.72rem; padding:3px 10px; border-radius:12px;">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align:right; padding-right:16px;">
+                            <a href="{{ url_for('establishment.establishment_view', id=branch.id) }}"
+                               class="btn btn-sm btn-outline-secondary" style="font-size:0.75rem; padding:3px 10px;"
+                               onclick="event.stopPropagation();">
+                                <i class="bi bi-arrow-right me-1"></i> View
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="view-section" style="text-align:center; padding:32px; color:#94a3b8;">
+        <i class="bi bi-diagram-2" style="font-size:2rem; display:block; margin-bottom:8px; color:#fde68a;"></i>
+        <div style="font-size:0.85rem; font-weight:600; color:#d97706; margin-bottom:4px;">No branches added yet</div>
+        <div style="font-size:0.78rem;">Use "Add Branch / Sub-Unit" to create a linked sub-establishment under this account.</div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
 
 <!-- Bottom Action Bar -->
 <div class="view-card" style="margin-bottom:0;">
