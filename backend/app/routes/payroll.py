@@ -1740,19 +1740,31 @@ def save_attendance(payroll_id):
             if entry.ot_hours and entry.ot_hours > 0 and working_days > 0:
                 rate_multiplier = 2.0 if getattr(config, 'ot_rate_type', 'double') == 'double' else 1.0
                 ot_unit = getattr(config, 'ot_unit', 'hours')
+
+                # Determine OT base: full gross (default) or Basic only
+                ot_base = full_gross
+                if getattr(config, 'ot_base_wage', 'gross') == 'basic_only' and _use_head_values:
+                    _basic_amt = next(
+                        (hv['amount'] for hv in _use_head_values
+                         if hv['salary_head'] and hv['salary_head'].short_code == 'BASIC'),
+                        None
+                    )
+                    if _basic_amt:
+                        ot_base = _basic_amt
+
                 if ot_unit == 'hours':
                     if _ovr_daily:
                         per_hour = _ovr_daily / 8
-                    elif full_gross > 0:
-                        per_hour = (full_gross / working_days) / 8
+                    elif ot_base > 0:
+                        per_hour = (ot_base / working_days) / 8
                     else:
                         per_hour = 0
                     entry.ot_amount = round(per_hour * entry.ot_hours * rate_multiplier)
                 else:
                     if _ovr_daily:
                         per_day = _ovr_daily
-                    elif full_gross > 0:
-                        per_day = full_gross / working_days
+                    elif ot_base > 0:
+                        per_day = ot_base / working_days
                     else:
                         per_day = 0
                     entry.ot_amount = round(per_day * entry.ot_hours * rate_multiplier)
