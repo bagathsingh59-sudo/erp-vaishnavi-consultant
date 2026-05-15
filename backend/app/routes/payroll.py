@@ -56,6 +56,13 @@ def payroll_config(est_id):
         else:
             config.custom_working_days = None
 
+        # Billing cycle start day (1 = standard, >1 = custom cycle)
+        try:
+            _cycle_day = int(request.form.get('billing_cycle_start_day', 1))
+            config.billing_cycle_start_day = max(1, min(28, _cycle_day))
+        except (ValueError, TypeError):
+            config.billing_cycle_start_day = 1
+
         # Compliance Basis
         config.compliance_basis = request.form.get('compliance_basis', 'basic_da')
         config.include_ot_in_epf = 'include_ot_in_epf' in request.form
@@ -1269,6 +1276,20 @@ def payroll_create():
             working_days = config.custom_working_days or 26
         else:
             working_days = calendar.monthrange(year, month)[1]
+
+        # Billing cycle override: if start day > 1, compute actual cycle days
+        # e.g. start_day=26, April → 26 Mar to 25 Apr = 31 days
+        _cycle_start_day = getattr(config, 'billing_cycle_start_day', 1) or 1
+        if _cycle_start_day > 1:
+            from datetime import date as _dt
+            _prev_month = month - 1 if month > 1 else 12
+            _prev_year  = year if month > 1 else year - 1
+            try:
+                _cycle_start = _dt(_prev_year, _prev_month, _cycle_start_day)
+                _cycle_end   = _dt(year, month, _cycle_start_day - 1)
+                working_days = (_cycle_end - _cycle_start).days + 1
+            except ValueError:
+                pass  # keep standard working_days on bad date (e.g. start_day=31 in short month)
 
         # Create payroll
         payroll = MonthlyPayroll(
@@ -2639,7 +2660,20 @@ def download_attendance_template(payroll_id):
     ws['A1'].font = Font(name='Calibri', bold=True, size=14, color='4338CA')
 
     ws.merge_cells('A2:H2')
-    ws['A2'] = f'{est.company_name} | Working Days: {payroll.working_days}'
+    _std_cycle = getattr(config, 'billing_cycle_start_day', 1) or 1
+    if _std_cycle > 1:
+        from datetime import date as _dt2
+        _pm = payroll.month - 1 if payroll.month > 1 else 12
+        _py = payroll.year if payroll.month > 1 else payroll.year - 1
+        try:
+            _cs = _dt2(_py, _pm, _std_cycle)
+            _ce = _dt2(payroll.year, payroll.month, _std_cycle - 1)
+            _cycle_label = f'Cycle: {_cs.strftime("%d %b")} – {_ce.strftime("%d %b %Y")} | Cycle Days: {payroll.working_days}'
+        except ValueError:
+            _cycle_label = f'{est.company_name} | Working Days: {payroll.working_days}'
+        ws['A2'] = _cycle_label
+    else:
+        ws['A2'] = f'{est.company_name} | Working Days: {payroll.working_days}'
     ws['A2'].font = Font(name='Calibri', size=10, color='64748B')
 
     ws.merge_cells('A3:H3')
@@ -3455,7 +3489,21 @@ def download_universal_template(payroll_id):
     ws['A1'].font = Font(name='Calibri', bold=True, size=14, color='0D9488')
 
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=total_cols)
-    ws['A2'] = 'Reusable for any month. Fill data and upload in Payroll Processing page. System matches by UAN / ESIC IP / Name.'
+    _uni_cycle = getattr(config, 'billing_cycle_start_day', 1) or 1
+    if _uni_cycle > 1:
+        from datetime import date as _dt3
+        _upm = payroll.month - 1 if payroll.month > 1 else 12
+        _upy = payroll.year if payroll.month > 1 else payroll.year - 1
+        try:
+            _ucs = _dt3(_upy, _upm, _uni_cycle)
+            _uce = _dt3(payroll.year, payroll.month, _uni_cycle - 1)
+            ws['A2'] = (f'Attendance Cycle: {_ucs.strftime("%d %b")} – {_uce.strftime("%d %b %Y")}  '
+                        f'| Cycle Days: {payroll.working_days}  '
+                        f'| Fill data and upload in Payroll Processing page.')
+        except ValueError:
+            ws['A2'] = 'Reusable for any month. Fill data and upload in Payroll Processing page. System matches by UAN / ESIC IP / Name.'
+    else:
+        ws['A2'] = 'Reusable for any month. Fill data and upload in Payroll Processing page. System matches by UAN / ESIC IP / Name.'
     ws['A2'].font = Font(name='Calibri', size=10, color='64748B')
 
     ws.merge_cells(start_row=3, start_column=1, end_row=3, end_column=total_cols)

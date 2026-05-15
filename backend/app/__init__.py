@@ -449,6 +449,8 @@ def _auto_migrate_columns(db):
         ('monthly_payrolls', 'nil_fee_amount', 'FLOAT DEFAULT 0'),
         # OT base wage — 'gross' (default) or 'basic_only'
         ('payroll_configs', 'ot_base_wage', "VARCHAR(15) DEFAULT 'gross'"),
+        # Billing cycle start day — 1 = standard month (default), >1 = custom cycle
+        ('payroll_configs', 'billing_cycle_start_day', 'INTEGER DEFAULT 1'),
     ]
     for table, column, col_def in migrations:
         try:

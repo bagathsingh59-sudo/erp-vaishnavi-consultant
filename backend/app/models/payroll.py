@@ -59,6 +59,12 @@ class PayrollConfig(db.Model):
     # 'basic_only' = Use Basic wage only as OT base (excludes HRA and other allowances)
     ot_base_wage = db.Column(db.String(15), nullable=True, default='gross')
 
+    # --- Billing Cycle ---
+    # 1 = standard calendar month (1st to last day) — default for all establishments
+    # >1 = custom cycle: start_day of prev month to (start_day-1) of current month
+    # e.g. 26 means cycle runs 26th March → 25th April for "April" payroll
+    billing_cycle_start_day = db.Column(db.Integer, nullable=True, default=1)
+
     # --- Rest Day / Weekly Off Settings ---
     # 'sunday'    = Fixed Sunday rest (default)
     # 'rotation'  = Rotation rest after 6 working days

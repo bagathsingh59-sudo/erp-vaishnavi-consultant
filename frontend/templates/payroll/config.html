@@ -113,6 +113,17 @@
                            value="{{ config.custom_working_days if config and config.custom_working_days else 26 }}"
                            min="1" max="31">
                 </div>
+                <div class="col-md-3">
+                    <label class="form-label">Billing Cycle Start Day
+                        <span data-bs-toggle="tooltip" title="Set to 1 for standard month (1st to last day). Set to e.g. 26 if attendance cycle runs from 26th of previous month to 25th of current month.">
+                            <i class="bi bi-info-circle text-muted" style="font-size:0.8rem;"></i>
+                        </span>
+                    </label>
+                    <input type="number" name="billing_cycle_start_day" class="form-control"
+                           value="{{ config.billing_cycle_start_day if config and config.billing_cycle_start_day else 1 }}"
+                           min="1" max="28">
+                    <small class="text-muted">1 = standard (default). E.g. 26 → cycle runs 26th prev month to 25th current month.</small>
+                </div>
             </div>
         </div>
 
