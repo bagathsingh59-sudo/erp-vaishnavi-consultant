@@ -21,6 +21,13 @@
 
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+    /* ── Quick Switch Client dropdown ── */
+    .qs-item { display:block; padding:7px 14px; font-size:0.78rem; color:#334155; text-decoration:none; transition:background 0.1s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .qs-item:hover { background:#f1f5f9; color:#1e293b; }
+    .qs-item.qs-active { background:#eff6ff; color:#2563eb; font-weight:600; }
+    .qs-grp-lbl { font-size:0.6rem; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.06em; padding:6px 14px 2px; }
+    </style>
 
     <!-- Theme Restore — runs BEFORE render to prevent flash of wrong colour -->
     <script>
@@ -504,10 +511,48 @@
                 {% block page_header %}Dashboard{% endblock %}
             </div>
             <div class="top-navbar-right">
-                {% if selected_est %}
-                <span class="badge bg-primary me-2" style="font-size: 0.75rem;">
-                    <i class="bi bi-building me-1"></i>{{ selected_est.display_name }}
-                </span>
+                <!-- ── Quick Switch Client ── -->
+                {% if qs_all_establishments %}
+                <div id="qsWrap" style="position:relative; margin-right:8px;" class="no-print">
+                    <button id="qsBtn" onclick="toggleQS(event)"
+                            style="display:flex; align-items:center; gap:5px; padding:4px 11px; background:rgba(var(--primary-rgb),0.12); border:1px solid rgba(var(--primary-rgb),0.28); border-radius:var(--radius-pill); color:var(--text-primary); font-size:0.72rem; font-weight:600; cursor:pointer; transition:background 0.15s; white-space:nowrap; max-width:220px;"
+                            title="Quick switch client">
+                        <i class="bi bi-arrow-left-right" style="font-size:0.68rem; flex-shrink:0;"></i>
+                        <span style="overflow:hidden; text-overflow:ellipsis; max-width:160px;">
+                            {% if selected_est %}{{ selected_est.display_name }}{% else %}Switch Client{% endif %}
+                        </span>
+                        <i class="bi bi-chevron-down" id="qsChevron" style="font-size:0.58rem; flex-shrink:0; transition:transform 0.2s;"></i>
+                    </button>
+                    <div id="qsPanel" style="display:none; position:absolute; top:calc(100% + 6px); right:0; width:270px; background:#fff; border-radius:10px; border:1px solid #e2e8f0; box-shadow:0 16px 48px rgba(0,0,0,0.18); z-index:10001; overflow:hidden;">
+                        <div style="padding:8px; border-bottom:1px solid #f1f5f9;">
+                            <input type="text" id="qsSearch" placeholder="Search client..."
+                                   oninput="qsFilter(this.value)" onclick="event.stopPropagation()"
+                                   style="width:100%; padding:6px 10px; border:1px solid #e2e8f0; border-radius:6px; font-size:0.78rem; outline:none; color:#1e293b;">
+                        </div>
+                        <div id="qsList" style="overflow-y:auto; max-height:310px; padding:4px 0;">
+                            {% if qs_recent_establishments %}
+                            <div class="qs-grp-lbl">Recent</div>
+                            {% for e in qs_recent_establishments %}
+                            <a href="{{ url_for('establishment.quick_switch_establishment', est_id=e.id) }}"
+                               class="qs-item{% if selected_est and selected_est.id == e.id %} qs-active{% endif %}"
+                               data-name="{{ e.display_name|lower }}">
+                                {% if selected_est and selected_est.id == e.id %}<i class="bi bi-check2" style="color:#16a34a; margin-right:4px;"></i>{% endif %}{{ e.display_name }}
+                            </a>
+                            {% endfor %}
+                            <div style="height:1px; background:#f1f5f9; margin:4px 0;"></div>
+                            <div class="qs-grp-lbl">All Clients</div>
+                            {% endif %}
+                            {% for e in qs_all_establishments %}
+                            <a href="{{ url_for('establishment.quick_switch_establishment', est_id=e.id) }}"
+                               class="qs-item{% if selected_est and selected_est.id == e.id %} qs-active{% endif %}"
+                               data-name="{{ e.display_name|lower }}">
+                                {% if selected_est and selected_est.id == e.id %}<i class="bi bi-check2" style="color:#16a34a; margin-right:4px;"></i>{% endif %}{{ e.display_name }}
+                            </a>
+                            {% endfor %}
+                            <div id="qsNoRes" style="display:none; padding:14px; text-align:center; font-size:0.75rem; color:#94a3b8;">No clients found</div>
+                        </div>
+                    </div>
+                </div>
                 {% endif %}
                 <button type="button" class="btn btn-sm no-print" data-bs-toggle="modal" data-bs-target="#epfCalcGlobal"
                         style="background:var(--gradient-primary); color:var(--text-inverse); font-size:0.68rem; padding:3px 10px; border-radius:var(--radius-pill); border:none;"
@@ -2078,7 +2123,42 @@
             if(wrap && panel && !wrap.contains(e.target)){
                 panel.style.display = 'none';
             }
+            // Close quick-switch panel on outside click
+            var qsWrap = document.getElementById('qsWrap');
+            var qsPanel = document.getElementById('qsPanel');
+            if(qsWrap && qsPanel && !qsWrap.contains(e.target)){
+                qsPanel.style.display = 'none';
+                var ch = document.getElementById('qsChevron');
+                if(ch) ch.style.transform = '';
+            }
         });
+
+        /* ── Quick Switch Client ── */
+        function toggleQS(e) {
+            e.stopPropagation();
+            var panel = document.getElementById('qsPanel');
+            var chevron = document.getElementById('qsChevron');
+            var isOpen = panel.style.display !== 'none';
+            panel.style.display = isOpen ? 'none' : 'block';
+            chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+            if (!isOpen) {
+                var s = document.getElementById('qsSearch');
+                s.value = '';
+                qsFilter('');
+                setTimeout(function(){ s.focus(); }, 60);
+            }
+        }
+        function qsFilter(val) {
+            var v = val.toLowerCase().trim();
+            var items = document.querySelectorAll('#qsList .qs-item');
+            var visible = 0;
+            items.forEach(function(item) {
+                var show = !v || item.dataset.name.indexOf(v) !== -1;
+                item.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+            document.getElementById('qsNoRes').style.display = visible ? 'none' : 'block';
+        }
 
         /* ─────────────────────────────────────────────────
            Restore on load (data-theme already applied in

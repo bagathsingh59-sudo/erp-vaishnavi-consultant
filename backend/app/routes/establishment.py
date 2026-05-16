@@ -259,6 +259,23 @@ def dashboard():
                            fy_options=fy_options)
 
 
+@establishment_bp.route('/establishments/quick-switch/<int:est_id>')
+def quick_switch_establishment(est_id):
+    """Quick-switch to another client from any page — lands on Establishment View"""
+    est = Establishment.query.get_or_404(est_id)
+    verify_est_ownership(est)
+    session.pop('epf_import_data', None)
+    session.pop('epf_import_est_id', None)
+    session['selected_est_id'] = est.id
+    # Track last 5 recently used clients
+    recent = list(session.get('recent_est_ids', []))
+    if est.id in recent:
+        recent.remove(est.id)
+    recent.insert(0, est.id)
+    session['recent_est_ids'] = recent[:5]
+    return redirect(url_for('establishment.establishment_view', id=est.id))
+
+
 @establishment_bp.route('/select-establishment/<int:est_id>')
 def select_establishment(est_id):
     """Select an establishment to work with — scopes all operations"""

@@ -149,6 +149,31 @@ def create_app():
     from app.auth import init_auth
     init_auth(app)
 
+    # Context processor: inject quick-switch establishment list into all templates
+    @app.context_processor
+    def inject_quick_switch():
+        from app.models.establishment import Establishment
+        from app.user_context import is_admin, current_user_id
+        from sqlalchemy import or_
+        try:
+            uid = current_user_id()
+            if uid:
+                base_q = Establishment.query.filter_by(is_active=True).order_by(Establishment.company_name)
+                if is_admin():
+                    ests = base_q.all()
+                else:
+                    ests = base_q.filter(
+                        or_(Establishment.owner_id == uid,
+                            Establishment.assigned_to_id == uid)
+                    ).all()
+                recent_ids = list(session.get('recent_est_ids', []))
+                recent = [e for e in ests if e.id in recent_ids]
+                recent.sort(key=lambda e: recent_ids.index(e.id) if e.id in recent_ids else 999)
+                return dict(qs_all_establishments=ests, qs_recent_establishments=recent)
+        except Exception:
+            pass
+        return dict(qs_all_establishments=[], qs_recent_establishments=[])
+
     # Context processor: inject selected establishment into all templates
     @app.context_processor
     def inject_selected_establishment():
