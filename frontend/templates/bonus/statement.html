@@ -57,7 +57,7 @@
         <thead>
             <tr>
                 <th rowspan="2">Sr</th>
-                <th rowspan="2">Emp<br>Code</th>
+                <th rowspan="2">{% if run.establishment.pf_code %}UAN{% else %}IP No.{% endif %}</th>
                 <th rowspan="2" style="text-align:left;">Name</th>
                 <th rowspan="2">Designation</th>
                 {% for y, m, lbl, key in months %}
@@ -79,7 +79,7 @@
             {% for e in entries %}
             <tr class="{% if not e.is_eligible %}ineligible{% endif %}">
                 <td class="text-center">{{ loop.index }}</td>
-                <td class="text-center">{{ e.employee.emp_code }}</td>
+                <td class="text-center" style="font-size:0.7rem;">{% if run.establishment.pf_code %}{{ e.employee.uan_number or '—' }}{% else %}{{ e.employee.esic_ip_number or '—' }}{% endif %}</td>
                 <td style="text-align:left; font-weight:600;">{{ e.employee.name }}</td>
                 <td>{{ e.employee.designation or '' }}</td>
                 {% for y, m, lbl, key in months %}

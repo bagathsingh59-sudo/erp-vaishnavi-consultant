@@ -201,7 +201,7 @@
             {% for row in rows %}
             <tr>
                 <td class="text-center">{{ loop.index }}</td>
-                <td class="text-center" style="font-size:0.75rem;">{% if config.epf_applicable %}{{ row.uan or '—' }}{% elif config.esic_applicable %}{{ row.esic_ip or 'NA' }}{% else %}{{ row.emp_code }}{% endif %}</td>
+                <td class="text-center" style="font-size:0.75rem;">{% if config.epf_applicable %}{{ row.uan or '—' }}{% else %}{{ row.esic_ip or '—' }}{% endif %}</td>
                 <td style="text-align:left; font-weight:600;">{{ row.name }}</td>
                 <td class="text-right">{{ "%.2f"|format(row.rate) }}</td>
                 <td class="text-center">{{ row.days_worked|int if row.days_worked == row.days_worked|int else "%.1f"|format(row.days_worked) }}</td>

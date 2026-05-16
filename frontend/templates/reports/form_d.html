@@ -89,7 +89,7 @@
     <table class="fd-table">
         <thead>
             <tr>
-                <th rowspan="2" style="min-width:60px;">Emp.<br>Code</th>
+                <th rowspan="2" style="min-width:80px;">{% if est.pf_code %}UAN{% else %}IP No.{% endif %}</th>
                 <th rowspan="2" style="min-width:130px; text-align:left;">Name</th>
                 <th rowspan="2" style="min-width:70px;">Designation</th>
                 <th rowspan="2" style="min-width:65px;">Place of<br>Work</th>
@@ -112,7 +112,7 @@
 
             {% for att in attendance %}
             <tr>
-                <td style="font-size:0.7rem;">{{ att.emp.internal_emp_code if att.emp.use_internal_code and att.emp.internal_emp_code else att.emp.emp_code }}</td>
+                <td style="font-size:0.7rem;">{% if est.pf_code %}{{ att.emp.uan_number or '—' }}{% else %}{{ att.emp.esic_ip_number or '—' }}{% endif %}</td>
                 <td style="text-align:left; font-weight:600; white-space:nowrap;">{{ att.emp.name.upper() }}</td>
                 <td style="font-size:0.65rem;">{{ att.emp.designation or '' }}</td>
                 <td></td>

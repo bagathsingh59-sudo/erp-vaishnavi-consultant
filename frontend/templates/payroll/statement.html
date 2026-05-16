@@ -237,7 +237,7 @@
                 <tr>
                     <th rowspan="2">Sl</th>
                     <th rowspan="2" style="min-width:130px; text-align:left;">Employee Name</th>
-                    <th rowspan="2">UAN /<br>ESIC IP</th>
+                    <th rowspan="2">{% if est.pf_code %}UAN{% else %}IP No.{% endif %}</th>
                     <th rowspan="2" style="background:#e0e7ff;">Rate</th>
                     <th colspan="3" style="background:#e0e7ff;">Attendance</th>
                     {% for head in heads %}
@@ -284,10 +284,7 @@
                         {% endif %}
                     </td>
                     <td class="text-center" style="font-size:0.7rem; color:#64748b;">
-                        {% if entry.employee.uan_number %}{{ entry.employee.uan_number }}{% endif %}
-                        {% if entry.employee.uan_number and entry.employee.esic_ip_number %}<br>{% endif %}
-                        {% if entry.employee.esic_ip_number %}{{ entry.employee.esic_ip_number }}{% endif %}
-                        {% if not entry.employee.uan_number and not entry.employee.esic_ip_number %}---{% endif %}
+                        {% if est.pf_code %}{{ entry.employee.uan_number or '—' }}{% else %}{{ entry.employee.esic_ip_number or '—' }}{% endif %}
                     </td>
                     <td class="text-right" style="font-size:0.7rem; color:#334155; background:#f8fafc;">{% if entry._salary_type == 'daily_wages' and entry._daily_rate %}{{ "%.2f"|format(entry._daily_rate) }}{% else %}{{ "{:,.0f}".format(entry.gross_salary) }}{% endif %}</td>
                     <td class="text-center">{{ entry.days_present|int if entry.days_present == entry.days_present|int else entry.days_present }}</td>

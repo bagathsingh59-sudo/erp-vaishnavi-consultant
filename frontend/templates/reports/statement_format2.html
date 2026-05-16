@@ -104,8 +104,7 @@
                     <th rowspan="2" class="hdr-main" style="min-width:30px;">Sl</th>
                     <th rowspan="2" class="hdr-main" style="min-width:130px; text-align:left;">Employee Name</th>
                     <th rowspan="2" class="hdr-main" style="min-width:70px;">Designation</th>
-                    <th rowspan="2" class="hdr-main">UAN</th>
-                    <th rowspan="2" class="hdr-main">ESIC IP</th>
+                    <th rowspan="2" class="hdr-main">{% if est.pf_code %}UAN{% else %}IP No.{% endif %}</th>
                     <th rowspan="2" class="hdr-att">Rate</th>
                     <th colspan="4" class="hdr-att">Attendance</th>
                     {% for head in heads %}
@@ -156,12 +155,14 @@
                         <div style="font-weight:700; font-size:0.74rem; color:#1e293b;">{{ entry.employee.name }}</div>
                     </td>
                     <td class="text-center" style="font-size:0.65rem; color:#64748b;">{{ entry.employee.designation or '' }}</td>
-                    {% set uan = entry.employee.uan_number or '' %}
-                    {% set uan_bad = uan and (uan|length != 12 or not uan.isdigit()) %}
-                    <td class="text-center" style="font-size:0.62rem;{% if uan_bad %} color:#dc2626; font-weight:700; background:#fef2f2;{% else %} color:#64748b;{% endif %}"{% if uan_bad %} title="UAN must be 12 digits"{% endif %}>{{ uan }}{% if uan_bad %} <i class="bi bi-exclamation-triangle-fill" style="font-size:0.55rem;"></i>{% endif %}</td>
-                    {% set ip = entry.employee.esic_ip_number or '' %}
-                    {% set ip_bad = ip and (ip|length != 10 or not ip.isdigit()) %}
-                    <td class="text-center" style="font-size:0.62rem;{% if ip_bad %} color:#dc2626; font-weight:700; background:#fef2f2;{% else %} color:#64748b;{% endif %}"{% if ip_bad %} title="ESIC IP must be 10 digits"{% endif %}>{{ ip or 'NA' }}{% if ip_bad %} <i class="bi bi-exclamation-triangle-fill" style="font-size:0.55rem;"></i>{% endif %}</td>
+                    {% if est.pf_code %}
+                    {% set id_val = entry.employee.uan_number or '' %}
+                    {% set id_bad = id_val and (id_val|length != 12 or not id_val.isdigit()) %}
+                    {% else %}
+                    {% set id_val = entry.employee.esic_ip_number or '' %}
+                    {% set id_bad = id_val and (id_val|length != 10 or not id_val.isdigit()) %}
+                    {% endif %}
+                    <td class="text-center" style="font-size:0.62rem;{% if id_bad %} color:#dc2626; font-weight:700; background:#fef2f2;{% else %} color:#64748b;{% endif %}"{% if id_bad %} title="{% if est.pf_code %}UAN must be 12 digits{% else %}IP must be 10 digits{% endif %}"{% endif %}>{{ id_val or '—' }}{% if id_bad %} <i class="bi bi-exclamation-triangle-fill" style="font-size:0.55rem;"></i>{% endif %}</td>
                     <td class="text-right" style="font-size:0.68rem; color:#64748b;">{% if entry._salary_type == 'daily_wages' and entry._daily_rate %}{{ "{:,.0f}".format(entry._daily_rate) }}{% else %}{{ "{:,.0f}".format(entry.gross_salary) }}{% endif %}</td>
                     <td class="text-center">{{ entry.days_present|int if entry.days_present == entry.days_present|int else entry.days_present }}</td>
                     <td class="text-center">{{ entry.days_absent|int if entry.days_absent == entry.days_absent|int else entry.days_absent }}</td>
@@ -221,7 +222,7 @@
                 <tr class="total-row">
                     <td></td>
                     <td class="text-left" style="font-size:0.78rem;">TOTAL ({{ entries|length }} Emp)</td>
-                    <td></td><td></td><td></td>
+                    <td></td><td></td>
                     <td></td>
                     <td class="text-center">{{ ns.t_present|int }}</td>
                     <td class="text-center">{{ ns.t_absent|int }}</td>
