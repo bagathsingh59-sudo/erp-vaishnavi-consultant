@@ -273,7 +273,7 @@ def quick_switch_establishment(est_id):
         recent.remove(est.id)
     recent.insert(0, est.id)
     session['recent_est_ids'] = recent[:5]
-    return redirect(url_for('establishment.dashboard'))
+    return redirect(url_for('establishment.client_dashboard'))
 
 
 @establishment_bp.route('/select-establishment/<int:est_id>')
