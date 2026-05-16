@@ -1540,6 +1540,9 @@
     </script>
     {% endif %}
 
+    <!-- Universal PDF Uploader -->
+    <script src="{{ url_for('static', filename='js/pdf_uploader.js') }}"></script>
+
     {% block scripts %}{% endblock %}
 
     {% if clerk_user %}

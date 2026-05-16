@@ -3747,14 +3747,14 @@ def payroll_documents_list(payroll_id):
             .order_by(PayrollDocument.uploaded_at.desc())
             .all())
 
-    return jsonify([{
+    return jsonify({'documents': [{
         'id':          d.id,
         'filename':    d.filename,
         'description': d.description or '',
         'size_kb':     d.size_kb,
         'uploaded_at': d.uploaded_at.strftime('%d-%b-%Y %H:%M'),
         'uploaded_by': d.uploaded_by or '',
-    } for d in docs])
+    } for d in docs]})
 
 
 @payroll_bp.route('/payroll/<int:payroll_id>/documents/upload', methods=['POST'])
