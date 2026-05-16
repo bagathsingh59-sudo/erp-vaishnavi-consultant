@@ -1,8 +1,10 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, send_file
 from app import db
 from app.models.payroll import (PayrollConfig, SalaryHead, EmployeeSalary,
                                  EmployeeSalaryHead, MonthlyPayroll, PayrollEntry,
-                                 PayrollEntryHead, SalaryTemplate, SalaryTemplateHead)
+                                 PayrollEntryHead, SalaryTemplate, SalaryTemplateHead,
+                                 PayrollDocument)
+from io import BytesIO
 from app.models.establishment import Establishment
 from app.models.employee import Employee
 from datetime import datetime, date
@@ -3725,3 +3727,110 @@ def download_universal_template(payroll_id):
         as_attachment=True,
         download_name=filename
     )
+
+
+# ─────────────────────────────────────────────────────────────
+#  PAYROLL DOCUMENTS  (PDF upload / view / delete)
+# ─────────────────────────────────────────────────────────────
+MAX_DOC_BYTES = 500 * 1024   # 500 KB hard limit per file
+
+
+@payroll_bp.route('/payroll/<int:payroll_id>/documents', methods=['GET'])
+def payroll_documents_list(payroll_id):
+    """Return JSON list of documents for this payroll (no binary data)."""
+    payroll = MonthlyPayroll.query.get_or_404(payroll_id)
+    est = Establishment.query.get_or_404(payroll.establishment_id)
+    verify_est_ownership(est)
+
+    docs = (PayrollDocument.query
+            .filter_by(payroll_id=payroll_id)
+            .order_by(PayrollDocument.uploaded_at.desc())
+            .all())
+
+    return jsonify([{
+        'id':          d.id,
+        'filename':    d.filename,
+        'description': d.description or '',
+        'size_kb':     d.size_kb,
+        'uploaded_at': d.uploaded_at.strftime('%d-%b-%Y %H:%M'),
+        'uploaded_by': d.uploaded_by or '',
+    } for d in docs])
+
+
+@payroll_bp.route('/payroll/<int:payroll_id>/documents/upload', methods=['POST'])
+def payroll_documents_upload(payroll_id):
+    """Accept a PDF upload and store its bytes in payroll_documents."""
+    payroll = MonthlyPayroll.query.get_or_404(payroll_id)
+    est = Establishment.query.get_or_404(payroll.establishment_id)
+    verify_est_ownership(est)
+
+    f = request.files.get('file')
+    if not f or f.filename == '':
+        return jsonify({'error': 'No file selected.'}), 400
+
+    # Strict PDF check: MIME type AND filename extension
+    if not f.filename.lower().endswith('.pdf'):
+        return jsonify({'error': 'Only PDF files are allowed.'}), 400
+    if f.mimetype not in ('application/pdf', 'application/octet-stream', ''):
+        if f.mimetype and not f.mimetype.startswith('application/pdf'):
+            return jsonify({'error': 'Only PDF files are allowed.'}), 400
+
+    raw = f.read()
+    # Verify PDF magic bytes (%PDF-)
+    if not raw.startswith(b'%PDF'):
+        return jsonify({'error': 'File does not appear to be a valid PDF.'}), 400
+    if len(raw) > MAX_DOC_BYTES:
+        return jsonify({'error': f'File too large. Maximum allowed size is 500 KB.'}), 400
+
+    description = (request.form.get('description') or '').strip()[:500]
+    uid = current_user_id()
+
+    doc = PayrollDocument(
+        payroll_id  = payroll_id,
+        filename    = f.filename,
+        description = description or None,
+        file_data   = raw,
+        file_size   = len(raw),
+        uploaded_by = uid,
+        uploaded_at = datetime.utcnow(),
+    )
+    db.session.add(doc)
+    db.session.commit()
+
+    return jsonify({
+        'id':          doc.id,
+        'filename':    doc.filename,
+        'description': doc.description or '',
+        'size_kb':     doc.size_kb,
+        'uploaded_at': doc.uploaded_at.strftime('%d-%b-%Y %H:%M'),
+        'uploaded_by': doc.uploaded_by or '',
+    }), 201
+
+
+@payroll_bp.route('/payroll/<int:payroll_id>/documents/<int:doc_id>', methods=['GET'])
+def payroll_documents_view(payroll_id, doc_id):
+    """Stream the PDF bytes inline (browser opens PDF viewer)."""
+    payroll = MonthlyPayroll.query.get_or_404(payroll_id)
+    est = Establishment.query.get_or_404(payroll.establishment_id)
+    verify_est_ownership(est)
+
+    doc = PayrollDocument.query.filter_by(id=doc_id, payroll_id=payroll_id).first_or_404()
+    return send_file(
+        BytesIO(doc.file_data),
+        mimetype='application/pdf',
+        as_attachment=False,
+        download_name=doc.filename,
+    )
+
+
+@payroll_bp.route('/payroll/<int:payroll_id>/documents/<int:doc_id>/delete', methods=['POST'])
+def payroll_documents_delete(payroll_id, doc_id):
+    """Delete a document record and its binary data."""
+    payroll = MonthlyPayroll.query.get_or_404(payroll_id)
+    est = Establishment.query.get_or_404(payroll.establishment_id)
+    verify_est_ownership(est)
+
+    doc = PayrollDocument.query.filter_by(id=doc_id, payroll_id=payroll_id).first_or_404()
+    db.session.delete(doc)
+    db.session.commit()
+    return jsonify({'deleted': doc_id})

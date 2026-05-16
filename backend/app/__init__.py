@@ -492,6 +492,28 @@ def _auto_migrate_columns(db):
             db.session.rollback()
             print(f"  [MIGRATE] Skip {table}.{column}: {e}")
 
+    # Create payroll_documents table if it doesn't exist
+    try:
+        db.session.execute(db.text("""
+            CREATE TABLE IF NOT EXISTS payroll_documents (
+                id          SERIAL PRIMARY KEY,
+                payroll_id  INTEGER NOT NULL REFERENCES monthly_payrolls(id) ON DELETE CASCADE,
+                filename    VARCHAR(255) NOT NULL,
+                description VARCHAR(500),
+                file_data   BYTEA NOT NULL,
+                file_size   INTEGER NOT NULL,
+                uploaded_by VARCHAR(100),
+                uploaded_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+        """))
+        db.session.execute(db.text(
+            "CREATE INDEX IF NOT EXISTS ix_payroll_documents_payroll_id ON payroll_documents(payroll_id)"
+        ))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"  [MIGRATE] payroll_documents table: {e}")
+
     # One-time data migration: copy old include_ot_in_compliance → new split fields
     try:
         db.session.execute(db.text(

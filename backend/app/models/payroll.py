@@ -487,6 +487,32 @@ class PayrollEntry(db.Model):
         return f'<PayrollEntry emp={self.employee_id} net={self.net_pay}>'
 
 
+class PayrollDocument(db.Model):
+    """PDF documents attached to a payroll period — stored as BYTEA in PostgreSQL"""
+    __tablename__ = 'payroll_documents'
+
+    id          = db.Column(db.Integer, primary_key=True)
+    payroll_id  = db.Column(db.Integer, db.ForeignKey('monthly_payrolls.id', ondelete='CASCADE'),
+                            nullable=False, index=True)
+    filename    = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.String(500), nullable=True)
+    file_data   = db.Column(db.LargeBinary, nullable=False)   # raw PDF bytes (BYTEA)
+    file_size   = db.Column(db.Integer, nullable=False)        # original bytes
+    uploaded_by = db.Column(db.String(100), nullable=True)
+    uploaded_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    payroll = db.relationship('MonthlyPayroll',
+                              backref=db.backref('documents', lazy='dynamic',
+                                                 cascade='all, delete-orphan'))
+
+    @property
+    def size_kb(self):
+        return round(self.file_size / 1024, 1)
+
+    def __repr__(self):
+        return f'<PayrollDocument {self.filename} payroll={self.payroll_id}>'
+
+
 class PayrollEntryHead(db.Model):
     """Individual head-wise breakup for each payroll entry"""
     __tablename__ = 'payroll_entry_heads'
