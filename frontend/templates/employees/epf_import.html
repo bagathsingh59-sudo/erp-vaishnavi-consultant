@@ -142,7 +142,7 @@
                         {% if rec.status == 'new' %}
                             <span class="badge bg-success bg-opacity-10 text-success" style="font-size:0.62rem;">NEW</span>
                         {% else %}
-                            <span class="badge bg-primary bg-opacity-10 text-primary" style="font-size:0.62rem;">UPDATE</span>
+                            <span class="badge badge-primary-soft" style="font-size:0.62rem;">UPDATE</span>
                         {% endif %}
                         {% if rec.name_mismatch %}
                             <span class="badge bg-danger bg-opacity-10 text-danger" style="font-size:0.62rem;" title="ERP: {{ rec.existing_name }} | EPFO: {{ rec.cleaned_name }}">MISMATCH</span>

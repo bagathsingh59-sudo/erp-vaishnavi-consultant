@@ -39,7 +39,7 @@
                         {% endfor %}
                     </div>
 
-                    <span class="badge bg-primary bg-opacity-10 text-primary" style="font-size: 0.75rem; padding: 5px 10px;">
+                    <span class="badge badge-primary-soft" style="font-size: 0.75rem; padding: 5px 10px;">
                         {{ fy_display }} <span style="opacity: 0.7;">(Apr {{ selected_fy }} — Mar {{ selected_fy + 1 }})</span>
                     </span>
 
@@ -85,7 +85,7 @@
                                 {% if p.is_nil %}<span style="background:#fef3c7; color:#92400e; padding:1px 6px; border-radius:6px; font-size:0.58rem; font-weight:700; margin-left:4px;">NIL</span>{% endif %}
                             </td>
                             <td style="font-size: 0.8rem; color: #64748b;">{{ p.establishment.company_name }}</td>
-                            <td class="text-center"><span class="badge bg-primary bg-opacity-10 text-primary">{{ p.total_employees }}</span></td>
+                            <td class="text-center"><span class="badge badge-primary-soft">{{ p.total_employees }}</span></td>
                             <td class="text-end fw-semibold">{{ "₹{:,.0f}".format(p.total_gross) }}</td>
                             <td class="text-end">{{ "₹{:,.0f}".format(p.total_epf_employee) }}</td>
                             <td class="text-end">{{ "₹{:,.0f}".format(p.total_esic_employee) }}</td>
