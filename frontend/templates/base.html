@@ -513,7 +513,7 @@
             <div class="top-navbar-right">
                 <!-- ── Quick Switch Client ── -->
                 {% if qs_all_establishments %}
-                <div id="qsWrap" style="position:relative; margin-right:8px;" class="no-print">
+                <div id="qsWrap" style="margin-right:8px;" class="no-print">
                     <button id="qsBtn" onclick="toggleQS(event)"
                             style="display:flex; align-items:center; gap:5px; padding:4px 11px; background:rgba(var(--primary-rgb),0.12); border:1px solid rgba(var(--primary-rgb),0.28); border-radius:var(--radius-pill); color:var(--text-primary); font-size:0.72rem; font-weight:600; cursor:pointer; transition:background 0.15s; white-space:nowrap; max-width:220px;"
                             title="Quick switch client">
@@ -523,7 +523,7 @@
                         </span>
                         <i class="bi bi-chevron-down" id="qsChevron" style="font-size:0.58rem; flex-shrink:0; transition:transform 0.2s;"></i>
                     </button>
-                    <div id="qsPanel" style="display:none; position:absolute; top:calc(100% + 6px); right:0; width:270px; background:#fff; border-radius:10px; border:1px solid #e2e8f0; box-shadow:0 16px 48px rgba(0,0,0,0.18); z-index:10001; overflow:hidden;">
+                    <div id="qsPanel" style="display:none; position:fixed; width:270px; background:#fff; border-radius:10px; border:1px solid #e2e8f0; box-shadow:0 16px 48px rgba(0,0,0,0.18); z-index:10001; overflow:hidden;">
                         <div style="padding:8px; border-bottom:1px solid #f1f5f9;">
                             <input type="text" id="qsSearch" placeholder="Search client..."
                                    oninput="qsFilter(this.value)" onclick="event.stopPropagation()"
@@ -2124,10 +2124,11 @@
                 panel.style.display = 'none';
             }
             // Close quick-switch panel on outside click
-            var qsWrap = document.getElementById('qsWrap');
-            var qsPanel = document.getElementById('qsPanel');
-            if(qsWrap && qsPanel && !qsWrap.contains(e.target)){
-                qsPanel.style.display = 'none';
+            var qsBtn2  = document.getElementById('qsBtn');
+            var qsPanel2 = document.getElementById('qsPanel');
+            if(qsPanel2 && qsPanel2.style.display !== 'none' &&
+               !qsPanel2.contains(e.target) && !(qsBtn2 && qsBtn2.contains(e.target))){
+                qsPanel2.style.display = 'none';
                 var ch = document.getElementById('qsChevron');
                 if(ch) ch.style.transform = '';
             }
@@ -2136,12 +2137,19 @@
         /* ── Quick Switch Client ── */
         function toggleQS(e) {
             e.stopPropagation();
-            var panel = document.getElementById('qsPanel');
+            var btn    = document.getElementById('qsBtn');
+            var panel  = document.getElementById('qsPanel');
             var chevron = document.getElementById('qsChevron');
             var isOpen = panel.style.display !== 'none';
-            panel.style.display = isOpen ? 'none' : 'block';
-            chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
-            if (!isOpen) {
+            if (isOpen) {
+                panel.style.display = 'none';
+                chevron.style.transform = '';
+            } else {
+                var rect = btn.getBoundingClientRect();
+                panel.style.top  = (rect.bottom + 6) + 'px';
+                panel.style.right = (window.innerWidth - rect.right) + 'px';
+                panel.style.display = 'block';
+                chevron.style.transform = 'rotate(180deg)';
                 var s = document.getElementById('qsSearch');
                 s.value = '';
                 qsFilter('');

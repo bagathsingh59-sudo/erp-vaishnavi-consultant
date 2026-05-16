@@ -158,7 +158,7 @@ def create_app():
         try:
             uid = current_user_id()
             if uid:
-                base_q = Establishment.query.filter_by(is_active=True).order_by(Establishment.company_name)
+                base_q = Establishment.query.order_by(Establishment.company_name)
                 if is_admin():
                     ests = base_q.all()
                 else:
@@ -170,8 +170,8 @@ def create_app():
                 recent = [e for e in ests if e.id in recent_ids]
                 recent.sort(key=lambda e: recent_ids.index(e.id) if e.id in recent_ids else 999)
                 return dict(qs_all_establishments=ests, qs_recent_establishments=recent)
-        except Exception:
-            pass
+        except Exception as _qs_err:
+            app.logger.warning(f"Quick-switch context processor error: {_qs_err}")
         return dict(qs_all_establishments=[], qs_recent_establishments=[])
 
     # Context processor: inject selected establishment into all templates
