@@ -1149,6 +1149,7 @@ function validateBeforeSave() {
 
 // ── Documents Modal ──────────────────────────────────────────────────────────
 const _DOCS_PAYROLL_ID = {{ payroll.id }};
+const _DOCS_CSRF = '{{ csrf_token() }}';  // required for Flask-WTF POST endpoints
 let _docSelectedFiles = [];  // array of File objects
 
 function openDocsModal() {
@@ -1200,7 +1201,7 @@ function loadDocs() {
                     </div>
                     <a href="/payroll/${_DOCS_PAYROLL_ID}/documents/${d.id}" target="_blank"
                        style="padding:5px 10px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;color:#0369a1;font-size:0.72rem;font-weight:600;text-decoration:none;flex-shrink:0;white-space:nowrap;">
-                        <i class="bi bi-eye me-1"></i>View
+                        <i class="bi bi-eye me-1"></i>Preview
                     </a>
                     <button onclick="deleteDoc(${d.id}, this)"
                             style="padding:5px 10px;background:#fff0f0;border:1px solid #fecaca;border-radius:6px;color:#dc2626;font-size:0.72rem;font-weight:600;cursor:pointer;flex-shrink:0;white-space:nowrap;">
@@ -1319,6 +1320,7 @@ async function uploadDoc() {
 
             const r = await fetch('/payroll/' + _DOCS_PAYROLL_ID + '/documents/upload', {
                 method: 'POST',
+                headers: { 'X-CSRFToken': _DOCS_CSRF },
                 body: fd
             });
 
@@ -1366,7 +1368,7 @@ function deleteDoc(docId, btnEl) {
     if (!confirm('Delete this document? This cannot be undone.')) return;
     btnEl.disabled = true;
     console.log('[Docs] Deleting doc', docId);
-    fetch('/payroll/' + _DOCS_PAYROLL_ID + '/documents/' + docId + '/delete', { method: 'POST' })
+    fetch('/payroll/' + _DOCS_PAYROLL_ID + '/documents/' + docId + '/delete', { method: 'POST', headers: { 'X-CSRFToken': _DOCS_CSRF } })
         .then(async r => {
             const text = await r.text();
             console.log('[Docs] Delete response:', r.status, text.substring(0, 200));
