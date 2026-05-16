@@ -1627,7 +1627,7 @@ def _build_form_b_rows(entries, heads, head_map, config, payroll):
 
 def _generate_form_b_excel(payroll, est, config, entries, rows, head_map):
     """Generate Form B Excel file — professional Legal-size print format.
-    Uses Emp. Code instead of UAN/ESIC IP. Reduced to 27 columns (A-AA) for better fit."""
+    Column B shows UAN (if EPF registered) or ESIC IP (if ESIC-only). 27 columns (A-AA)."""
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
     from openpyxl.utils import get_column_letter
@@ -1754,9 +1754,11 @@ def _generate_form_b_excel(payroll, est, config, entries, rows, head_map):
         ws.column_dimensions[col_letter].width = width
 
     # --- Header Row 1 (merged headers) ---
+    _epf_on = getattr(config, 'epf_applicable', False)
+    _col_b_header = 'UAN' if _epf_on else 'ESIC IP\nNo.'
     headers_r1 = [
         ('A', 'A', 'Sr.\nNo.'),
-        ('B', 'B', 'Emp.\nCode'),
+        ('B', 'B', _col_b_header),
         ('C', 'C', 'Name'),
         ('D', 'D', 'Rate of\nWages'),
         ('E', 'E', 'Days\nWorked'),
@@ -1867,9 +1869,10 @@ def _generate_form_b_excel(payroll, est, config, entries, rows, head_map):
         ws.row_dimensions[r].height = 26
 
         # Build cells: A-AA (27 columns)
+        _id_val = row_data.get('uan', '') if _epf_on else row_data.get('esic_ip', '')
         data_cells = [
             ('A', sl, center, data_font, None),
-            ('B', row_data.get('emp_code', ''), center, data_font, None),
+            ('B', _id_val, center, data_font, None),
             ('C', row_data['name'], left_align, name_font, None),
             ('D', float(row_data['rate']) if row_data['rate'] else 0, right_align, data_font, None),
             ('E', row_data['days_worked'], center, data_font, None),
