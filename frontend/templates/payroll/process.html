@@ -1089,16 +1089,9 @@ function calcEpfPenalty() {
         <div style="font-size:0.78rem;color:#64748b;margin-top:6px;">Drag & drop a PDF here, or <strong style="color:#0369a1;">click to browse</strong></div>
         <div style="font-size:0.68rem;color:#94a3b8;margin-top:3px;">PDF only · max 500 KB per file</div>
       </div>
-      <input type="file" id="docFileInput" accept=".pdf,application/pdf" style="display:none;" onchange="handleDocFileSelect(this)">
+      <input type="file" id="docFileInput" accept=".pdf,application/pdf" multiple style="display:none;" onchange="handleDocFileSelect(this)">
 
-      <div id="docFilePreview" style="display:none;margin-top:10px;padding:8px 12px;background:#fff;border:1px solid #e2e8f0;border-radius:7px;display:none;align-items:center;gap:10px;">
-        <i class="bi bi-file-earmark-pdf-fill" style="color:#e2160a;font-size:1.1rem;flex-shrink:0;"></i>
-        <div style="flex:1;min-width:0;">
-          <div id="docFileName" style="font-size:0.8rem;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
-          <div id="docFileSize" style="font-size:0.68rem;color:#64748b;"></div>
-        </div>
-        <button onclick="clearDocFile()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:1rem;flex-shrink:0;">&times;</button>
-      </div>
+      <div id="docFilesList" style="display:none;margin-top:10px;max-height:140px;overflow-y:auto;"></div>
 
       <div style="display:flex;gap:8px;margin-top:10px;align-items:flex-end;">
         <div style="flex:1;">
@@ -1156,9 +1149,10 @@ function validateBeforeSave() {
 
 // ── Documents Modal ──────────────────────────────────────────────────────────
 const _DOCS_PAYROLL_ID = {{ payroll.id }};
-let _docSelectedFile = null;
+let _docSelectedFiles = [];  // array of File objects
 
 function openDocsModal() {
+    console.log('[Docs] Opening modal for payroll', _DOCS_PAYROLL_ID);
     document.getElementById('docsModal').style.display = 'block';
     document.body.style.overflow = 'hidden';
     loadDocs();
@@ -1167,7 +1161,7 @@ function openDocsModal() {
 function closeDocsModal() {
     document.getElementById('docsModal').style.display = 'none';
     document.body.style.overflow = '';
-    clearDocFile();
+    clearDocFiles();
     document.getElementById('docDescription').value = '';
     document.getElementById('docUploadMsg').style.display = 'none';
 }
@@ -1175,11 +1169,16 @@ function closeDocsModal() {
 function loadDocs() {
     const body = document.getElementById('docsListBody');
     body.innerHTML = '<div style="text-align:center;padding:28px;color:#94a3b8;font-size:0.8rem;"><i class="bi bi-hourglass-split" style="font-size:1.5rem;display:block;margin-bottom:8px;"></i>Loading…</div>';
+    console.log('[Docs] Loading list from /payroll/' + _DOCS_PAYROLL_ID + '/documents');
     fetch('/payroll/' + _DOCS_PAYROLL_ID + '/documents')
-        .then(r => r.json())
+        .then(async r => {
+            const text = await r.text();
+            console.log('[Docs] List response status:', r.status, '| body:', text.substring(0, 300));
+            return JSON.parse(text);
+        })
         .then(data => {
             const docs = data.documents || [];
-            // Update badge on button
+            console.log('[Docs] Loaded', docs.length, 'documents');
             const badge = document.getElementById('docsBadge');
             if (docs.length > 0) {
                 badge.textContent = docs.length;
@@ -1187,7 +1186,6 @@ function loadDocs() {
             } else {
                 badge.style.display = 'none';
             }
-            // Update count in modal
             document.getElementById('docsCount').textContent = docs.length ? ' (' + docs.length + ')' : '';
             if (docs.length === 0) {
                 body.innerHTML = '<div style="text-align:center;padding:32px;color:#94a3b8;font-size:0.82rem;"><i class="bi bi-folder2-open" style="font-size:2rem;display:block;margin-bottom:8px;"></i>No documents uploaded yet.</div>';
@@ -1198,7 +1196,7 @@ function loadDocs() {
                     <i class="bi bi-file-earmark-pdf-fill" style="color:#e2160a;font-size:1.25rem;flex-shrink:0;"></i>
                     <div style="flex:1;min-width:0;">
                         <div style="font-size:0.8rem;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(d.filename)}">${_esc(d.filename)}</div>
-                        <div style="font-size:0.68rem;color:#64748b;">${_esc(d.description||'')} ${d.description ? '·' : ''} ${d.size_kb} KB · ${_esc(d.uploaded_at)}</div>
+                        <div style="font-size:0.68rem;color:#64748b;">${_esc(d.description||'')}${d.description ? ' · ' : ''}${d.size_kb} KB · ${_esc(d.uploaded_at)}</div>
                     </div>
                     <a href="/payroll/${_DOCS_PAYROLL_ID}/documents/${d.id}" target="_blank"
                        style="padding:5px 10px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;color:#0369a1;font-size:0.72rem;font-weight:600;text-decoration:none;flex-shrink:0;white-space:nowrap;">
@@ -1211,8 +1209,9 @@ function loadDocs() {
                 </div>
             `).join('');
         })
-        .catch(() => {
-            body.innerHTML = '<div style="text-align:center;padding:28px;color:#dc2626;font-size:0.8rem;">Failed to load documents. Please try again.</div>';
+        .catch(err => {
+            console.error('[Docs] loadDocs error:', err);
+            body.innerHTML = '<div style="text-align:center;padding:28px;color:#dc2626;font-size:0.8rem;">Failed to load documents. Check console (F12) for details.</div>';
         });
 }
 
@@ -1225,84 +1224,165 @@ function handleDocDrop(event) {
     const zone = document.getElementById('docDropZone');
     zone.style.borderColor = '#cbd5e1';
     zone.style.background = '#f1f5f9';
-    const files = event.dataTransfer.files;
-    if (files.length > 0) _setDocFile(files[0]);
+    console.log('[Docs] Drop event, files:', event.dataTransfer.files.length);
+    _addDocFiles(event.dataTransfer.files);
 }
 
 function handleDocFileSelect(input) {
-    if (input.files.length > 0) _setDocFile(input.files[0]);
+    console.log('[Docs] File select, files:', input.files.length);
+    _addDocFiles(input.files);
+    input.value = '';  // reset so same file can be re-selected if needed
 }
 
-function _setDocFile(file) {
-    const msg = document.getElementById('docUploadMsg');
-    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-        _showDocMsg('Only PDF files are allowed.', 'error');
-        return;
-    }
-    if (file.size > 500 * 1024) {
-        _showDocMsg('File exceeds 500 KB limit (' + (file.size/1024).toFixed(0) + ' KB).', 'error');
-        return;
-    }
-    _docSelectedFile = file;
-    document.getElementById('docFileName').textContent = file.name;
-    document.getElementById('docFileSize').textContent = (file.size / 1024).toFixed(1) + ' KB';
-    const preview = document.getElementById('docFilePreview');
-    preview.style.display = 'flex';
-    msg.style.display = 'none';
+function _addDocFiles(fileList) {
+    Array.from(fileList).forEach(file => {
+        const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
+        if (!isPdf) {
+            console.warn('[Docs] Skipped non-PDF:', file.name, 'type:', file.type);
+            _showDocMsg('Skipped "' + file.name + '" — only PDF files are allowed.', 'error');
+            return;
+        }
+        if (file.size > 500 * 1024) {
+            console.warn('[Docs] File too large:', file.name, file.size + ' bytes');
+            _showDocMsg('"' + file.name + '" is ' + (file.size/1024).toFixed(0) + ' KB — max 500 KB per file.', 'error');
+            return;
+        }
+        if (_docSelectedFiles.some(f => f.name === file.name && f.size === file.size)) {
+            console.warn('[Docs] Duplicate skipped:', file.name);
+            return;
+        }
+        console.log('[Docs] File queued:', file.name, (file.size/1024).toFixed(1) + ' KB');
+        _docSelectedFiles.push(file);
+    });
+    _renderFilesList();
 }
 
-function clearDocFile() {
-    _docSelectedFile = null;
-    document.getElementById('docFileInput').value = '';
-    const preview = document.getElementById('docFilePreview');
-    preview.style.display = 'none';
-}
-
-function uploadDoc() {
-    if (!_docSelectedFile) { _showDocMsg('Please select a PDF file first.', 'error'); return; }
+function _renderFilesList() {
+    const container = document.getElementById('docFilesList');
     const btn = document.getElementById('docUploadBtn');
+    if (_docSelectedFiles.length === 0) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+        btn.innerHTML = '<i class="bi bi-upload me-1"></i>Upload';
+        return;
+    }
+    container.style.display = 'block';
+    container.innerHTML = _docSelectedFiles.map((f, i) => `
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:5px;">
+            <i class="bi bi-file-earmark-pdf-fill" style="color:#e2160a;font-size:1rem;flex-shrink:0;"></i>
+            <div style="flex:1;min-width:0;font-size:0.78rem;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(f.name)}">${_esc(f.name)}</div>
+            <span style="font-size:0.68rem;color:#64748b;flex-shrink:0;">${(f.size/1024).toFixed(1)} KB</span>
+            <button onclick="removeDocFile(${i})" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:1rem;padding:0 2px;flex-shrink:0;" title="Remove">&times;</button>
+        </div>
+    `).join('');
+    btn.innerHTML = _docSelectedFiles.length > 1
+        ? '<i class="bi bi-upload me-1"></i>Upload All (' + _docSelectedFiles.length + ')'
+        : '<i class="bi bi-upload me-1"></i>Upload';
+}
+
+function removeDocFile(index) {
+    console.log('[Docs] Removing file at index', index, ':', _docSelectedFiles[index]?.name);
+    _docSelectedFiles.splice(index, 1);
+    _renderFilesList();
+}
+
+function clearDocFiles() {
+    _docSelectedFiles = [];
+    document.getElementById('docFileInput').value = '';
+    _renderFilesList();
+}
+
+async function uploadDoc() {
+    if (_docSelectedFiles.length === 0) {
+        _showDocMsg('Please select at least one PDF file.', 'error');
+        return;
+    }
+    const btn = document.getElementById('docUploadBtn');
+    const description = document.getElementById('docDescription').value.trim();
+    const filesToUpload = [..._docSelectedFiles];
+    clearDocFiles();
+
+    let uploaded = 0, failed = 0;
     btn.disabled = true;
-    btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Uploading…';
-    const fd = new FormData();
-    fd.append('file', _docSelectedFile);
-    fd.append('description', document.getElementById('docDescription').value.trim());
-    fetch('/payroll/' + _DOCS_PAYROLL_ID + '/documents/upload', { method: 'POST', body: fd })
-        .then(r => r.json())
-        .then(data => {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-upload me-1"></i>Upload';
-            if (data.ok) {
-                _showDocMsg('Uploaded successfully!', 'ok');
-                clearDocFile();
-                document.getElementById('docDescription').value = '';
-                loadDocs();
-            } else {
-                _showDocMsg(data.error || 'Upload failed.', 'error');
+
+    for (let i = 0; i < filesToUpload.length; i++) {
+        const file = filesToUpload[i];
+        const label = filesToUpload.length > 1 ? (i+1) + '/' + filesToUpload.length + ' — ' + file.name : file.name;
+        btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>' + (i+1) + '/' + filesToUpload.length + '…';
+        _showDocMsg('Uploading ' + label, 'info');
+        console.log('[Docs] Uploading', file.name, '(' + (file.size/1024).toFixed(1) + ' KB)');
+
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append('description', description);
+
+            const r = await fetch('/payroll/' + _DOCS_PAYROLL_ID + '/documents/upload', {
+                method: 'POST',
+                body: fd
+            });
+
+            const rawText = await r.text();
+            console.log('[Docs] Upload response — status:', r.status, r.statusText);
+            console.log('[Docs] Upload response — body:', rawText.substring(0, 500));
+
+            let data;
+            try { data = JSON.parse(rawText); } catch(e) {
+                console.error('[Docs] Response is not valid JSON. Raw:', rawText.substring(0, 300));
+                failed++;
+                continue;
             }
-        })
-        .catch(() => {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-upload me-1"></i>Upload';
-            _showDocMsg('Network error. Please try again.', 'error');
-        });
+
+            if (r.ok) {
+                console.log('[Docs] Upload success:', data);
+                uploaded++;
+            } else {
+                console.warn('[Docs] Upload rejected by server:', data);
+                _showDocMsg((data.error || 'Upload failed') + ' (' + file.name + ')', 'error');
+                failed++;
+            }
+        } catch(err) {
+            console.error('[Docs] Fetch/network error for', file.name, ':', err);
+            failed++;
+        }
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-upload me-1"></i>Upload';
+    document.getElementById('docDescription').value = '';
+
+    if (failed === 0) {
+        _showDocMsg(uploaded === 1 ? 'Uploaded successfully!' : uploaded + ' files uploaded successfully!', 'ok');
+    } else if (uploaded > 0) {
+        _showDocMsg(uploaded + ' uploaded, ' + failed + ' failed — check console (F12) for details.', 'error');
+    } else {
+        _showDocMsg('Upload failed — open browser console (F12) and share the red error with us.', 'error');
+    }
+
+    loadDocs();
 }
 
 function deleteDoc(docId, btnEl) {
     if (!confirm('Delete this document? This cannot be undone.')) return;
     btnEl.disabled = true;
+    console.log('[Docs] Deleting doc', docId);
     fetch('/payroll/' + _DOCS_PAYROLL_ID + '/documents/' + docId + '/delete', { method: 'POST' })
-        .then(r => r.json())
+        .then(async r => {
+            const text = await r.text();
+            console.log('[Docs] Delete response:', r.status, text.substring(0, 200));
+            return JSON.parse(text);
+        })
         .then(data => {
             if (data.ok) { loadDocs(); }
             else { btnEl.disabled = false; alert(data.error || 'Delete failed.'); }
         })
-        .catch(() => { btnEl.disabled = false; alert('Network error.'); });
+        .catch(err => { btnEl.disabled = false; console.error('[Docs] Delete error:', err); alert('Network error — check console (F12).'); });
 }
 
 function _showDocMsg(text, type) {
     const el = document.getElementById('docUploadMsg');
     el.textContent = text;
-    el.style.color = type === 'ok' ? '#16a34a' : '#dc2626';
+    el.style.color = type === 'ok' ? '#16a34a' : type === 'info' ? '#0369a1' : '#dc2626';
     el.style.display = 'block';
 }
 
@@ -1313,12 +1393,9 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             const count = (data.documents || []).length;
             const badge = document.getElementById('docsBadge');
-            if (badge && count > 0) {
-                badge.textContent = count;
-                badge.style.display = 'inline-block';
-            }
+            if (badge && count > 0) { badge.textContent = count; badge.style.display = 'inline-block'; }
         })
-        .catch(() => {});
+        .catch(err => console.warn('[Docs] Badge load failed:', err));
 });
 </script>
 {% endblock %}

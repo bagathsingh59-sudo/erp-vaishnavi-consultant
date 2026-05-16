@@ -3798,6 +3798,7 @@ def payroll_documents_upload(payroll_id):
     db.session.commit()
 
     return jsonify({
+        'ok':          True,
         'id':          doc.id,
         'filename':    doc.filename,
         'description': doc.description or '',
@@ -3833,4 +3834,4 @@ def payroll_documents_delete(payroll_id, doc_id):
     doc = PayrollDocument.query.filter_by(id=doc_id, payroll_id=payroll_id).first_or_404()
     db.session.delete(doc)
     db.session.commit()
-    return jsonify({'deleted': doc_id})
+    return jsonify({'ok': True, 'deleted': doc_id})
