@@ -513,6 +513,23 @@
             <div class="top-navbar-right">
                 <!-- ── Quick Switch Client ── -->
                 {% if qs_all_establishments %}
+                <script>
+                var _QS_DATA = {
+                    all: {{ qs_all_establishments | map(attribute='id') | list | tojson }},
+                    names: {
+                        {% for e in qs_all_establishments %}
+                        {{ e.id }}: {{ e.display_name | tojson }}{% if not loop.last %},{% endif %}
+                        {% endfor %}
+                    },
+                    urls: {
+                        {% for e in qs_all_establishments %}
+                        {{ e.id }}: {{ url_for('establishment.quick_switch_establishment', est_id=e.id) | tojson }}{% if not loop.last %},{% endif %}
+                        {% endfor %}
+                    },
+                    recent: {{ qs_recent_establishments | map(attribute='id') | list | tojson }},
+                    active: {{ selected_est.id if selected_est else 'null' }}
+                };
+                </script>
                 <div id="qsWrap" style="margin-right:8px;" class="no-print">
                     <button id="qsBtn" onclick="toggleQS(event)"
                             style="display:flex; align-items:center; gap:5px; padding:4px 11px; background:rgba(var(--primary-rgb),0.12); border:1px solid rgba(var(--primary-rgb),0.28); border-radius:var(--radius-pill); color:var(--text-primary); font-size:0.72rem; font-weight:600; cursor:pointer; transition:background 0.15s; white-space:nowrap; max-width:220px;"
@@ -523,34 +540,13 @@
                         </span>
                         <i class="bi bi-chevron-down" id="qsChevron" style="font-size:0.58rem; flex-shrink:0; transition:transform 0.2s;"></i>
                     </button>
-                    <div id="qsPanel" style="display:none; position:fixed; width:270px; background:#fff; border-radius:10px; border:1px solid #e2e8f0; box-shadow:0 16px 48px rgba(0,0,0,0.18); z-index:10001; overflow:hidden;">
+                    <div id="qsPanel" style="display:none; position:fixed; width:280px; background:#fff; border-radius:10px; border:1px solid #e2e8f0; box-shadow:0 16px 48px rgba(0,0,0,0.18); z-index:10001;">
                         <div style="padding:8px; border-bottom:1px solid #f1f5f9;">
                             <input type="text" id="qsSearch" placeholder="Search client..."
                                    oninput="qsFilter(this.value)" onclick="event.stopPropagation()"
-                                   style="width:100%; padding:6px 10px; border:1px solid #e2e8f0; border-radius:6px; font-size:0.78rem; outline:none; color:#1e293b;">
+                                   style="width:100%; padding:6px 10px; border:1px solid #e2e8f0; border-radius:6px; font-size:0.78rem; outline:none; color:#1e293b; box-sizing:border-box;">
                         </div>
-                        <div id="qsList" style="overflow-y:auto; max-height:310px; padding:4px 0;">
-                            {% if qs_recent_establishments %}
-                            <div class="qs-grp-lbl">Recent</div>
-                            {% for e in qs_recent_establishments %}
-                            <a href="{{ url_for('establishment.quick_switch_establishment', est_id=e.id) }}"
-                               class="qs-item{% if selected_est and selected_est.id == e.id %} qs-active{% endif %}"
-                               data-name="{{ e.display_name|lower }}">
-                                {% if selected_est and selected_est.id == e.id %}<i class="bi bi-check2" style="color:#16a34a; margin-right:4px;"></i>{% endif %}{{ e.display_name }}
-                            </a>
-                            {% endfor %}
-                            <div style="height:1px; background:#f1f5f9; margin:4px 0;"></div>
-                            <div class="qs-grp-lbl">All Clients</div>
-                            {% endif %}
-                            {% for e in qs_all_establishments %}
-                            <a href="{{ url_for('establishment.quick_switch_establishment', est_id=e.id) }}"
-                               class="qs-item{% if selected_est and selected_est.id == e.id %} qs-active{% endif %}"
-                               data-name="{{ e.display_name|lower }}">
-                                {% if selected_est and selected_est.id == e.id %}<i class="bi bi-check2" style="color:#16a34a; margin-right:4px;"></i>{% endif %}{{ e.display_name }}
-                            </a>
-                            {% endfor %}
-                            <div id="qsNoRes" style="display:none; padding:14px; text-align:center; font-size:0.75rem; color:#94a3b8;">No clients found</div>
-                        </div>
+                        <div id="qsList" style="overflow-y:auto; max-height:320px;"></div>
                     </div>
                 </div>
                 {% endif %}
@@ -2140,32 +2136,65 @@
             var btn    = document.getElementById('qsBtn');
             var panel  = document.getElementById('qsPanel');
             var chevron = document.getElementById('qsChevron');
+            if (!panel) return;
             var isOpen = panel.style.display !== 'none';
             if (isOpen) {
                 panel.style.display = 'none';
-                chevron.style.transform = '';
+                if (chevron) chevron.style.transform = '';
             } else {
                 var rect = btn.getBoundingClientRect();
                 panel.style.top  = (rect.bottom + 6) + 'px';
                 panel.style.right = (window.innerWidth - rect.right) + 'px';
                 panel.style.display = 'block';
-                chevron.style.transform = 'rotate(180deg)';
+                if (chevron) chevron.style.transform = 'rotate(180deg)';
                 var s = document.getElementById('qsSearch');
-                s.value = '';
+                if (s) { s.value = ''; }
                 qsFilter('');
-                setTimeout(function(){ s.focus(); }, 60);
+                setTimeout(function(){ if(s) s.focus(); }, 60);
             }
         }
         function qsFilter(val) {
+            if (typeof _QS_DATA === 'undefined') return;
             var v = val.toLowerCase().trim();
-            var items = document.querySelectorAll('#qsList .qs-item');
+            var list = document.getElementById('qsList');
+            if (!list) return;
+            var html = '';
             var visible = 0;
-            items.forEach(function(item) {
-                var show = !v || item.dataset.name.indexOf(v) !== -1;
-                item.style.display = show ? '' : 'none';
-                if (show) visible++;
+
+            function makeItem(id) {
+                var name = _QS_DATA.names[id] || '';
+                var url  = _QS_DATA.urls[id]  || '#';
+                var isActive = (_QS_DATA.active === id);
+                var cls  = 'qs-item' + (isActive ? ' qs-active' : '');
+                var chk  = isActive ? '<i class="bi bi-check2" style="color:#16a34a;margin-right:4px;"></i>' : '';
+                var esc  = name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                return '<a href="' + url + '" class="' + cls + '">' + chk + esc + '</a>';
+            }
+
+            /* Recent section (only when no search text) */
+            if (!v && _QS_DATA.recent && _QS_DATA.recent.length) {
+                html += '<div class="qs-grp-lbl">Recent</div>';
+                _QS_DATA.recent.forEach(function(id) {
+                    html += makeItem(id);
+                    visible++;
+                });
+                html += '<div style="height:1px;background:#f1f5f9;margin:4px 0;"></div>';
+                html += '<div class="qs-grp-lbl">All Clients</div>';
+            }
+
+            /* Full list */
+            _QS_DATA.all.forEach(function(id) {
+                var name = (_QS_DATA.names[id] || '').toLowerCase();
+                if (!v || name.indexOf(v) !== -1) {
+                    html += makeItem(id);
+                    visible++;
+                }
             });
-            document.getElementById('qsNoRes').style.display = visible ? 'none' : 'block';
+
+            if (!visible) {
+                html = '<div style="padding:14px;text-align:center;font-size:0.75rem;color:#94a3b8;">No clients found</div>';
+            }
+            list.innerHTML = html;
         }
 
         /* ─────────────────────────────────────────────────
