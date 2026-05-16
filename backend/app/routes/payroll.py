@@ -3732,7 +3732,8 @@ def download_universal_template(payroll_id):
 # ─────────────────────────────────────────────────────────────
 #  PAYROLL DOCUMENTS  (PDF upload / view / delete)
 # ─────────────────────────────────────────────────────────────
-MAX_DOC_BYTES = 500 * 1024   # 500 KB hard limit per file
+MAX_DOC_BYTES = 500 * 1024   # 500 KB hard limit per file (uncompressed)
+import zlib as _zlib
 
 
 @payroll_bp.route('/payroll/<int:payroll_id>/documents', methods=['GET'])
@@ -3751,7 +3752,8 @@ def payroll_documents_list(payroll_id):
         'id':          d.id,
         'filename':    d.filename,
         'description': d.description or '',
-        'size_kb':     d.size_kb,
+        'size_kb':     d.size_kb,                         # original PDF size
+        'stored_kb':   round(len(d.file_data) / 1024, 1), # actual bytes stored
         'uploaded_at': d.uploaded_at.strftime('%d-%b-%Y %H:%M'),
         'uploaded_by': d.uploaded_by or '',
     } for d in docs]})
@@ -3779,20 +3781,33 @@ def payroll_documents_upload(payroll_id):
     # Verify PDF magic bytes (%PDF-)
     if not raw.startswith(b'%PDF'):
         return jsonify({'error': 'File does not appear to be a valid PDF.'}), 400
-    if len(raw) > MAX_DOC_BYTES:
-        return jsonify({'error': f'File too large. Maximum allowed size is 500 KB.'}), 400
+    original_size = len(raw)
+    if original_size > MAX_DOC_BYTES:
+        return jsonify({'error': 'File too large. Maximum allowed size is 500 KB.'}), 400
+
+    # Try zlib compression — store whichever is smaller.
+    # PDFs that are already internally compressed (e.g. government challans) will
+    # compress barely at all; text-heavy/form PDFs can shrink 40-70%.
+    compressed = _zlib.compress(raw, 6)
+    if len(compressed) < original_size:
+        store_data    = compressed
+        is_compressed = True
+    else:
+        store_data    = raw
+        is_compressed = False
 
     description = (request.form.get('description') or '').strip()[:500]
     uid = current_user_id()
 
     doc = PayrollDocument(
-        payroll_id  = payroll_id,
-        filename    = f.filename,
-        description = description or None,
-        file_data   = raw,
-        file_size   = len(raw),
-        uploaded_by = uid,
-        uploaded_at = datetime.utcnow(),
+        payroll_id    = payroll_id,
+        filename      = f.filename,
+        description   = description or None,
+        file_data     = store_data,
+        file_size     = original_size,
+        is_compressed = is_compressed,
+        uploaded_by   = uid,
+        uploaded_at   = datetime.utcnow(),
     )
     db.session.add(doc)
     db.session.commit()
@@ -3816,8 +3831,9 @@ def payroll_documents_view(payroll_id, doc_id):
     verify_est_ownership(est)
 
     doc = PayrollDocument.query.filter_by(id=doc_id, payroll_id=payroll_id).first_or_404()
+    pdf_bytes = _zlib.decompress(doc.file_data) if doc.is_compressed else doc.file_data
     return send_file(
-        BytesIO(doc.file_data),
+        BytesIO(pdf_bytes),
         mimetype='application/pdf',
         as_attachment=False,
         download_name=doc.filename,

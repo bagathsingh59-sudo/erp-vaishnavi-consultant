@@ -488,18 +488,22 @@ class PayrollEntry(db.Model):
 
 
 class PayrollDocument(db.Model):
-    """PDF documents attached to a payroll period — stored as BYTEA in PostgreSQL"""
+    """PDF documents attached to a payroll period — stored as BYTEA in PostgreSQL.
+    file_data may be zlib-compressed; is_compressed flag tells the view route whether
+    to decompress before serving.  file_size always reflects the original PDF size.
+    """
     __tablename__ = 'payroll_documents'
 
-    id          = db.Column(db.Integer, primary_key=True)
-    payroll_id  = db.Column(db.Integer, db.ForeignKey('monthly_payrolls.id', ondelete='CASCADE'),
-                            nullable=False, index=True)
-    filename    = db.Column(db.String(255), nullable=False)
-    description = db.Column(db.String(500), nullable=True)
-    file_data   = db.Column(db.LargeBinary, nullable=False)   # raw PDF bytes (BYTEA)
-    file_size   = db.Column(db.Integer, nullable=False)        # original bytes
-    uploaded_by = db.Column(db.String(100), nullable=True)
-    uploaded_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    id            = db.Column(db.Integer, primary_key=True)
+    payroll_id    = db.Column(db.Integer, db.ForeignKey('monthly_payrolls.id', ondelete='CASCADE'),
+                              nullable=False, index=True)
+    filename      = db.Column(db.String(255), nullable=False)
+    description   = db.Column(db.String(500), nullable=True)
+    file_data     = db.Column(db.LargeBinary, nullable=False)   # stored bytes (possibly compressed)
+    file_size     = db.Column(db.Integer, nullable=False)        # original PDF size in bytes
+    is_compressed = db.Column(db.Boolean, nullable=False, default=False)  # True = zlib compressed
+    uploaded_by   = db.Column(db.String(100), nullable=True)
+    uploaded_at   = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     payroll = db.relationship('MonthlyPayroll',
                               backref=db.backref('documents', lazy='dynamic',
@@ -508,6 +512,10 @@ class PayrollDocument(db.Model):
     @property
     def size_kb(self):
         return round(self.file_size / 1024, 1)
+
+    @property
+    def stored_kb(self):
+        return round(len(self.file_data) / 1024, 1)
 
     def __repr__(self):
         return f'<PayrollDocument {self.filename} payroll={self.payroll_id}>'

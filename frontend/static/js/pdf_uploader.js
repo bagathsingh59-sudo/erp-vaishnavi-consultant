@@ -333,7 +333,11 @@ const PDFUploader = (() => {
                                     text-overflow:ellipsis;white-space:nowrap;"
                              title="${_esc(d.filename)}">${_esc(d.filename)}</div>
                         <div style="font-size:0.68rem;color:#64748b;">
-                          ${_esc(d.description || '')}${d.description ? ' &middot; ' : ''}${d.size_kb} KB &middot; ${_esc(d.uploaded_at)}
+                          ${_esc(d.description || '')}${d.description ? ' &middot; ' : ''}${d.size_kb} KB
+                          ${(d.stored_kb && d.stored_kb < d.size_kb)
+                              ? `<span style="color:#16a34a;" title="Stored compressed">(${d.stored_kb} KB stored)</span>`
+                              : ''}
+                          &middot; ${_esc(d.uploaded_at)}
                         </div>
                       </div>
                       <a href="${_esc(viewUrl)}" target="_blank"

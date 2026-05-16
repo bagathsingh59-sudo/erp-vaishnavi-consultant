@@ -514,6 +514,17 @@ def _auto_migrate_columns(db):
         db.session.rollback()
         print(f"  [MIGRATE] payroll_documents table: {e}")
 
+    # Add is_compressed column to payroll_documents (existing installs)
+    try:
+        db.session.execute(db.text(
+            "ALTER TABLE payroll_documents ADD COLUMN IF NOT EXISTS "
+            "is_compressed BOOLEAN NOT NULL DEFAULT FALSE"
+        ))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"  [MIGRATE] payroll_documents.is_compressed: {e}")
+
     # One-time data migration: copy old include_ot_in_compliance → new split fields
     try:
         db.session.execute(db.text(
