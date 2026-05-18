@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block title %}Client Portal Logins - Vaishnavi Consultant{% endblock %}
+{% block page_header %}Client Portal Logins{% endblock %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
+    <div>
+        <h5 class="mb-1" style="font-weight:700;">
+            <i class="bi bi-key-fill me-2" style="color:#6366f1;"></i>
+            Portal Logins ({{ users|length }})
+        </h5>
+        <p class="text-muted mb-0" style="font-size:0.78rem;">
+            One row per establishment.  Edit username/email/phone, change password,
+            or activate/deactivate access to the client portal.
+        </p>
+    </div>
+    <form method="GET" class="d-flex gap-2" style="max-width:360px;">
+        <input type="search" name="q" value="{{ search }}" placeholder="Search company, username, email, phone…"
+               class="form-control form-control-sm" style="font-size:0.78rem;">
+        <button type="submit" class="btn btn-sm btn-outline-primary" style="font-size:0.78rem;">
+            <i class="bi bi-search"></i>
+        </button>
+    </form>
+</div>
+
+<!-- Security notice -->
+<div class="alert alert-warning d-flex align-items-start gap-2 mb-3" style="font-size:0.78rem;">
+    <i class="bi bi-shield-exclamation" style="font-size:1rem; color:#d97706;"></i>
+    <div>
+        <strong>Admin-only data.</strong> Passwords below are stored in plaintext alongside the bcrypt
+        hash so you can recover them when a client forgets.  Don't share screenshots of this page.
+    </div>
+</div>
+
+<!-- Users table -->
+<div class="card border-0 shadow-sm" style="border-radius:12px; overflow:hidden;">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" style="font-size:0.82rem;">
+            <thead style="background:#f8fafc;">
+                <tr>
+                    <th style="padding:12px 14px; font-weight:700; color:#475569;">Establishment</th>
+                    <th style="padding:12px 14px; font-weight:700; color:#475569;">Username</th>
+                    <th style="padding:12px 14px; font-weight:700; color:#475569;">Email</th>
+                    <th style="padding:12px 14px; font-weight:700; color:#475569;">Phone</th>
+                    <th style="padding:12px 14px; font-weight:700; color:#475569;">Password</th>
+                    <th style="padding:12px 14px; font-weight:700; color:#475569;">Status</th>
+                    <th style="padding:12px 14px; font-weight:700; color:#475569; text-align:right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for u in users %}
+                <tr>
+                    <td style="padding:10px 14px;">
+                        <div style="font-weight:600;">{{ u.establishment.company_name }}</div>
+                        {% if u.establishment.branch_name %}
+                        <div class="text-muted" style="font-size:0.7rem;">{{ u.establishment.branch_name }}</div>
+                        {% endif %}
+                    </td>
+                    <td style="padding:10px 14px;"><code style="font-size:0.78rem; color:#1e293b;">{{ u.username }}</code></td>
+                    <td style="padding:10px 14px;">{{ u.email }}</td>
+                    <td style="padding:10px 14px;">{{ u.phone or '—' }}</td>
+                    <td style="padding:10px 14px;">
+                        <div class="d-flex align-items-center gap-2">
+                            <code id="pw-{{ u.id }}" data-plain="{{ u.vault_password or '' }}"
+                                  style="font-size:0.78rem; color:#64748b; letter-spacing:1px;">
+                                {% if u.vault_password %}••••••••••{% else %}<em class="text-muted">(unknown — reset)</em>{% endif %}
+                            </code>
+                            {% if u.vault_password %}
+                            <button type="button" onclick="togglePw('{{ u.id }}', this)"
+                                    class="btn btn-sm btn-outline-secondary p-1" title="Show/hide"
+                                    style="font-size:0.7rem; line-height:1;">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            <button type="button" onclick="copyPw('{{ u.id }}', this)"
+                                    class="btn btn-sm btn-outline-secondary p-1" title="Copy"
+                                    style="font-size:0.7rem; line-height:1;">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td style="padding:10px 14px;">
+                        {% if u.is_active %}
+                        <span class="badge bg-success bg-opacity-25 text-success" style="font-size:0.68rem;">Active</span>
+                        {% else %}
+                        <span class="badge bg-secondary bg-opacity-25 text-secondary" style="font-size:0.68rem;">Disabled</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding:10px 14px; text-align:right; white-space:nowrap;">
+                        <button type="button" class="btn btn-sm btn-primary"
+                                onclick='openEditModal({{ {
+                                    "id": u.id,
+                                    "username": u.username,
+                                    "email": u.email,
+                                    "phone": u.phone or "",
+                                    "vault_password": u.vault_password or "",
+                                    "is_active": u.is_active,
+                                    "establishment": u.establishment.company_name + (" (" + u.establishment.branch_name + ")" if u.establishment.branch_name else "")
+                                } | tojson }})'
+                                style="font-size:0.72rem;">
+                            <i class="bi bi-pencil"></i> Edit
+                        </button>
+                        <form method="POST" action="{{ url_for('admin.portal_user_reset_password', user_id=u.id) }}"
+                              class="d-inline" onsubmit="return confirm('Reset password for {{ u.username }} to 123456789?');">
+                            <button type="submit" class="btn btn-sm btn-outline-warning" style="font-size:0.72rem;">
+                                <i class="bi bi-arrow-counterclockwise"></i> Reset
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="7" class="text-center text-muted py-4" style="font-size:0.85rem;">
+                    No portal logins yet — they appear once the Spring Boot server seeds them.
+                </td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+
+<!-- Edit modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="POST" id="editForm" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" style="font-weight:700;">
+                    <i class="bi bi-pencil-square me-2" style="color:#6366f1;"></i>
+                    Edit portal login
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label small text-muted">Establishment</label>
+                    <div id="m-est" style="font-weight:600;"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Username</label>
+                    <input type="text" name="username" id="m-username" class="form-control" maxlength="100" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Email</label>
+                    <input type="email" name="email" id="m-email" class="form-control" maxlength="255" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Phone (10 digits, leave blank to clear)</label>
+                    <input type="text" name="phone" id="m-phone" class="form-control" maxlength="20">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Password (leave blank to keep current)</label>
+                    <div class="input-group">
+                        <input type="text" name="password" id="m-password" class="form-control" minlength="6" maxlength="200" placeholder="Type a new password, or leave empty">
+                        <button type="button" class="btn btn-outline-secondary" onclick="genPw()" title="Generate strong password">
+                            <i class="bi bi-shuffle"></i>
+                        </button>
+                    </div>
+                    <div class="form-text small">Min 6 chars.  Setting this also updates the admin-visible vault.</div>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="is_active" id="m-active">
+                    <label class="form-check-label small" for="m-active">Account active — user can log in</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check2-circle me-1"></i> Save changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function togglePw(id, btn) {
+    const el = document.getElementById('pw-' + id);
+    const plain = el.dataset.plain;
+    const showing = el.dataset.shown === '1';
+    el.textContent = showing ? '••••••••••' : plain;
+    el.dataset.shown = showing ? '0' : '1';
+    btn.innerHTML = showing
+        ? '<i class="bi bi-eye"></i>'
+        : '<i class="bi bi-eye-slash"></i>';
+}
+
+function copyPw(id, btn) {
+    const plain = document.getElementById('pw-' + id).dataset.plain;
+    navigator.clipboard.writeText(plain).then(() => {
+        const original = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check2"></i>';
+        setTimeout(() => { btn.innerHTML = original; }, 1200);
+    });
+}
+
+function openEditModal(u) {
+    document.getElementById('m-est').textContent      = u.establishment;
+    document.getElementById('m-username').value       = u.username;
+    document.getElementById('m-email').value          = u.email;
+    document.getElementById('m-phone').value          = u.phone;
+    document.getElementById('m-password').value       = '';
+    document.getElementById('m-password').placeholder = 'Current: ' + (u.vault_password || '(unknown)');
+    document.getElementById('m-active').checked       = u.is_active;
+    document.getElementById('editForm').action        = '/admin/portal-users/' + u.id + '/update';
+    new bootstrap.Modal(document.getElementById('editModal')).show();
+}
+
+function genPw() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    let pw = '';
+    for (let i = 0; i < 12; i++) pw += chars[Math.floor(Math.random() * chars.length)];
+    document.getElementById('m-password').value = pw;
+}
+</script>
+
+{% endblock %}

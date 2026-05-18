@@ -795,3 +795,134 @@ def transfer_establishment(est_id):
 
     flash(f'{est.display_name} transferred to {to_user.name or to_user.email}.', 'success')
     return redirect(request.referrer or url_for('establishment.establishment_list'))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  CLIENT PORTAL USER MANAGEMENT
+#  Read/write `client_users` rows — the login table for the standalone
+#  Spring Boot + Next.js portal at vaishnavi-client-portal.
+# ═══════════════════════════════════════════════════════════════════════════
+from app.models.client_user import ClientUser
+from app.models.establishment import Establishment
+
+try:
+    import bcrypt as _bcrypt
+except ImportError:
+    _bcrypt = None  # We'll error politely if a save is attempted without it.
+
+
+def _bcrypt_hash(plain):
+    """Hash a password with bcrypt cost-10 — same scheme Spring Security validates."""
+    if _bcrypt is None:
+        raise RuntimeError(
+            "bcrypt package not installed.  Run `pip install bcrypt>=4.1.0` "
+            "in the ERP environment and restart the service."
+        )
+    return _bcrypt.hashpw(plain.encode('utf-8'),
+                          _bcrypt.gensalt(rounds=10)).decode('utf-8')
+
+
+@admin_bp.route('/portal-users')
+def portal_user_list():
+    """List all client portal logins with their establishment names."""
+    search = (request.args.get('q') or '').strip().lower()
+
+    q = ClientUser.query.join(Establishment,
+                              Establishment.id == ClientUser.establishment_id)
+    if search:
+        like = f"%{search}%"
+        q = q.filter(db.or_(
+            db.func.lower(ClientUser.username).like(like),
+            db.func.lower(ClientUser.email).like(like),
+            ClientUser.phone.like(like),
+            db.func.lower(Establishment.company_name).like(like),
+            db.func.lower(db.func.coalesce(Establishment.branch_name, '')).like(like),
+        ))
+
+    users = q.order_by(Establishment.company_name,
+                       Establishment.branch_name).all()
+    return render_template('admin/portal_users.html',
+                           users=users,
+                           search=search)
+
+
+@admin_bp.route('/portal-users/<int:user_id>/update', methods=['POST'])
+def portal_user_update(user_id):
+    """Update any of username/email/phone/password/active flag."""
+    u = ClientUser.query.get_or_404(user_id)
+
+    new_username = (request.form.get('username') or '').strip()
+    new_email    = (request.form.get('email')    or '').strip()
+    new_phone    = (request.form.get('phone')    or '').strip()
+    new_password = request.form.get('password') or ''   # don't strip — preserve trailing spaces if intentional
+    is_active    = request.form.get('is_active') == 'on'
+
+    # Identifier uniqueness checks (skip if value didn't change)
+    if new_username and new_username.lower() != u.username.lower():
+        clash = ClientUser.query.filter(db.func.lower(ClientUser.username) == new_username.lower(),
+                                        ClientUser.id != u.id).first()
+        if clash:
+            flash(f'Username "{new_username}" is already in use.', 'danger')
+            return redirect(url_for('admin.portal_user_list'))
+        u.username = new_username
+
+    if new_email and new_email.lower() != (u.email or '').lower():
+        clash = ClientUser.query.filter(db.func.lower(ClientUser.email) == new_email.lower(),
+                                        ClientUser.id != u.id).first()
+        if clash:
+            flash(f'Email "{new_email}" is already in use.', 'danger')
+            return redirect(url_for('admin.portal_user_list'))
+        u.email = new_email
+
+    if new_phone != (u.phone or ''):
+        # Allow clearing the phone
+        if new_phone == '':
+            u.phone = None
+        else:
+            clash = ClientUser.query.filter(ClientUser.phone == new_phone,
+                                            ClientUser.id != u.id).first()
+            if clash:
+                flash(f'Phone "{new_phone}" is already in use.', 'danger')
+                return redirect(url_for('admin.portal_user_list'))
+            u.phone = new_phone
+
+    if new_password:
+        if len(new_password) < 6:
+            flash('Password must be at least 6 characters.', 'danger')
+            return redirect(url_for('admin.portal_user_list'))
+        try:
+            u.password_hash  = _bcrypt_hash(new_password)
+        except RuntimeError as e:
+            flash(str(e), 'danger')
+            return redirect(url_for('admin.portal_user_list'))
+        u.vault_password = new_password
+
+    u.is_active = is_active
+    db.session.commit()
+
+    log_activity('portal_user_updated',
+                 f'Updated portal login for establishment_id={u.establishment_id} (username={u.username})')
+    flash(f'Updated portal login for "{u.username}".', 'success')
+    return redirect(url_for('admin.portal_user_list'))
+
+
+@admin_bp.route('/portal-users/<int:user_id>/reset-password', methods=['POST'])
+def portal_user_reset_password(user_id):
+    """Reset to the default password (or whatever's posted as ?new_password=)."""
+    u = ClientUser.query.get_or_404(user_id)
+    new_password = (request.form.get('new_password') or '123456789').strip()
+    if len(new_password) < 6:
+        flash('Password must be at least 6 characters.', 'danger')
+        return redirect(url_for('admin.portal_user_list'))
+    try:
+        u.password_hash  = _bcrypt_hash(new_password)
+    except RuntimeError as e:
+        flash(str(e), 'danger')
+        return redirect(url_for('admin.portal_user_list'))
+    u.vault_password = new_password
+    db.session.commit()
+
+    log_activity('portal_user_password_reset',
+                 f'Reset portal password for username={u.username}')
+    flash(f'Password for "{u.username}" reset to: {new_password}', 'success')
+    return redirect(url_for('admin.portal_user_list'))

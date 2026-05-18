@@ -478,9 +478,14 @@
         <div style="margin-top:4px;">
             <div class="sidebar-section-title" style="font-size:0.6rem; color:#64748b; padding:6px 16px; text-transform:uppercase; letter-spacing:0.5px;">SYSTEM</div>
             <a href="{{ url_for('admin.user_list') }}"
-               class="sidebar-link {% if request.endpoint and 'admin.' in (request.endpoint or '') %}active{% endif %}">
+               class="sidebar-link {% if request.endpoint == 'admin.user_list' %}active{% endif %}">
                 <i class="bi bi-person-gear"></i>
                 <span>User Management</span>
+            </a>
+            <a href="{{ url_for('admin.portal_user_list') }}"
+               class="sidebar-link {% if request.endpoint == 'admin.portal_user_list' %}active{% endif %}">
+                <i class="bi bi-key"></i>
+                <span>Client Portal Logins</span>
             </a>
             <a href="{{ url_for('backup.backup_home') }}"
                class="sidebar-link {% if request.endpoint and 'backup' in request.endpoint %}active{% endif %}">
