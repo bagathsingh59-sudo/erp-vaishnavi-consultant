@@ -417,8 +417,29 @@ def init_auth(app):
     def check_auth():
         """Check Clerk authentication on every request"""
         g.clerk_user = None
+        g.is_internal = False
         # Make Flask session permanent so PERMANENT_SESSION_LIFETIME (8h) applies
         session.permanent = True
+
+        # ── Internal API-key bypass — for service-to-service calls ──
+        # The Client Portal (Spring Boot) reuses the ERP's report endpoints
+        # by adding `X-Internal-Api-Key: <secret>` to its requests.  When the
+        # key matches the INTERNAL_API_KEY env var we treat the caller as an
+        # admin so verify_est_ownership() and is_admin() both succeed,
+        # without involving Clerk at all.
+        internal_key = os.getenv('INTERNAL_API_KEY', '')
+        header_key   = request.headers.get('X-Internal-Api-Key', '')
+        if internal_key and header_key and header_key == internal_key:
+            g.clerk_user = {
+                'user_id': 'internal-portal',
+                'name':    'Client Portal (Internal)',
+                'email':   'portal@internal',
+                'image_url': '',
+                'role':    'admin',
+                'is_admin': True,
+            }
+            g.is_internal = True
+            return
 
         # Skip auth for: static files, login page, logout page, debug, public APIs
         if request.endpoint and (
