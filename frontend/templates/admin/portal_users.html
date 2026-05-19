@@ -35,12 +35,54 @@
     </div>
 </div>
 
+<!-- Bulk-action bar — appears when 1+ rows checked OR when "Apply to all" is on -->
+<form id="bulkForm" method="POST" action="{{ url_for('admin.portal_user_bulk') }}"
+      class="card border-0 shadow-sm mb-3 d-none"
+      style="border-radius:12px; background:linear-gradient(135deg,#eff6ff,#eef2ff); border:1px solid #c7d2fe !important;">
+    <div class="card-body py-3 px-4 d-flex flex-wrap gap-3 align-items-center">
+        <input type="hidden" name="select_all" id="bulk-select-all" value="0">
+        <div id="bulk-count" class="fw-bold" style="color:#3730a3;">0 selected</div>
+
+        <select name="action" id="bulk-action" class="form-select form-select-sm"
+                style="max-width:240px;" required>
+            <option value="" disabled selected>Choose action…</option>
+            <option value="reset-password">Reset password</option>
+            <option value="activate">Activate</option>
+            <option value="deactivate">Deactivate</option>
+            <option value="sync-phones">Sync phones from establishments</option>
+        </select>
+
+        <input type="text" name="new_password" id="bulk-password" placeholder="123456789"
+               class="form-control form-control-sm d-none"
+               style="max-width:200px;" minlength="6" maxlength="200">
+
+        <button type="submit" class="btn btn-sm btn-primary"
+                onclick="return confirmBulk();">
+            <i class="bi bi-lightning-charge me-1"></i> Apply
+        </button>
+
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearSelection()">
+            Clear
+        </button>
+
+        <div class="ms-auto">
+            <button type="button" id="bulk-all-btn" onclick="toggleApplyAll()"
+                    class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-check2-all me-1"></i> Apply to ALL ({{ users|length }})
+            </button>
+        </div>
+    </div>
+</form>
+
 <!-- Users table -->
 <div class="card border-0 shadow-sm" style="border-radius:12px; overflow:hidden;">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0" style="font-size:0.82rem;">
             <thead style="background:#f8fafc;">
                 <tr>
+                    <th style="padding:12px 8px; width:36px; text-align:center;">
+                        <input type="checkbox" id="check-all" onchange="toggleAllRows(this)" class="form-check-input">
+                    </th>
                     <th style="padding:12px 14px; font-weight:700; color:#475569;">Establishment</th>
                     <th style="padding:12px 14px; font-weight:700; color:#475569;">Username</th>
                     <th style="padding:12px 14px; font-weight:700; color:#475569;">Email</th>
@@ -53,6 +95,10 @@
             <tbody>
             {% for u in users %}
                 <tr>
+                    <td style="padding:10px 8px; text-align:center;">
+                        <input type="checkbox" form="bulkForm" name="user_ids[]" value="{{ u.id }}"
+                               class="form-check-input row-check" onchange="updateBulkBar()">
+                    </td>
                     <td style="padding:10px 14px;">
                         <div style="font-weight:600;">{{ u.establishment.company_name }}</div>
                         {% if u.establishment.branch_name %}
@@ -176,6 +222,75 @@
 </div>
 
 <script>
+/* ─── bulk-action helpers ─── */
+function updateBulkBar() {
+    const checked = document.querySelectorAll('.row-check:checked').length;
+    const bar     = document.getElementById('bulkForm');
+    const all     = document.getElementById('bulk-select-all');
+    const count   = document.getElementById('bulk-count');
+
+    if (all.value === '1') {
+        bar.classList.remove('d-none');
+        count.textContent = 'ALL rows ({{ users|length }} users)';
+    } else if (checked > 0) {
+        bar.classList.remove('d-none');
+        count.textContent = checked + ' selected';
+    } else {
+        bar.classList.add('d-none');
+    }
+
+    document.getElementById('check-all').checked =
+        (checked === document.querySelectorAll('.row-check').length && checked > 0);
+}
+function toggleAllRows(masterCheckbox) {
+    document.querySelectorAll('.row-check').forEach(c => { c.checked = masterCheckbox.checked; });
+    if (document.getElementById('bulk-select-all').value === '1') toggleApplyAll();  // turn off "all" mode
+    updateBulkBar();
+}
+function toggleApplyAll() {
+    const flag = document.getElementById('bulk-select-all');
+    const btn  = document.getElementById('bulk-all-btn');
+    flag.value = (flag.value === '1') ? '0' : '1';
+    btn.classList.toggle('btn-primary', flag.value === '1');
+    btn.classList.toggle('btn-outline-primary', flag.value !== '1');
+    if (flag.value === '1') {
+        document.querySelectorAll('.row-check').forEach(c => c.checked = false);
+        document.getElementById('check-all').checked = false;
+    }
+    updateBulkBar();
+}
+function clearSelection() {
+    document.querySelectorAll('.row-check').forEach(c => c.checked = false);
+    document.getElementById('check-all').checked = false;
+    document.getElementById('bulk-select-all').value = '0';
+    document.getElementById('bulk-all-btn').classList.remove('btn-primary');
+    document.getElementById('bulk-all-btn').classList.add('btn-outline-primary');
+    updateBulkBar();
+}
+// Show password input only when action === 'reset-password'
+document.addEventListener('DOMContentLoaded', function() {
+    const sel = document.getElementById('bulk-action');
+    const pwd = document.getElementById('bulk-password');
+    sel.addEventListener('change', function() {
+        pwd.classList.toggle('d-none', this.value !== 'reset-password');
+        if (this.value === 'reset-password') pwd.placeholder = '123456789 (default)';
+    });
+});
+function confirmBulk() {
+    const action = document.getElementById('bulk-action').value;
+    if (!action) { alert('Please choose an action first.'); return false; }
+    const all = document.getElementById('bulk-select-all').value === '1';
+    const target = all ? 'ALL {{ users|length }} client logins' :
+                         document.querySelectorAll('.row-check:checked').length + ' selected login(s)';
+    const labels = {
+        'reset-password': 'Reset password for ' + target + '?',
+        'activate':       'Activate ' + target + '?',
+        'deactivate':     'DEACTIVATE ' + target + '?  Users will not be able to log in.',
+        'sync-phones':    'Pull phone numbers from the establishments table into ' + target + '?',
+    };
+    return confirm(labels[action] || 'Apply action?');
+}
+
 function togglePw(id, btn) {
     const el = document.getElementById('pw-' + id);
     const plain = el.dataset.plain;

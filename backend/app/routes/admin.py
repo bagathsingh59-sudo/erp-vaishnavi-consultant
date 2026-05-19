@@ -926,3 +926,115 @@ def portal_user_reset_password(user_id):
                  f'Reset portal password for username={u.username}')
     flash(f'Password for "{u.username}" reset to: {new_password}', 'success')
     return redirect(url_for('admin.portal_user_list'))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  BULK OPERATIONS on client_users
+# ═══════════════════════════════════════════════════════════════════════════
+
+@admin_bp.route('/portal-users/bulk', methods=['POST'])
+def portal_user_bulk():
+    """
+    Apply one of several bulk actions to a selected set (or all) of client_users.
+      action = 'reset-password'   → reset to ?new_password=… (defaults to 123456789)
+      action = 'deactivate'       → set is_active = False
+      action = 'activate'         → set is_active = True
+      action = 'sync-phones'      → pull last 10 digits of contact_phone from each
+                                    establishment; skip rows where the resulting
+                                    phone collides with another client_user
+
+    Selection: form fields user_ids[] (list of integer IDs).  If empty AND
+    `select_all=1` is present, applies to ALL client_users.
+    """
+    action       = (request.form.get('action') or '').strip()
+    new_password = (request.form.get('new_password') or '123456789').strip()
+    select_all   = request.form.get('select_all') == '1'
+    raw_ids      = request.form.getlist('user_ids[]') or request.form.getlist('user_ids')
+
+    q = ClientUser.query
+    if not select_all:
+        try:
+            ids = [int(x) for x in raw_ids if x.strip()]
+        except ValueError:
+            flash('Invalid user ID in selection.', 'danger')
+            return redirect(url_for('admin.portal_user_list'))
+        if not ids:
+            flash('No users selected.  Tick the rows you want to change, '
+                  'or use "Apply to all" for a global action.', 'warning')
+            return redirect(url_for('admin.portal_user_list'))
+        q = q.filter(ClientUser.id.in_(ids))
+
+    users = q.all()
+    if not users:
+        flash('No matching users found.', 'warning')
+        return redirect(url_for('admin.portal_user_list'))
+
+    n_changed = 0
+    n_skipped = 0
+
+    if action == 'reset-password':
+        if len(new_password) < 6:
+            flash('Password must be at least 6 characters.', 'danger')
+            return redirect(url_for('admin.portal_user_list'))
+        try:
+            pwd_hash = _bcrypt_hash(new_password)
+        except RuntimeError as e:
+            flash(str(e), 'danger')
+            return redirect(url_for('admin.portal_user_list'))
+        for u in users:
+            u.password_hash = pwd_hash
+            u.vault_password = new_password
+            n_changed += 1
+        log_activity('portal_user_bulk_reset_password',
+                     f'Bulk-reset password for {n_changed} client_users')
+        flash(f'Reset password for {n_changed} login(s) to: {new_password}', 'success')
+
+    elif action in ('deactivate', 'activate'):
+        target = (action == 'activate')
+        for u in users:
+            if u.is_active != target:
+                u.is_active = target
+                n_changed += 1
+        verb = 'Activated' if target else 'Deactivated'
+        log_activity(f'portal_user_bulk_{action}',
+                     f'{verb} {n_changed} client_users')
+        flash(f'{verb} {n_changed} login(s).', 'success')
+
+    elif action == 'sync-phones':
+        # Pull each establishment's contact_phone and stamp it onto the linked
+        # client_user — skipping rows where the resulting number would collide
+        # with another row.
+        est_phones = dict(
+            db.session.query(Establishment.id, Establishment.contact_phone).all()
+        )
+        for u in users:
+            raw = est_phones.get(u.establishment_id) or ''
+            digits = ''.join(ch for ch in raw if ch.isdigit())
+            if len(digits) > 10:
+                digits = digits[-10:]
+            if len(digits) != 10:
+                n_skipped += 1
+                continue
+            if digits == (u.phone or ''):
+                continue  # already in sync
+            clash = ClientUser.query.filter(
+                ClientUser.phone == digits, ClientUser.id != u.id
+            ).first()
+            if clash:
+                n_skipped += 1
+                continue
+            u.phone = digits
+            n_changed += 1
+        log_activity('portal_user_bulk_sync_phones',
+                     f'Synced phones for {n_changed} client_users '
+                     f'(skipped {n_skipped})')
+        flash(f'Synced phones for {n_changed} login(s). '
+              f'Skipped {n_skipped} (no clean 10-digit phone or duplicate).',
+              'success' if n_changed else 'warning')
+
+    else:
+        flash(f'Unknown bulk action: "{action}"', 'danger')
+        return redirect(url_for('admin.portal_user_list'))
+
+    db.session.commit()
+    return redirect(url_for('admin.portal_user_list'))
