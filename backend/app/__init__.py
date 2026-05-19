@@ -368,6 +368,9 @@ def create_app():
     csrf.exempt('flasgger.apispec_1')
     csrf.exempt('flasgger.apidocs')
     csrf.exempt('api_docs.test_db_connection')
+    # JSON toggle endpoint — JS fetch sends X-CSRFToken header explicitly,
+    # but it's simpler to exempt this single admin-only route.
+    csrf.exempt('admin.portal_user_toggle_active')
 
     # Create database tables
     with app.app_context():

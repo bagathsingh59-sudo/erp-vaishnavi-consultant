@@ -1038,3 +1038,22 @@ def portal_user_bulk():
 
     db.session.commit()
     return redirect(url_for('admin.portal_user_list'))
+
+
+@admin_bp.route('/portal-users/<int:user_id>/toggle-active', methods=['POST'])
+def portal_user_toggle_active(user_id):
+    """
+    Flip is_active in one click — used by the inline toggle switch in the
+    portal users table.  Returns JSON for the inline JS handler.
+    """
+    u = ClientUser.query.get_or_404(user_id)
+    u.is_active = not u.is_active
+    db.session.commit()
+    log_activity('portal_user_toggle_active',
+                 ("Activated" if u.is_active else "Deactivated") +
+                 f" portal login for username={u.username}")
+    return jsonify({
+        'ok':        True,
+        'id':        u.id,
+        'is_active': u.is_active,
+    })

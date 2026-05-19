@@ -84,11 +84,11 @@
                         <input type="checkbox" id="check-all" onchange="toggleAllRows(this)" class="form-check-input">
                     </th>
                     <th style="padding:12px 14px; font-weight:700; color:#475569;">Establishment</th>
-                    <th style="padding:12px 14px; font-weight:700; color:#475569;">Username</th>
-                    <th style="padding:12px 14px; font-weight:700; color:#475569;">Email</th>
-                    <th style="padding:12px 14px; font-weight:700; color:#475569;">Phone</th>
+                    <th style="padding:12px 14px; font-weight:700; color:#475569;">EPF / ESIC Code <span class="text-muted" style="font-weight:500;">(login)</span></th>
+                    <th style="padding:12px 14px; font-weight:700; color:#475569;">Email <span class="text-muted" style="font-weight:500;">(data)</span></th>
+                    <th style="padding:12px 14px; font-weight:700; color:#475569;">Phone <span class="text-muted" style="font-weight:500;">(data)</span></th>
                     <th style="padding:12px 14px; font-weight:700; color:#475569;">Password</th>
-                    <th style="padding:12px 14px; font-weight:700; color:#475569;">Status</th>
+                    <th style="padding:12px 14px; font-weight:700; color:#475569;">Active</th>
                     <th style="padding:12px 14px; font-weight:700; color:#475569; text-align:right;">Actions</th>
                 </tr>
             </thead>
@@ -105,7 +105,24 @@
                         <div class="text-muted" style="font-size:0.7rem;">{{ u.establishment.branch_name }}</div>
                         {% endif %}
                     </td>
-                    <td style="padding:10px 14px;"><code style="font-size:0.78rem; color:#1e293b;">{{ u.username }}</code></td>
+                    <td style="padding:10px 14px;">
+                        {% if u.establishment.pf_code %}
+                        <div style="font-family:monospace; font-size:0.78rem; color:#1e293b;">
+                            <span class="badge bg-primary bg-opacity-10 text-primary me-1" style="font-size:0.6rem; vertical-align:middle;">EPF</span>
+                            {{ u.establishment.pf_code }}
+                        </div>
+                        {% endif %}
+                        {% if u.establishment.esic_code %}
+                        <div style="font-family:monospace; font-size:0.78rem; color:#1e293b; margin-top:2px;">
+                            <span class="badge bg-success bg-opacity-10 text-success me-1" style="font-size:0.6rem; vertical-align:middle;">ESIC</span>
+                            {{ u.establishment.esic_code }}
+                        </div>
+                        {% endif %}
+                        {% if not u.establishment.pf_code and not u.establishment.esic_code %}
+                        <span class="text-muted small">no code on file</span>
+                        {% endif %}
+                        <div class="text-muted" style="font-size:0.65rem; margin-top:3px;">username: <code>{{ u.username }}</code></div>
+                    </td>
                     <td style="padding:10px 14px;">{{ u.email }}</td>
                     <td style="padding:10px 14px;">{{ u.phone or '—' }}</td>
                     <td style="padding:10px 14px;">
@@ -129,11 +146,17 @@
                         </div>
                     </td>
                     <td style="padding:10px 14px;">
-                        {% if u.is_active %}
-                        <span class="badge bg-success bg-opacity-25 text-success" style="font-size:0.68rem;">Active</span>
-                        {% else %}
-                        <span class="badge bg-secondary bg-opacity-25 text-secondary" style="font-size:0.68rem;">Disabled</span>
-                        {% endif %}
+                        <div class="form-check form-switch m-0" style="min-height:0;" title="Toggle login access">
+                            <input type="checkbox"
+                                   class="form-check-input toggle-active"
+                                   data-user-id="{{ u.id }}"
+                                   {% if u.is_active %}checked{% endif %}
+                                   onchange="toggleActive(this)"
+                                   style="width:2.25em; height:1.2em; cursor:pointer;">
+                            <span class="toggle-label" style="font-size:0.68rem; margin-left:6px; color: {{ '#16a34a' if u.is_active else '#94a3b8' }};">
+                                {{ 'Active' if u.is_active else 'Inactive' }}
+                            </span>
+                        </div>
                     </td>
                     <td style="padding:10px 14px; text-align:right; white-space:nowrap;">
                         <button type="button" class="btn btn-sm btn-primary"
@@ -289,6 +312,40 @@ function confirmBulk() {
         'sync-phones':    'Pull phone numbers from the establishments table into ' + target + '?',
     };
     return confirm(labels[action] || 'Apply action?');
+}
+
+/* ─── live toggle handler ─── */
+async function toggleActive(input) {
+    const id      = input.dataset.userId;
+    const wrapper = input.closest('.form-check');
+    const label   = wrapper.querySelector('.toggle-label');
+    const wasOn   = input.checked;   // already flipped by the browser
+    input.disabled = true;
+    label.style.opacity = '0.5';
+
+    try {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+        const res = await fetch(`/admin/portal-users/${id}/toggle-active`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(csrf ? { 'X-CSRFToken': csrf } : {}),
+            },
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        // Reflect server's view (in case of race)
+        input.checked = data.is_active;
+        label.textContent       = data.is_active ? 'Active' : 'Inactive';
+        label.style.color       = data.is_active ? '#16a34a' : '#94a3b8';
+    } catch (err) {
+        // Revert
+        input.checked = !wasOn;
+        alert('Could not toggle status — please refresh and try again.');
+    } finally {
+        input.disabled = false;
+        label.style.opacity = '1';
+    }
 }
 
 function togglePw(id, btn) {
