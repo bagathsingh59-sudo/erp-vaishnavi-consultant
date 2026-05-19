@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block title %}Assign Clients to Staff - Vaishnavi Consultant{% endblock %}
+{% block page_header %}Assign Clients to Staff{% endblock %}
+
+{% block content %}
+<style>
+.ac-wrap { max-width: 1200px; margin: 0 auto; }
+.ac-toolbar {
+    background: linear-gradient(135deg, #eff6ff, #eef2ff);
+    border: 1px solid #c7d2fe; border-radius: 12px;
+    padding: 14px 18px; margin-bottom: 14px;
+}
+.ac-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ac-filter-btn {
+    padding: 5px 12px; font-size: 0.72rem; font-weight: 600;
+    border-radius: 999px; border: 1px solid #cbd5e1; background: #fff;
+    color: #475569; text-decoration: none; transition: all 0.15s;
+}
+.ac-filter-btn:hover { background: #f1f5f9; color: #1e293b; }
+.ac-filter-btn.active { background: #3730a3; color: #fff; border-color: #3730a3; }
+
+.ac-bulk-bar {
+    background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+    border: 1px solid #86efac; border-radius: 12px;
+    padding: 12px 18px; margin-bottom: 14px;
+    display: none;
+}
+.ac-bulk-bar.active { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+.ac-table-card {
+    background: #fff; border-radius: 12px; overflow: hidden;
+    border: 1px solid #e2e8f0;
+}
+.ac-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.ac-table thead th {
+    background: #f8fafc; padding: 11px 12px; text-align: left;
+    font-size: 0.65rem; font-weight: 700; color: #475569;
+    text-transform: uppercase; letter-spacing: 0.4px;
+    border-bottom: 2px solid #e2e8f0;
+}
+.ac-table tbody td {
+    padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle;
+}
+.ac-table tbody tr:hover { background: #fafbff; }
+.ac-table input[type="checkbox"] { transform: scale(1.15); cursor: pointer; }
+
+.ac-badge {
+    display: inline-block; padding: 2px 7px; border-radius: 4px;
+    font-size: 0.6rem; font-weight: 700; vertical-align: middle;
+}
+.ac-badge-pf   { background: #dbeafe; color: #1d4ed8; }
+.ac-badge-esic { background: #dcfce7; color: #15803d; }
+.ac-badge-none { background: #fee2e2; color: #b91c1c; }
+.ac-badge-assigned { background: #f0fdf4; color: #166534; }
+</style>
+
+<div class="ac-wrap">
+
+    <!-- Toolbar: filters + search -->
+    <div class="ac-toolbar">
+        <div class="d-flex flex-wrap align-items-center gap-3 mb-2">
+            <div style="font-size:0.92rem; font-weight:700; color:#3730a3;">
+                <i class="bi bi-people-fill me-2"></i>{{ ests|length }} establishment(s) shown
+            </div>
+            <div style="font-size:0.72rem; color:#6366f1;">
+                <strong>{{ total }}</strong> total, <strong>{{ unassigned_count }}</strong> unassigned
+            </div>
+
+            <form method="GET" class="d-flex gap-2 ms-auto" style="max-width:340px;">
+                <input type="search" name="q" value="{{ search }}" placeholder="Search company / PF / ESIC…"
+                       class="form-control form-control-sm" style="font-size:0.78rem;">
+                <input type="hidden" name="filter" value="{{ current_filter }}">
+                <button type="submit" class="btn btn-sm btn-outline-primary" style="font-size:0.78rem;">
+                    <i class="bi bi-search"></i>
+                </button>
+            </form>
+        </div>
+        <div class="ac-filters">
+            <span style="font-size:0.7rem; color:#64748b; margin-right:4px;">FILTER:</span>
+            <a href="{{ url_for('admin.assign_clients_list', filter='all', q=search) }}"
+               class="ac-filter-btn {% if current_filter == 'all' %}active{% endif %}">
+                All ({{ total }})
+            </a>
+            <a href="{{ url_for('admin.assign_clients_list', filter='unassigned', q=search) }}"
+               class="ac-filter-btn {% if current_filter == 'unassigned' %}active{% endif %}">
+                Unassigned ({{ unassigned_count }})
+            </a>
+            {% for s in staff %}
+            <a href="{{ url_for('admin.assign_clients_list', filter=s.clerk_user_id, q=search) }}"
+               class="ac-filter-btn {% if current_filter == s.clerk_user_id %}active{% endif %}">
+                {{ s.name or s.email }}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Bulk action bar -->
+    <form method="POST" action="{{ url_for('admin.assign_clients_apply') }}"
+          id="bulkForm" class="ac-bulk-bar" onsubmit="return confirmAssign();">
+        <input type="hidden" name="csrf_token"  value="{{ csrf_token() }}">
+        <input type="hidden" name="return_to"   value="{{ current_filter }}">
+
+        <div style="font-weight:700; color:#15803d;" id="bulk-count">0 selected</div>
+
+        <select name="to_user_id" id="to_user_id" required
+                class="form-select form-select-sm" style="max-width:280px;">
+            <option value="">— Pick destination staff —</option>
+            {% for s in staff %}
+            <option value="{{ s.clerk_user_id }}">{{ s.name or s.email }} ({{ s.role|upper }})</option>
+            {% endfor %}
+            <option value="UNASSIGN" style="color:#b91c1c;">⚠ Clear assignment (Unassigned)</option>
+        </select>
+
+        <input type="text" name="reason" placeholder="Reason (optional)"
+               class="form-control form-control-sm" style="max-width:300px;">
+
+        <button type="submit" class="btn btn-sm btn-success" style="font-weight:700;">
+            <i class="bi bi-arrow-right-circle me-1"></i>Assign Selected
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearSelection()">
+            Clear
+        </button>
+    </form>
+
+    <!-- Establishments table -->
+    {% if ests %}
+    <div class="ac-table-card">
+        <div style="max-height: 65vh; overflow-y: auto;">
+            <table class="ac-table">
+                <thead>
+                    <tr>
+                        <th style="width:42px; text-align:center;">
+                            <input type="checkbox" id="check-all" onchange="toggleAll(this)">
+                        </th>
+                        <th>Establishment</th>
+                        <th>PF / ESIC Code</th>
+                        <th>Currently Assigned To</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in ests %}
+                    {% set cur = staff_by_id.get(e.assigned_to_id) %}
+                    <tr>
+                        <td style="text-align:center;">
+                            <input type="checkbox" form="bulkForm" name="est_ids"
+                                   value="{{ e.id }}"
+                                   class="est-check"
+                                   onchange="updateBulkBar()">
+                        </td>
+                        <td>
+                            <div style="font-weight:600; color:#1e293b;">{{ e.company_name }}</div>
+                            {% if e.branch_name %}
+                            <div style="font-size:0.66rem; color:#94a3b8;">{{ e.branch_name }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if e.pf_code %}<div><span class="ac-badge ac-badge-pf">PF</span> <code style="font-size:0.72rem;">{{ e.pf_code }}</code></div>{% endif %}
+                            {% if e.esic_code %}<div style="margin-top:2px;"><span class="ac-badge ac-badge-esic">ESIC</span> <code style="font-size:0.72rem;">{{ e.esic_code }}</code></div>{% endif %}
+                            {% if not e.pf_code and not e.esic_code %}<span class="text-muted small">—</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if cur %}
+                            <span class="ac-badge ac-badge-assigned">
+                                <i class="bi bi-person-check-fill me-1"></i>{{ cur.name or cur.email }}
+                            </span>
+                            {% else %}
+                            <span class="ac-badge ac-badge-none">
+                                <i class="bi bi-exclamation-circle-fill me-1"></i>Unassigned
+                            </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="ac-table-card" style="padding: 50px; text-align: center; color: #94a3b8;">
+        <i class="bi bi-inbox" style="font-size: 2.5rem;"></i>
+        <div style="margin-top: 10px; font-size: 0.9rem;">No establishments match the current filter.</div>
+    </div>
+    {% endif %}
+
+</div>
+
+<script>
+function updateBulkBar() {
+    const checked = document.querySelectorAll('.est-check:checked').length;
+    const bar     = document.getElementById('bulkForm');
+    const count   = document.getElementById('bulk-count');
+    if (checked > 0) {
+        bar.classList.add('active');
+        count.textContent = checked + ' selected';
+    } else {
+        bar.classList.remove('active');
+    }
+    document.getElementById('check-all').checked =
+        (checked === document.querySelectorAll('.est-check').length && checked > 0);
+}
+function toggleAll(master) {
+    document.querySelectorAll('.est-check').forEach(c => c.checked = master.checked);
+    updateBulkBar();
+}
+function clearSelection() {
+    document.querySelectorAll('.est-check').forEach(c => c.checked = false);
+    document.getElementById('check-all').checked = false;
+    updateBulkBar();
+}
+function confirmAssign() {
+    const sel = document.getElementById('to_user_id');
+    const target = sel.options[sel.selectedIndex].text;
+    const n = document.querySelectorAll('.est-check:checked').length;
+    if (!sel.value) { alert('Please pick a destination staff first.'); return false; }
+    if (n === 0)    { alert('Select at least one establishment.'); return false; }
+    if (sel.value === 'UNASSIGN') {
+        return confirm('CLEAR assignment for ' + n + ' establishment(s)?  They will appear as Unassigned.');
+    }
+    return confirm('Assign ' + n + ' establishment(s) to ' + target + '?');
+}
+</script>
+
+{% endblock %}

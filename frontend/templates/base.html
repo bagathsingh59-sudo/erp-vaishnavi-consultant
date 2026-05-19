@@ -487,6 +487,11 @@
                 <i class="bi bi-key"></i>
                 <span>Client Portal Logins</span>
             </a>
+            <a href="{{ url_for('admin.assign_clients_list') }}"
+               class="sidebar-link {% if request.endpoint in ('admin.assign_clients_list', 'admin.assign_clients_apply') %}active{% endif %}">
+                <i class="bi bi-diagram-3"></i>
+                <span>Assign Clients to Staff</span>
+            </a>
             <a href="{{ url_for('backup.backup_home') }}"
                class="sidebar-link {% if request.endpoint and 'backup' in request.endpoint %}active{% endif %}">
                 <i class="bi bi-database-down"></i>

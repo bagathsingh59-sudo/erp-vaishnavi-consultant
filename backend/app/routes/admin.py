@@ -1057,3 +1057,149 @@ def portal_user_toggle_active(user_id):
         'id':        u.id,
         'is_active': u.is_active,
     })
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  ASSIGN CLIENTS  —  admin picks any establishments and gives them to any
+#  staff in one shot.  Unlike /admin/reassign which is per-source-staff,
+#  this page lists ALL establishments with their current assignee and lets
+#  the admin filter by "Unassigned", a specific staff, or "All".
+# ═══════════════════════════════════════════════════════════════════════════
+
+from app.models.assignment_log import EstablishmentAssignmentLog  # safe re-import
+
+@admin_bp.route('/assign-clients', methods=['GET'])
+def assign_clients_list():
+    """
+    List every active establishment with its current assignee (or "Unassigned")
+    plus controls for filtering and bulk-assigning.
+    """
+    flt = (request.args.get('filter') or 'all').strip()  # all | unassigned | <clerk_user_id>
+    search = (request.args.get('q') or '').strip().lower()
+
+    q = Establishment.query.filter(Establishment.is_active == True)
+
+    if flt == 'unassigned':
+        q = q.filter((Establishment.assigned_to_id == None) | (Establishment.assigned_to_id == ''))
+    elif flt and flt != 'all':
+        q = q.filter(Establishment.assigned_to_id == flt)
+
+    if search:
+        like = f"%{search}%"
+        q = q.filter(db.or_(
+            db.func.lower(Establishment.company_name).like(like),
+            db.func.lower(db.func.coalesce(Establishment.branch_name, '')).like(like),
+            db.func.lower(db.func.coalesce(Establishment.pf_code, '')).like(like),
+            db.func.lower(db.func.coalesce(Establishment.esic_code, '')).like(like),
+        ))
+
+    ests = q.order_by(Establishment.company_name, Establishment.branch_name).all()
+
+    # Build clerk_user_id → AppUser map so we can show the current assignee name
+    all_staff = AppUser.query.filter(AppUser.is_active == True).order_by(AppUser.name).all()
+    staff_by_id = {s.clerk_user_id: s for s in all_staff}
+
+    # Stats for the filter bar
+    total = Establishment.query.filter(Establishment.is_active == True).count()
+    unassigned_count = Establishment.query.filter(
+        Establishment.is_active == True,
+        ((Establishment.assigned_to_id == None) | (Establishment.assigned_to_id == ''))
+    ).count()
+
+    return render_template('admin/assign_clients.html',
+                           ests=ests,
+                           staff=all_staff,
+                           staff_by_id=staff_by_id,
+                           current_filter=flt,
+                           search=search,
+                           total=total,
+                           unassigned_count=unassigned_count)
+
+
+@admin_bp.route('/assign-clients', methods=['POST'])
+def assign_clients_apply():
+    """
+    Apply the bulk-assign action.  Form fields:
+      - est_ids[]     list of establishment IDs (or single est_ids)
+      - to_user_id    destination clerk_user_id  (use empty/UNASSIGN to clear)
+      - reason        optional free text
+      - return_to     filter to redirect back to
+    """
+    raw_ids = request.form.getlist('est_ids[]') or request.form.getlist('est_ids')
+    to_id   = (request.form.get('to_user_id') or '').strip()
+    reason  = (request.form.get('reason') or '').strip()
+    return_to = (request.form.get('return_to') or 'all').strip()
+
+    try:
+        ids = [int(x) for x in raw_ids if x.strip()]
+    except ValueError:
+        flash('Invalid establishment ID in selection.', 'danger')
+        return redirect(url_for('admin.assign_clients_list', filter=return_to))
+
+    if not ids:
+        flash('No establishments selected.  Tick the rows you want to assign first.', 'warning')
+        return redirect(url_for('admin.assign_clients_list', filter=return_to))
+
+    # Destination — empty / "UNASSIGN" clears the assignment
+    to_user = None
+    clear_mode = (to_id == '' or to_id.lower() == 'unassign')
+    if not clear_mode:
+        to_user = AppUser.query.filter_by(clerk_user_id=to_id, is_active=True).first()
+        if not to_user:
+            flash('Destination staff not found or inactive.', 'danger')
+            return redirect(url_for('admin.assign_clients_list', filter=return_to))
+
+    # Admin who's performing the change — for the audit log
+    performer = AppUser.query.filter_by(clerk_user_id=current_user_id()).first()
+    performer_name = (performer.name or performer.email) if performer else None
+
+    moved = 0
+    unchanged = 0
+    for est_id in ids:
+        est = Establishment.query.get(est_id)
+        if not est:
+            continue
+
+        new_assignee = None if clear_mode else to_user.clerk_user_id
+        if (est.assigned_to_id or None) == new_assignee:
+            unchanged += 1
+            continue
+
+        # Resolve the FROM name for the log
+        from_name = '—'
+        if est.assigned_to_id:
+            from_user = AppUser.query.filter_by(clerk_user_id=est.assigned_to_id).first()
+            if from_user:
+                from_name = from_user.name or from_user.email
+
+        log = EstablishmentAssignmentLog(
+            establishment_id   = est.id,
+            from_user_id       = est.assigned_to_id,
+            from_user_name     = from_name if est.assigned_to_id else 'Unassigned',
+            to_user_id         = new_assignee,
+            to_user_name       = (to_user.name or to_user.email) if to_user else 'Unassigned',
+            performed_by_id    = current_user_id(),
+            performed_by_name  = performer_name,
+            performed_by_role  = 'admin',
+            reason             = reason or None,
+        )
+        db.session.add(log)
+
+        est.assigned_to_id = new_assignee
+        moved += 1
+
+    db.session.commit()
+    log_activity('admin_bulk_assign_clients',
+                 f'Assigned {moved} establishment(s) to '
+                 f'{(to_user.name or to_user.email) if to_user else "(Unassigned)"}'
+                 f' [unchanged: {unchanged}]')
+
+    if moved:
+        target = (to_user.name or to_user.email) if to_user else 'Unassigned'
+        flash(f'Successfully assigned {moved} establishment(s) to {target}.'
+              + (f'  ({unchanged} already had this assignment.)' if unchanged else ''),
+              'success')
+    else:
+        flash(f'No changes — {unchanged} establishment(s) already had this assignment.', 'info')
+
+    return redirect(url_for('admin.assign_clients_list', filter=return_to))
