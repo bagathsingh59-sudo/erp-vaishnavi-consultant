@@ -327,6 +327,10 @@ def create_app():
     from app.routes.admin import admin_bp
     app.register_blueprint(admin_bp)
 
+    # Register SEO blueprint (robots.txt, sitemap.xml — publicly fetchable)
+    from app.routes.seo import seo_bp
+    app.register_blueprint(seo_bp)
+
     # Register Enrollment (UAN & ESIC Tracker) blueprint
     from app.routes.enrollment import enrollment_bp
     app.register_blueprint(enrollment_bp)

@@ -441,11 +441,13 @@ def init_auth(app):
             g.is_internal = True
             return
 
-        # Skip auth for: static files, login page, logout page, debug, public APIs
+        # Skip auth for: static files, login page, logout page, debug, public APIs,
+        # SEO routes (must be publicly fetchable so Googlebot can index them)
         if request.endpoint and (
             request.endpoint == 'static' or
             request.endpoint in ('auth.login_page', 'auth.logout_page', 'auth.debug_user',
-                                 'api_docs.test_db_connection', 'api_docs.api_route_list') or
+                                 'api_docs.test_db_connection', 'api_docs.api_route_list',
+                                 'seo.robots_txt', 'seo.sitemap_xml') or
             request.path.startswith('/static/') or
             request.endpoint.startswith('flasgger.')
         ):
