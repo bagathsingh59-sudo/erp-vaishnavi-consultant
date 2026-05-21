@@ -606,6 +606,11 @@ def _import_rows(rows, headers):
             imported += 1
 
         except Exception as e:
+            # Roll back the session so the next row gets a clean transaction.
+            # Without this, SQLAlchemy/psycopg2 poisons the session and every
+            # subsequent INSERT fails with the misleading
+            # "transaction has been rolled back" cascade.
+            db.session.rollback()
             errors.append(f'Row {row_num}: {str(e)}')
             continue
 

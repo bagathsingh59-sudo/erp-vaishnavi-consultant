@@ -532,6 +532,32 @@ def _auto_migrate_columns(db):
         db.session.rollback()
         print(f"  [MIGRATE] payroll_documents.is_compressed: {e}")
 
+    # Widen pf_code / esic_code on establishments (and the mirror columns on
+    # manual_reimbursements) from the old VARCHAR(10) to VARCHAR(50).
+    # Real-world codes like 'GBGLB1971391000' (15 chars) and ESIC numbers
+    # like '71000056970001302' (17 chars) overflow the old 10-char cap and
+    # cause psycopg2.errors.StringDataRightTruncation during bulk import.
+    # Idempotent — ALTER TYPE to the same length is a no-op.
+    _widen_columns = [
+        ('establishments',         'pf_code',          'VARCHAR(50)'),
+        ('establishments',         'esic_code',        'VARCHAR(50)'),
+        ('non_client_returns',     'pf_code',          'VARCHAR(50)'),
+        ('non_client_returns',     'esic_code',        'VARCHAR(50)'),
+        ('manual_reimbursements',  'manual_pf_code',   'VARCHAR(50)'),
+        ('manual_reimbursements',  'manual_esic_code', 'VARCHAR(50)'),
+    ]
+    for table, column, new_type in _widen_columns:
+        try:
+            db.session.execute(db.text(
+                f"ALTER TABLE {table} ALTER COLUMN {column} TYPE {new_type}"
+            ))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            # Table or column may not exist yet on a fresh install — that's fine,
+            # create_all() above will have built it at the new width.
+            print(f"  [MIGRATE] Skip widen {table}.{column}: {e}")
+
     # One-time data migration: copy old include_ot_in_compliance → new split fields
     try:
         db.session.execute(db.text(
