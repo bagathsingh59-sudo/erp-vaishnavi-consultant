@@ -18,14 +18,22 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{% block title %}Vaishnavi Consultant — Payroll & Compliance{% endblock %}</title>
 <meta name="description" content="{% block meta_desc %}Karnataka-rooted payroll, EPF and ESIC compliance consultancy. Trusted by 300+ establishments since 2013.{% endblock %}">
-<link rel="canonical" href="{% block canonical %}https://erp.srivenkateshwara.in/landing{% endblock %}">
+<link rel="canonical" href="{% block canonical %}https://erp.srivenkateshwara.in/{% endblock %}">
 
+<meta name="robots"             content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
 <meta property="og:title"       content="Vaishnavi Consultant — Payroll & Compliance">
 <meta property="og:description" content="EPF, ESIC, professional tax and monthly payroll for 300+ establishments across Karnataka. Twelve years of unbroken practice.">
 <meta property="og:type"        content="website">
+<meta property="og:url"         content="{% block og_url %}https://erp.srivenkateshwara.in/{% endblock %}">
 <meta property="og:image"       content="{% block og_image %}https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=1200&h=630&q=85{% endblock %}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:site_name"   content="Vaishnavi Consultant">
 <meta property="og:locale"      content="en_IN">
 <meta name="twitter:card"       content="summary_large_image">
+<meta name="twitter:title"      content="Vaishnavi Consultant — Payroll & Compliance">
+<meta name="twitter:description" content="EPF, ESIC, professional tax and monthly payroll for 300+ establishments across Karnataka.">
+<meta name="twitter:image"      content="https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=1200&h=630&q=85">
 
 <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/namam.svg') }}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -363,7 +371,7 @@ img { display: block; max-width: 100%; height: auto; }
 
 <header class="mk-nav">
   <div class="container mk-nav-inner">
-    <a href="/landing" class="mk-brand" aria-label="Vaishnavi Consultant home">
+    <a href="/" class="mk-brand" aria-label="Vaishnavi Consultant home">
       <span class="mk-brand-mark">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><path d="M9 9v.01"/><path d="M9 12v.01"/><path d="M9 15v.01"/><path d="M9 18v.01"/></svg>
       </span>
@@ -373,10 +381,14 @@ img { display: block; max-width: 100%; height: auto; }
       </span>
     </a>
     <nav class="mk-links">
-      <a href="/landing" class="mk-link">Home</a>
-      <a href="/about"   class="mk-link">About</a>
+      <a href="/"       class="mk-link">Home</a>
+      <a href="/about"  class="mk-link">About</a>
       <a href="mailto:info@srivenkateshwara.in" class="mk-link">Contact</a>
-      <a href="https://client.srivenkateshwara.in/login" class="mk-link cta">Client Sign In</a>
+      <a href="https://client.srivenkateshwara.in/login" class="mk-link">Client Sign In</a>
+      <a href="/auth/login" class="mk-link cta">
+        Staff Sign In
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px;"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+      </a>
     </nav>
   </div>
 </header>
@@ -388,7 +400,7 @@ img { display: block; max-width: 100%; height: auto; }
 <footer class="mk-footer">
   <div class="container mk-footer-grid">
     <div>
-      <a href="/landing" class="mk-brand" aria-label="Vaishnavi Consultant home">
+      <a href="/" class="mk-brand" aria-label="Vaishnavi Consultant home">
         <span class="mk-brand-mark" style="width:36px;height:36px;border-radius:10px;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
         </span>
@@ -404,10 +416,11 @@ img { display: block; max-width: 100%; height: auto; }
     <div>
       <h5>Pages</h5>
       <ul>
-        <li><a href="/landing">Home</a></li>
+        <li><a href="/">Home</a></li>
         <li><a href="/about">About Us</a></li>
         <li><a href="mailto:info@srivenkateshwara.in">Contact</a></li>
         <li><a href="https://client.srivenkateshwara.in">Client Portal</a></li>
+        <li><a href="/auth/login">Staff Sign In</a></li>
       </ul>
     </div>
     <div>

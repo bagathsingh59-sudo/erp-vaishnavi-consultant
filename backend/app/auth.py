@@ -443,16 +443,17 @@ def init_auth(app):
 
         # Skip auth for: static files, login/logout pages, debug, public APIs,
         # SEO routes (publicly fetchable so Googlebot can index them), the
-        # health probe, and the public marketing surface.
+        # health probe, and the public marketing surface (which includes the
+        # bare site root `/` — `marketing.home` serves the landing to everyone).
         if request.endpoint and (
             request.endpoint == 'static' or
             request.endpoint in ('auth.login_page', 'auth.logout_page', 'auth.debug_user',
                                  'api_docs.test_db_connection', 'api_docs.api_route_list',
                                  'seo.robots_txt', 'seo.sitemap_xml',
-                                 'marketing.landing', 'marketing.about',
+                                 'marketing.home', 'marketing.landing', 'marketing.about',
                                  '_healthz') or
             request.path.startswith('/static/') or
-            request.path in ('/landing', '/about', '/healthz') or
+            request.path in ('/', '/landing', '/about', '/healthz') or
             request.endpoint.startswith('flasgger.')
         ):
             return

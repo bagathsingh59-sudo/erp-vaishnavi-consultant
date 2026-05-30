@@ -29,13 +29,16 @@ def robots_txt():
     root = _site_root()
     body = (
         "# Vaishnavi Consultant ERP — public marketing pages + login-walled app.\n"
-        "# Crawlers may index /landing and /about (public marketing) and /auth/login.\n"
-        "# Everything else is private internal tooling.\n"
+        "# `/` and `/about` are the canonical public pages.  `/landing` is an\n"
+        "# alias for `/` and is intentionally NOT in the sitemap (avoids the\n"
+        "# duplicate-content signal) but is still allowed for direct linking.\n"
+        "# Every other route below is private internal tooling.\n"
         "User-agent: *\n"
-        "Allow: /$\n"
-        "Allow: /landing\n"
+        "Allow: /\n"
         "Allow: /about\n"
+        "Allow: /landing\n"
         "Allow: /auth/login\n"
+        "Disallow: /dashboard\n"
         "Disallow: /admin/\n"
         "Disallow: /api/\n"
         "Disallow: /payroll/\n"
@@ -59,11 +62,12 @@ def sitemap_xml():
     root = _site_root()
     today = datetime.utcnow().strftime('%Y-%m-%d')
 
+    # Canonical surface is the bare `/` (marketing.home).  `/landing` is kept
+    # as an alias for backwards-compat with already-published links, but is
+    # NOT listed in the sitemap to avoid duplicate-content signals to Google.
     urls = [
         (f"{root}/",            today, 'weekly',  '1.0'),
-        (f"{root}/landing",     today, 'weekly',  '1.0'),
         (f"{root}/about",       today, 'monthly', '0.9'),
-        (f"{root}/auth/login",  today, 'yearly',  '0.4'),
     ]
 
     lines = ['<?xml version="1.0" encoding="UTF-8"?>',

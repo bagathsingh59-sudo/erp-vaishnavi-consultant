@@ -133,6 +133,10 @@
         <a href="{{ url_for('daily_mis.filing_matrix') }}" class="btn btn-sm btn-outline-primary" style="font-size:0.72rem;">
             <i class="bi bi-grid-3x3-gap me-1"></i>Filing Matrix
         </a>
+        <a href="{{ url_for('admin.reassign_staff_clients', clerk_user_id=staff_user.clerk_user_id) }}"
+           class="btn btn-sm btn-warning" style="font-size:0.72rem; font-weight:700;">
+            <i class="bi bi-arrow-left-right me-1"></i>Reassign Clients
+        </a>
     </div>
     <button onclick="window.print()" class="btn btn-sm btn-primary" style="font-size:0.72rem;">
         <i class="bi bi-printer me-1"></i>Print

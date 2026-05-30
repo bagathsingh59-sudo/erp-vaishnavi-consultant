@@ -13,9 +13,14 @@ from datetime import datetime
 establishment_bp = Blueprint('establishment', __name__)
 
 
-@establishment_bp.route('/')
+@establishment_bp.route('/dashboard')
 def dashboard():
-    """Main Dashboard — overview of all clients"""
+    """Main Dashboard — overview of all clients.
+
+    Previously served at `/` — moved to `/dashboard` so the bare site root
+    can serve the public marketing landing.  All `url_for('establishment.dashboard')`
+    callers continue to work unchanged (Clerk post-login redirect included).
+    """
     import calendar as cal
     # Clear selected establishment when coming to dashboard
     session.pop('selected_est_id', None)

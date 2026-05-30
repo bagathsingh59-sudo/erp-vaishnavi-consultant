@@ -24,17 +24,32 @@ marketing_bp = Blueprint(
 )
 
 
-@marketing_bp.route('/landing')
-def landing():
-    resp = make_response(render_template('marketing/landing.html'))
-    # Cache aggressively at the edge — content is fully static for now.
-    # Bust the cache when the future CMS edits any content.
+def _cached(html):
+    """Edge-cache for 5 min with 24 h stale-while-revalidate.
+    Future ERP CMS edits will bust this via cache-tag invalidation."""
+    resp = make_response(html)
     resp.headers['Cache-Control'] = 'public, max-age=300, stale-while-revalidate=86400'
     return resp
+
+
+@marketing_bp.route('/')
+def home():
+    """Public landing — served at the bare site root.
+
+    Everyone (anonymous AND signed-in staff) gets the marketing landing.
+    Staff click the "Staff Sign In" button in the nav to go through Clerk
+    auth; on success they land on `/dashboard` (the moved-from-`/` dashboard).
+    No automated redirect from `/`.
+    """
+    return _cached(render_template('marketing/landing.html'))
+
+
+@marketing_bp.route('/landing')
+def landing():
+    """Alias for `/` — kept so previously-published links keep working."""
+    return _cached(render_template('marketing/landing.html'))
 
 
 @marketing_bp.route('/about')
 def about():
-    resp = make_response(render_template('marketing/about.html'))
-    resp.headers['Cache-Control'] = 'public, max-age=300, stale-while-revalidate=86400'
-    return resp
+    return _cached(render_template('marketing/about.html'))

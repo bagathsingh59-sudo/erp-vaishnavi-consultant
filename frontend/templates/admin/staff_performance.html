@@ -321,11 +321,17 @@
                         <span style="color:#16a34a; font-size:0.72rem;">✓ All</span>
                         {% endif %}
                     </td>
-                    <td>
+                    <td style="white-space:nowrap;">
                         <a class="sp-drill-btn"
                            href="{{ url_for('admin.staff_performance_drill', clerk_user_id=m.user.clerk_user_id) }}?from={{ from_month_str }}&to={{ to_month_str }}"
                            onclick="event.stopPropagation()">
                             <i class="bi bi-zoom-in"></i>Detail
+                        </a>
+                        <a class="sp-drill-btn ms-1"
+                           style="background:#fef3c7; color:#92400e; border-color:#fcd34d;"
+                           href="{{ url_for('admin.reassign_staff_clients', clerk_user_id=m.user.clerk_user_id) }}"
+                           onclick="event.stopPropagation()" title="Reassign establishments to another staff">
+                            <i class="bi bi-arrow-left-right"></i>Reassign
                         </a>
                     </td>
                 </tr>
