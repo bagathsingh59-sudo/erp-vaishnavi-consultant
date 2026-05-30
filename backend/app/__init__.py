@@ -150,7 +150,7 @@ def create_app():
     # The bare `/` is owned by the `marketing.home` route which serves the
     # public landing template directly to every visitor (anonymous AND staff).
     # Staff click the "Staff Sign In" button in the landing nav to hit
-    # `/auth/login` and go through Clerk; the existing post-login redirect
+    # `/login` and go through Clerk; the existing post-login redirect
     # then lands them on `/dashboard` (moved from `/`).
     from app.auth import init_auth
     init_auth(app)

@@ -37,7 +37,7 @@ def robots_txt():
         "Allow: /\n"
         "Allow: /about\n"
         "Allow: /landing\n"
-        "Allow: /auth/login\n"
+        "Allow: /login\n"
         "Disallow: /dashboard\n"
         "Disallow: /admin/\n"
         "Disallow: /api/\n"
