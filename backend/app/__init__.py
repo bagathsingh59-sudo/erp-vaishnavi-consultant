@@ -295,16 +295,32 @@ def create_app():
 
         return dict(mis_action_url=mis_action_url)
 
-    # ── Health probe for the front-end "Server is waking up / Under maintenance"
-    # banner.  Auth-free, CSRF-exempt, no DB hit — must return as cheaply and
-    # quickly as possible so the front-end can use response time as a "cold
-    # start" signal.  See base.html ServerStatusBanner JS.
+    # ── Health probe — auth-free, CSRF-exempt, no DB hit.  Used by Railway's
+    # healthcheck and by any future external monitor (UptimeRobot etc.).
     @app.route('/healthz')
     def _healthz():
         from flask import jsonify
         return jsonify(status='UP'), 200
 
     csrf.exempt('_healthz')
+
+    # ── Marketing-page redirect for anonymous visitors hitting `/`.
+    # Detect "is signed in" purely from cookies (the Clerk JS sets `__session`
+    # / `__client` on every authenticated browser).  If neither is present
+    # AND the request is for `/`, send the visitor to the marketing landing.
+    # Staff with a valid Clerk session continue to see the existing dashboard
+    # at `/` — no change to the staff UI.
+    @app.before_request
+    def _marketing_root_redirect():
+        from flask import request, redirect
+        # Only intercept the bare root path on safe HTTP methods.
+        if request.path != '/' or request.method not in ('GET', 'HEAD'):
+            return None
+        # Skip if a Clerk cookie of any kind is set.
+        for c in request.cookies.keys():
+            if c == '__session' or c == '__client' or c.startswith('__session_') or c.startswith('__client_'):
+                return None
+        return redirect('/landing', code=302)
 
     # Register blueprints
     from app.routes.auth import auth_bp
@@ -369,6 +385,14 @@ def create_app():
     # Register Non-Client Quick Returns blueprint
     from app.routes.non_client import non_client_bp
     app.register_blueprint(non_client_bp)
+
+    # Register public marketing pages (/landing, /about) — anonymous-friendly
+    # surface that sits alongside the staff dashboard at /.
+    from app.routes.marketing import marketing_bp
+    app.register_blueprint(marketing_bp)
+    # Marketing pages are public — exempt from CSRF (they have no forms).
+    csrf.exempt('marketing.landing')
+    csrf.exempt('marketing.about')
 
     # Register Vault blueprint — disabled for now, re-enable later
     # from app.routes.vault import vault_bp

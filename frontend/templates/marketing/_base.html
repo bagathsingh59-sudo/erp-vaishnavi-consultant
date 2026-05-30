@@ -1,0 +1,453 @@
+{#-
+    Standalone marketing layout — completely separate from the staff
+    base.html (which has sidebar + Clerk + Bootstrap).  We use plain
+    CSS with the teal + amber + charcoal palette so the public-facing
+    surface stays light, fast and totally independent of the internal
+    ERP styling.
+
+    Blocks:
+      title        — page <title>
+      meta_desc    — meta description for SEO
+      og_image     — Open-Graph card image URL
+      canonical    — canonical URL for the page
+      content      — page body (between nav and footer)
+-#}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}Vaishnavi Consultant — Payroll & Compliance{% endblock %}</title>
+<meta name="description" content="{% block meta_desc %}Karnataka-rooted payroll, EPF and ESIC compliance consultancy. Trusted by 300+ establishments since 2013.{% endblock %}">
+<link rel="canonical" href="{% block canonical %}https://erp.srivenkateshwara.in/landing{% endblock %}">
+
+<meta property="og:title"       content="Vaishnavi Consultant — Payroll & Compliance">
+<meta property="og:description" content="EPF, ESIC, professional tax and monthly payroll for 300+ establishments across Karnataka. Twelve years of unbroken practice.">
+<meta property="og:type"        content="website">
+<meta property="og:image"       content="{% block og_image %}https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=1200&h=630&q=85{% endblock %}">
+<meta property="og:locale"      content="en_IN">
+<meta name="twitter:card"       content="summary_large_image">
+
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/namam.svg') }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://images.unsplash.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": ["Organization","LocalBusiness","ProfessionalService"],
+  "name": "Vaishnavi Consultant",
+  "url": "https://erp.srivenkateshwara.in",
+  "description": "Payroll compliance consultancy — EPF/ESIC registration, monthly returns, wage register Form B, pay-slip generation, statutory audits. Karnataka, India, since 2013.",
+  "areaServed": { "@type": "AdministrativeArea", "name": "Karnataka, India" },
+  "address": { "@type": "PostalAddress", "addressRegion": "Karnataka", "addressCountry": "IN" },
+  "email": "info@srivenkateshwara.in",
+  "foundingDate": "2013"
+}
+</script>
+
+<style>
+:root {
+  --primary:        #0d9488;
+  --primary-700:    #115e59;
+  --primary-50:     #f0fdfa;
+  --accent:         #f59e0b;
+  --accent-700:     #b45309;
+  --accent-50:      #fffbeb;
+  --shadow:         24 10% 10%;
+  --bg:             #fcfaf7;
+  --fg:             #1c1917;
+  --muted:          #78716c;
+  --border:         #e7e5e0;
+  --card:           #ffffff;
+  --radius:         14px;
+  --container:      1180px;
+  --shadow-sm:      0 1px 2px rgba(28,25,23,.05), 0 1px 3px rgba(28,25,23,.06);
+  --shadow-md:      0 4px 8px -2px rgba(28,25,23,.07), 0 2px 4px -2px rgba(28,25,23,.05);
+  --shadow-lg:      0 12px 28px -6px rgba(28,25,23,.12);
+}
+*       { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg); color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "rlig" 1, "calt" 1;
+  scroll-behavior: smooth;
+}
+a { color: inherit; text-decoration: none; }
+img { display: block; max-width: 100%; height: auto; }
+.container { max-width: var(--container); margin: 0 auto; padding: 0 22px; }
+
+/* Nav */
+.mk-nav {
+  position: sticky; top: 0; z-index: 50;
+  backdrop-filter: blur(14px);
+  background: rgba(252,250,247,0.78);
+  border-bottom: 1px solid var(--border);
+}
+.mk-nav-inner {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 66px;
+}
+.mk-brand { display: flex; align-items: center; gap: 11px; }
+.mk-brand-mark {
+  width: 38px; height: 38px; border-radius: 11px;
+  background: var(--primary); display: grid; place-items: center;
+  box-shadow: var(--shadow-sm);
+}
+.mk-brand-mark svg { width: 22px; height: 22px; color: #fff; }
+.mk-brand-text { line-height: 1.15; }
+.mk-brand-name { font-size: 14.5px; font-weight: 600; letter-spacing: -0.01em; }
+.mk-brand-tag  { font-size: 10.5px; color: var(--muted); }
+.mk-links { display: flex; align-items: center; gap: 6px; }
+.mk-link {
+  padding: 7px 13px; border-radius: 999px;
+  font-size: 13.5px; font-weight: 500;
+  color: rgba(28,25,23,0.78);
+  transition: background .15s, color .15s;
+}
+.mk-link:hover { background: #f5f5f1; color: var(--fg); }
+.mk-link.cta {
+  background: var(--primary); color: #fff;
+  padding: 9px 18px; box-shadow: var(--shadow-sm);
+}
+.mk-link.cta:hover { background: var(--primary-700); color: #fff; }
+@media (max-width: 720px) {
+  .mk-link:not(.cta) { display: none; }
+}
+
+/* Hero */
+.mk-hero {
+  position: relative; overflow: hidden;
+  padding: 96px 0 88px;
+}
+.mk-hero-bg {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    radial-gradient(60% 50% at 12% 18%, rgba(13,148,136,.18), transparent 65%),
+    radial-gradient(50% 40% at 85% 65%, rgba(245,158,11,.14), transparent 70%),
+    linear-gradient(180deg, transparent, var(--bg) 70%);
+}
+.mk-hero-grid {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(28,25,23,.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(28,25,23,.05) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 50% at 50% 50%, #000 40%, transparent 100%);
+          mask-image: radial-gradient(ellipse 70% 50% at 50% 50%, #000 40%, transparent 100%);
+  opacity: .65;
+}
+.mk-hero-inner { position: relative; z-index: 1; }
+.mk-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 7px 14px; border-radius: 999px;
+  background: rgba(13,148,136,.08);
+  color: var(--primary-700);
+  border: 1px solid rgba(13,148,136,.18);
+  font-size: 12px; font-weight: 600;
+  letter-spacing: .01em;
+}
+.mk-h1 {
+  font-size: clamp(38px, 5.6vw + 6px, 76px);
+  line-height: 1.04; letter-spacing: -0.035em;
+  font-weight: 600; margin: 20px 0 18px;
+  max-width: 22ch;
+}
+.mk-h1 em { font-style: normal;
+  background: linear-gradient(135deg, var(--primary), var(--primary-700) 60%, var(--accent));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.mk-lead {
+  font-size: clamp(16px, 1.3vw + 8px, 19px);
+  color: var(--muted); max-width: 58ch; line-height: 1.65;
+  margin: 0;
+}
+.mk-cta-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 34px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 13px 22px; border-radius: 999px;
+  font-size: 14px; font-weight: 600;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: transform .12s, box-shadow .15s, background .15s;
+  cursor: pointer;
+}
+.btn-primary {
+  background: var(--primary); color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+.btn-primary:hover {
+  background: var(--primary-700);
+  box-shadow: var(--shadow-md), 0 0 30px rgba(13,148,136,.25);
+  transform: translateY(-1px);
+}
+.btn-ghost {
+  background: #fff; color: var(--fg);
+  border-color: var(--border);
+}
+.btn-ghost:hover { border-color: rgba(13,148,136,.4); }
+
+/* Stats */
+.mk-stats {
+  margin-top: 56px;
+  display: grid; gap: 1px;
+  grid-template-columns: repeat(4, 1fr);
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.mk-stat { background: var(--card); padding: 22px; text-align: center; }
+.mk-stat-num {
+  font-size: clamp(22px, 2vw + 8px, 32px);
+  font-weight: 600; letter-spacing: -0.02em;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+}
+.mk-stat-lbl {
+  margin-top: 4px;
+  font-size: 11.5px; color: var(--muted); letter-spacing: .02em;
+}
+@media (max-width: 720px) { .mk-stats { grid-template-columns: repeat(2, 1fr); } }
+
+/* Section shared */
+.mk-section { padding: 92px 0; position: relative; }
+.mk-section.alt { background: #f7f5f0; }
+.mk-section-head { text-align: center; max-width: 720px; margin: 0 auto 56px; }
+.mk-section h2 {
+  font-size: clamp(28px, 2.5vw + 8px, 44px);
+  line-height: 1.1; letter-spacing: -0.028em;
+  font-weight: 600; margin: 12px 0 18px;
+}
+.mk-section .mk-eyebrow { background: rgba(13,148,136,.06); }
+.mk-section h2 em {
+  font-style: normal; color: var(--primary);
+}
+.mk-section .lead {
+  font-size: 16px; line-height: 1.7;
+  color: var(--muted); margin: 0;
+}
+
+/* Cards grid */
+.mk-cards {
+  display: grid; gap: 18px;
+  grid-template-columns: repeat(3, 1fr);
+}
+@media (max-width: 1000px) { .mk-cards { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px)  { .mk-cards { grid-template-columns: 1fr; } }
+.mk-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 26px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow .2s, transform .15s;
+  position: relative; overflow: hidden;
+}
+.mk-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.mk-card-icon {
+  width: 42px; height: 42px; border-radius: 12px;
+  background: rgba(13,148,136,.1); color: var(--primary);
+  display: grid; place-items: center; margin-bottom: 18px;
+}
+.mk-card-icon svg { width: 20px; height: 20px; }
+.mk-card h3 {
+  font-size: 17px; font-weight: 600; letter-spacing: -0.01em;
+  margin: 0 0 8px;
+}
+.mk-card p {
+  margin: 0; font-size: 13.5px; line-height: 1.65; color: var(--muted);
+}
+
+/* Two-column block (image + copy) */
+.mk-two-col {
+  display: grid; gap: 56px;
+  grid-template-columns: 1.05fr 1fr; align-items: center;
+}
+.mk-two-col.reverse { grid-template-columns: 1fr 1.05fr; }
+.mk-two-col.reverse .mk-tc-image { order: 2; }
+@media (max-width: 880px) {
+  .mk-two-col, .mk-two-col.reverse { grid-template-columns: 1fr; gap: 36px; }
+  .mk-two-col.reverse .mk-tc-image { order: 0; }
+}
+.mk-tc-image {
+  position: relative; border-radius: 28px;
+  overflow: hidden; box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border);
+}
+.mk-tc-image img { width: 100%; height: 100%; object-fit: cover; aspect-ratio: 5/6; }
+.mk-tc-image::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(13,148,136,.32), transparent 55%, rgba(245,158,11,.15));
+  mix-blend-mode: multiply;
+}
+.mk-pillars { margin-top: 30px; display: grid; gap: 22px; }
+.mk-pillar { display: grid; grid-template-columns: 44px 1fr; gap: 14px; align-items: start; }
+.mk-pillar-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: var(--card); border: 1px solid var(--border);
+  display: grid; place-items: center; color: var(--primary);
+  box-shadow: var(--shadow-sm);
+}
+.mk-pillar-icon svg { width: 22px; height: 22px; }
+.mk-pillar h4 { font-size: 15.5px; font-weight: 600; margin: 0 0 4px; }
+.mk-pillar p { margin: 0; font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+
+/* CTA */
+.mk-cta-card {
+  position: relative;
+  border-radius: 30px; overflow: hidden;
+  padding: 64px 56px;
+  color: #fff; isolation: isolate;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-700) 60%, var(--accent-700) 110%);
+}
+.mk-cta-card::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background-image: url('https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1600&q=80');
+  background-size: cover; background-position: center;
+  opacity: .25; mix-blend-mode: overlay;
+}
+.mk-cta-card h2 { color: #fff; max-width: 18ch; }
+.mk-cta-card .lead { color: rgba(255,255,255,.85); }
+.mk-cta-card .btn-primary {
+  background: #fff; color: var(--primary-700);
+}
+.mk-cta-card .btn-primary:hover { background: var(--primary-50); color: var(--primary-700); }
+.mk-cta-card .btn-ghost {
+  background: rgba(255,255,255,.1); color: #fff; border-color: rgba(255,255,255,.25);
+}
+.mk-cta-card .btn-ghost:hover { background: rgba(255,255,255,.18); }
+@media (max-width: 720px) { .mk-cta-card { padding: 44px 28px; } }
+
+/* Footer */
+.mk-footer {
+  border-top: 1px solid var(--border);
+  background: #f7f5f0;
+  padding: 56px 0 28px;
+}
+.mk-footer-grid {
+  display: grid; gap: 36px;
+  grid-template-columns: 1.4fr 1fr 1fr 1.2fr;
+}
+@media (max-width: 880px) { .mk-footer-grid { grid-template-columns: 1fr 1fr; } }
+.mk-footer h5 {
+  font-size: 11px; font-weight: 700; letter-spacing: .14em;
+  color: var(--muted); text-transform: uppercase;
+  margin: 0 0 14px;
+}
+.mk-footer ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; font-size: 13.5px; color: var(--muted); }
+.mk-footer a:hover { color: var(--primary); }
+.mk-footer .footer-bottom {
+  margin-top: 40px; padding-top: 22px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  font-size: 11.5px; color: var(--muted);
+}
+
+/* Reveal on scroll — non-essential progressive enhancement */
+.reveal { opacity: 0; transform: translateY(18px); transition: opacity .8s ease, transform .8s ease; }
+.reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+  html { scroll-behavior: auto; }
+}
+</style>
+</head>
+<body>
+
+<header class="mk-nav">
+  <div class="container mk-nav-inner">
+    <a href="/landing" class="mk-brand" aria-label="Vaishnavi Consultant home">
+      <span class="mk-brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><path d="M9 9v.01"/><path d="M9 12v.01"/><path d="M9 15v.01"/><path d="M9 18v.01"/></svg>
+      </span>
+      <span class="mk-brand-text">
+        <span class="mk-brand-name">Vaishnavi Consultant</span>
+        <span class="mk-brand-tag">Payroll & Compliance</span>
+      </span>
+    </a>
+    <nav class="mk-links">
+      <a href="/landing" class="mk-link">Home</a>
+      <a href="/about"   class="mk-link">About</a>
+      <a href="mailto:info@srivenkateshwara.in" class="mk-link">Contact</a>
+      <a href="https://client.srivenkateshwara.in/login" class="mk-link cta">Client Sign In</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="mk-footer">
+  <div class="container mk-footer-grid">
+    <div>
+      <a href="/landing" class="mk-brand" aria-label="Vaishnavi Consultant home">
+        <span class="mk-brand-mark" style="width:36px;height:36px;border-radius:10px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
+        </span>
+        <span class="mk-brand-text">
+          <span class="mk-brand-name">Vaishnavi Consultant</span>
+          <span class="mk-brand-tag">Payroll & Compliance</span>
+        </span>
+      </a>
+      <p style="font-size:13px;color:var(--muted);max-width:28ch;line-height:1.65;margin:14px 0 0;">
+        Trusted payroll and statutory compliance consulting for establishments across Karnataka — over a decade of service.
+      </p>
+    </div>
+    <div>
+      <h5>Pages</h5>
+      <ul>
+        <li><a href="/landing">Home</a></li>
+        <li><a href="/about">About Us</a></li>
+        <li><a href="mailto:info@srivenkateshwara.in">Contact</a></li>
+        <li><a href="https://client.srivenkateshwara.in">Client Portal</a></li>
+      </ul>
+    </div>
+    <div>
+      <h5>Services</h5>
+      <ul>
+        <li>EPF Registration & Returns</li>
+        <li>ESIC Registration & Returns</li>
+        <li>Wage Register (Form B)</li>
+        <li>Payroll Processing</li>
+        <li>Statutory Audits</li>
+      </ul>
+    </div>
+    <div>
+      <h5>Contact</h5>
+      <ul>
+        <li>Karnataka, India</li>
+        <li><a href="mailto:info@srivenkateshwara.in">info@srivenkateshwara.in</a></li>
+        <li>Established 2013 · 12+ years</li>
+      </ul>
+    </div>
+  </div>
+  <div class="container footer-bottom">
+    <div>© {{ now_year() if now_year is defined else '2026' }} Vaishnavi Consultant. All rights reserved.</div>
+    <div><a href="/about">About</a> &nbsp;·&nbsp; <a href="https://client.srivenkateshwara.in/login">Client Sign In</a></div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  if (!('IntersectionObserver' in window)) {
+    document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('in'); });
+    return;
+  }
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+    });
+  }, { rootMargin: '-60px 0px' });
+  document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+})();
+</script>
+</body>
+</html>

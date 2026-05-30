@@ -28,10 +28,13 @@ def _site_root():
 def robots_txt():
     root = _site_root()
     body = (
-        "# Vaishnavi Consultant ERP — login-walled internal app.\n"
-        "# Crawlers may only fetch the login page; the rest is private.\n"
+        "# Vaishnavi Consultant ERP — public marketing pages + login-walled app.\n"
+        "# Crawlers may index /landing and /about (public marketing) and /auth/login.\n"
+        "# Everything else is private internal tooling.\n"
         "User-agent: *\n"
         "Allow: /$\n"
+        "Allow: /landing\n"
+        "Allow: /about\n"
         "Allow: /auth/login\n"
         "Disallow: /admin/\n"
         "Disallow: /api/\n"
@@ -57,8 +60,10 @@ def sitemap_xml():
     today = datetime.utcnow().strftime('%Y-%m-%d')
 
     urls = [
-        (f"{root}/",            today, 'monthly', '1.0'),
-        (f"{root}/auth/login",  today, 'monthly', '0.8'),
+        (f"{root}/",            today, 'weekly',  '1.0'),
+        (f"{root}/landing",     today, 'weekly',  '1.0'),
+        (f"{root}/about",       today, 'monthly', '0.9'),
+        (f"{root}/auth/login",  today, 'yearly',  '0.4'),
     ]
 
     lines = ['<?xml version="1.0" encoding="UTF-8"?>',

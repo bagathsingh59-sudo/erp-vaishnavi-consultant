@@ -1,0 +1,141 @@
+{% extends "marketing/_base.html" %}
+{% block title %}About Vaishnavi Consultant — Karnataka's Quiet Payroll & Compliance Practice{% endblock %}
+{% block meta_desc %}A focused regional consultancy founded in 2013 — running EPF, ESIC, PT and payroll for 300+ Karnataka establishments. Our story, our values, our numbers.{% endblock %}
+{% block canonical %}https://erp.srivenkateshwara.in/about{% endblock %}
+
+{% block content %}
+
+{# ─── Hero ─────────────────────────────────────────────────────────── #}
+<section class="mk-hero">
+  <div class="mk-hero-bg"></div>
+  <div class="mk-hero-grid"></div>
+  <div class="container mk-hero-inner reveal">
+    <span class="mk-eyebrow">About us</span>
+    <h1 class="mk-h1">A quiet, careful <em>compliance</em> practice in Karnataka.</h1>
+    <p class="mk-lead">
+      Vaishnavi Consultant was founded to do one thing exceptionally well: run the
+      payroll and statutory compliance back-office for small and mid-sized
+      establishments — so their leaders can focus on the work their business
+      actually exists to do.
+    </p>
+    <div style="margin-top:24px;display:flex;gap:24px;flex-wrap:wrap;color:var(--muted);font-size:13.5px;">
+      <span style="display:inline-flex;align-items:center;gap:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary);"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg> Established 2013 · 12+ years</span>
+      <span style="display:inline-flex;align-items:center;gap:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary);"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg> Karnataka, India</span>
+    </div>
+  </div>
+  <div class="container" style="margin-top:56px;">
+    <div class="mk-tc-image reveal" style="aspect-ratio:16/6.5;border-radius:28px;">
+      <img src="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1800&q=85" alt="Professional consultancy workspace with statutory documents and calculators" style="aspect-ratio:auto;">
+    </div>
+  </div>
+</section>
+
+{# ─── Story ────────────────────────────────────────────────────────── #}
+<section class="mk-section">
+  <div class="container reveal" style="max-width:760px;">
+    <span class="mk-eyebrow">Our story</span>
+    <h2 style="margin-top:12px;">Twelve years of staying out of your way.</h2>
+    <div style="margin-top:30px;display:grid;gap:24px;font-size:15.5px;line-height:1.75;color:rgba(28,25,23,.85);">
+      <p>We started in 2013 with a single conviction: payroll and statutory compliance is too important to outsource to an anonymous national agency, and too tedious to leave on a small business owner's desk. The middle ground — a focused regional consultancy run by people who pick up the phone — is where the real value lives.</p>
+      <p>Today we manage payroll, EPF, ESIC, professional tax and statutory reporting for over three hundred establishments across Karnataka. From workshops in Wadi to security agencies in Bengaluru and civil contractors in Kalaburagi, the work looks different on the surface and identical underneath: <span style="color:var(--primary);font-weight:600;">file accurately, file on time, keep the record clean.</span></p>
+      <p>Our client portal — accessible from anywhere — is the latest chapter of that practice. It puts every document we generate for you in your own hands, indexed and downloadable, available the moment you need to send something to an auditor or a labour officer at midnight on a Sunday.</p>
+    </div>
+  </div>
+</section>
+
+{# ─── Values ──────────────────────────────────────────────────────── #}
+<section class="mk-section alt">
+  <div class="container">
+    <div class="mk-section-head reveal">
+      <span class="mk-eyebrow">What we believe</span>
+      <h2>Four principles, twelve years.</h2>
+    </div>
+    <div class="mk-cards" style="grid-template-columns:repeat(2,1fr);">
+      {% for v in [
+        ('Boring is a feature', 'A consultancy that delivers surprises is failing at its job. We aim for filings so on-time, so accurate, so paper-trailed that you stop thinking about us — and that\'s the highest praise we can get.'),
+        ('A real person, not a ticket', 'Every establishment gets a named consultant who knows their business. No call-tree, no rotating juniors. When the labour officer turns up, you call one number and someone who already knows your file picks up.'),
+        ('Your data is yours', 'We don\'t hold your records hostage. Every register, every challan, every report we generate is mirrored to our client portal, in your name, downloadable forever — even if you decide to leave us tomorrow.'),
+        ('Long, quiet relationships', 'Most of our clients have been with us for five years or more. We are not optimised for growth at any cost — we are optimised for staying the same trusted consultant, decade after decade.')
+      ] %}
+      <article class="mk-card reveal" style="padding:30px;">
+        <div class="mk-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></div>
+        <h3 style="font-size:18px;">{{ v[0] }}</h3>
+        <p style="font-size:14px;">{{ v[1] }}</p>
+      </article>
+      {% endfor %}
+    </div>
+    <style>@media (max-width:760px){.mk-section.alt .mk-cards{grid-template-columns:1fr !important;}}</style>
+  </div>
+</section>
+
+{# ─── Numbers ─────────────────────────────────────────────────────── #}
+<section class="mk-section">
+  <div class="container">
+    <div class="mk-section-head reveal">
+      <span class="mk-eyebrow">In numbers</span>
+      <h2>The shape of a decade.</h2>
+      <p class="lead">Numbers are an imperfect measure of a service practice, but these are ours — honestly counted, regularly audited, quietly proud of.</p>
+    </div>
+    <div class="mk-stats" style="margin-top:0;grid-template-columns:repeat(3,1fr);">
+      {% for n in [
+        ('2013', 'Year founded'),
+        ('300+', 'Establishments served'),
+        ('50,000+', 'Pay slips processed annually'),
+        ('12+', 'Years of unbroken practice'),
+        ('99.9%', 'On-time filing accuracy'),
+        ('< 60 min', 'Notice-response turnaround'),
+      ] %}
+      <div class="mk-stat reveal" style="padding:36px 22px;">
+        <div class="mk-stat-num" style="font-size:30px;">{{ n[0] }}</div>
+        <div class="mk-stat-lbl">{{ n[1] }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    <style>@media (max-width:680px){.mk-section .mk-stats{grid-template-columns:repeat(2,1fr) !important;}}</style>
+  </div>
+</section>
+
+{# ─── Founder ─────────────────────────────────────────────────────── #}
+<section class="mk-section alt">
+  <div class="container">
+    <div class="mk-two-col">
+      <div class="mk-tc-image reveal" style="aspect-ratio:1/1;max-width:420px;margin:0 auto;">
+        <img src="https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=900&q=85" alt="A focused practitioner working at a desk with documents">
+      </div>
+      <div class="reveal">
+        <span class="mk-eyebrow">From the founder</span>
+        <h2 style="margin-top:12px;max-width:20ch;">"We answer the phone."</h2>
+        <div style="margin-top:24px;display:grid;gap:18px;font-size:15.5px;line-height:1.7;color:rgba(28,25,23,.85);">
+          <p>When I started this practice, I noticed something strange about the market: the bigger the compliance agency, the harder it was to talk to a human who actually knew your business. I built Vaishnavi Consultant to be the opposite of that — a firm deliberately scaled so every establishment owner knows the name of the consultant handling their file.</p>
+          <p>We've kept that promise for twelve years. The portal you can sign into now is just an extension of it — your records, in your hands, with a real consultant a phone call away when the records can't answer your question.</p>
+        </div>
+        <div style="margin-top:24px;display:flex;align-items:center;gap:12px;">
+          <span style="height:3px;width:36px;background:var(--primary);border-radius:99px;"></span>
+          <span style="font-size:13px;color:var(--muted);">Founder, Vaishnavi Consultant</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ─── Share ───────────────────────────────────────────────────────── #}
+<section class="mk-section">
+  <div class="container">
+    <div class="mk-cta-card reveal" style="background:none;padding:60px 48px;border:1px solid var(--border);color:var(--fg);">
+      <div style="position:absolute;inset:0;z-index:-1;background:
+                  radial-gradient(circle at 0% 0%, rgba(13,148,136,.08), transparent 50%),
+                  radial-gradient(circle at 100% 100%, rgba(245,158,11,.08), transparent 50%);"></div>
+      <span class="mk-eyebrow" style="color:var(--accent-700);background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.25);">For peers & other consultants</span>
+      <h2 style="margin-top:20px;color:var(--fg);">Know a business that could use this?</h2>
+      <p class="lead" style="color:var(--muted);max-width:58ch;">
+        Our existing clients often tell us their peers — fellow contractors, workshop owners, agency runners — are still managing payroll and statutory filings on paper or with spreadsheet templates. If that sounds like someone you know, forward this page or drop us a note.
+      </p>
+      <div class="mk-cta-row" style="margin-top:26px;">
+        <a href="mailto:info@srivenkateshwara.in?subject=Referral%20%E2%80%94%20introduction%20request" class="btn btn-primary">Email us</a>
+        <a href="https://client.srivenkateshwara.in/login" class="btn btn-ghost">Client portal sign in</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% endblock %}
