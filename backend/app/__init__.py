@@ -295,6 +295,17 @@ def create_app():
 
         return dict(mis_action_url=mis_action_url)
 
+    # ── Health probe for the front-end "Server is waking up / Under maintenance"
+    # banner.  Auth-free, CSRF-exempt, no DB hit — must return as cheaply and
+    # quickly as possible so the front-end can use response time as a "cold
+    # start" signal.  See base.html ServerStatusBanner JS.
+    @app.route('/healthz')
+    def _healthz():
+        from flask import jsonify
+        return jsonify(status='UP'), 200
+
+    csrf.exempt('_healthz')
+
     # Register blueprints
     from app.routes.auth import auth_bp
     from app.routes.backup import backup_bp
