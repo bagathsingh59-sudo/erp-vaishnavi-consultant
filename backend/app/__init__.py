@@ -145,6 +145,25 @@ def create_app():
             db.session.rollback()
         db.session.remove()
 
+    # ── Marketing-page redirect for anonymous visitors hitting `/`.
+    # MUST be registered BEFORE init_auth so it runs first — otherwise Clerk's
+    # check_auth() will redirect anonymous visitors to /auth/login before this
+    # hook ever fires, and the marketing landing becomes unreachable from `/`.
+    #
+    # Detect "is signed in" purely from cookies (Clerk JS sets `__session` /
+    # `__client` on every authenticated browser).  If neither is present AND
+    # the request is for the bare `/`, send the visitor to /landing.  Staff
+    # with a valid Clerk session continue to see the existing dashboard at `/`.
+    @app.before_request
+    def _marketing_root_redirect():
+        from flask import request, redirect
+        if request.path != '/' or request.method not in ('GET', 'HEAD'):
+            return None
+        for c in request.cookies.keys():
+            if c == '__session' or c == '__client' or c.startswith('__session_') or c.startswith('__client_'):
+                return None
+        return redirect('/landing', code=302)
+
     # Initialize Clerk Authentication
     from app.auth import init_auth
     init_auth(app)
@@ -303,24 +322,6 @@ def create_app():
         return jsonify(status='UP'), 200
 
     csrf.exempt('_healthz')
-
-    # ── Marketing-page redirect for anonymous visitors hitting `/`.
-    # Detect "is signed in" purely from cookies (the Clerk JS sets `__session`
-    # / `__client` on every authenticated browser).  If neither is present
-    # AND the request is for `/`, send the visitor to the marketing landing.
-    # Staff with a valid Clerk session continue to see the existing dashboard
-    # at `/` — no change to the staff UI.
-    @app.before_request
-    def _marketing_root_redirect():
-        from flask import request, redirect
-        # Only intercept the bare root path on safe HTTP methods.
-        if request.path != '/' or request.method not in ('GET', 'HEAD'):
-            return None
-        # Skip if a Clerk cookie of any kind is set.
-        for c in request.cookies.keys():
-            if c == '__session' or c == '__client' or c.startswith('__session_') or c.startswith('__client_'):
-                return None
-        return redirect('/landing', code=302)
 
     # Register blueprints
     from app.routes.auth import auth_bp
