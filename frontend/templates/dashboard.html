@@ -221,20 +221,21 @@
 {% for item in client_list %}
 {
     "id": {{ item.est.id }},
-    "name": {{ item.est.display_name|tojson }},
-    "company": {{ item.est.company_name|tojson }},
+    "name": {{ (item.est.display_name or '')|tojson }},
+    "company": {{ (item.est.company_name or '')|tojson }},
+    "branch": {{ (item.est.branch_name or '')|tojson }},
     "pf": {{ (item.est.pf_code or '')|tojson }},
     "esic": {{ (item.est.esic_code or '')|tojson }},
-    "emps": {{ item.emp_count }},
-    "status": {{ item.status|tojson }},
-    "fee": {{ item.est.fee_amount|default(0)|tojson }},
+    "emps": {{ item.emp_count|default(0) }},
+    "status": {{ (item.status or 'pending')|tojson }},
+    "fee": {{ (item.est.fee_amount or 0)|tojson }},
     "feeType": {{ (item.est.fee_type or 'M')|tojson }},
     "service": {{ (item.est.service_type or '')|tojson }},
     "epfUser": {{ (item.epf_cred.username if item.epf_cred else '')|tojson }},
     "epfPass": {{ (item.epf_cred.password if item.epf_cred else '')|tojson }},
     "esicUser": {{ (item.esic_cred.username if item.esic_cred else '')|tojson }},
     "esicPass": {{ (item.esic_cred.password if item.esic_cred else '')|tojson }},
-    "url": "{{ url_for('establishment.select_establishment', est_id=item.est.id) }}"
+    "url": {{ url_for('establishment.select_establishment', est_id=item.est.id)|tojson }}
 }{{ ',' if not loop.last }}
 {% endfor %}
 ]
@@ -785,7 +786,14 @@ if (ctx) {
 //  HERO SEARCH — Dynamic instant search for establishments
 // ════════════════════════════════════════════════════════════════════
 var _heroClients = [];
-try { _heroClients = JSON.parse(document.getElementById('clientData').textContent); } catch(e){}
+try {
+    _heroClients = JSON.parse(document.getElementById('clientData').textContent);
+} catch (e) {
+    // Don't swallow silently — surface to the console so a malformed entry
+    // (often a single establishment with an odd character in its name) can
+    // be diagnosed instead of just returning 0 search results.
+    console.error('[heroSearch] Failed to parse client JSON — search will be empty.', e);
+}
 
 var _heroIdx = -1;  // Keyboard navigation index
 
@@ -803,12 +811,17 @@ function heroFilter() {
         return;
     }
 
-    // Filter clients
+    // Filter clients — every lookup is null-safe so a single establishment
+    // with a NULL company_name / pf_code / esic_code can no longer throw
+    // a TypeError that drops the whole result set.  Branch name is also
+    // searched so the user can type any fragment that appears in the
+    // bracketed display_name "Company (Branch)".
     var matches = _heroClients.filter(function(c) {
-        return c.name.toLowerCase().indexOf(q) >= 0 ||
-               c.pf.toLowerCase().indexOf(q) >= 0 ||
-               c.esic.toLowerCase().indexOf(q) >= 0 ||
-               c.company.toLowerCase().indexOf(q) >= 0;
+        var hay = [
+            c.name, c.company, c.branch, c.pf, c.esic,
+            c.epfUser, c.esicUser
+        ].map(function(v) { return (v == null ? '' : String(v)).toLowerCase(); }).join('  ');
+        return hay.indexOf(q) >= 0;
     });
 
     resultsBox.style.display = 'block';
@@ -821,8 +834,14 @@ function heroFilter() {
 
     emptyEl.style.display = 'none';
 
-    // Build result items
-    var html = '';
+    // Build result items — header strip shows the match count up front so
+    // the user can immediately tell whether the dataset has more matches
+    // they're missing or whether this is genuinely all that exists.
+    var html = '<div style="padding:8px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; font-size:0.68rem; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.05em; display:flex; align-items:center; gap:6px;">'
+             + '<i class="bi bi-funnel-fill" style="color:#6366f1;"></i>'
+             + 'Found ' + matches.length + ' match' + (matches.length === 1 ? '' : 'es')
+             + ' <span style="color:#94a3b8; font-weight:400; margin-left:auto; text-transform:none; letter-spacing:0;">of ' + _heroClients.length + ' loaded</span>'
+             + '</div>';
     matches.forEach(function(c, i) {
         var statusBadge = '';
         if (c.status === 'filed') {
@@ -975,20 +994,24 @@ function filterClients() {
 //  CREDENTIAL SEARCH — Dedicated lookup for EPF/ESIC logins
 // ════════════════════════════════════════════════════════════════════
 var _credClients = [];
-try { _credClients = JSON.parse(document.getElementById('clientData').textContent); } catch(e){}
+try {
+    _credClients = JSON.parse(document.getElementById('clientData').textContent);
+} catch (e) {
+    console.error('[credSearch] Failed to parse client JSON — search will be empty.', e);
+}
 
 function credSearch() {
     var q = document.getElementById('credSearchInput').value.trim().toLowerCase();
     var box = document.getElementById('credResults');
     if (!q || q.length < 2) { box.style.display = 'none'; return; }
 
+    // Null-safe haystack — same defensive pattern as heroFilter so a single
+    // establishment with a NULL field can't sink the whole result set.
     var matches = _credClients.filter(function(c) {
-        return c.name.toLowerCase().indexOf(q) >= 0 ||
-               c.pf.toLowerCase().indexOf(q) >= 0 ||
-               c.esic.toLowerCase().indexOf(q) >= 0 ||
-               c.company.toLowerCase().indexOf(q) >= 0 ||
-               c.epfUser.toLowerCase().indexOf(q) >= 0 ||
-               c.esicUser.toLowerCase().indexOf(q) >= 0;
+        var hay = [
+            c.name, c.company, c.branch, c.pf, c.esic, c.epfUser, c.esicUser
+        ].map(function(v) { return (v == null ? '' : String(v)).toLowerCase(); }).join('  ');
+        return hay.indexOf(q) >= 0;
     });
 
     if (matches.length === 0) {
