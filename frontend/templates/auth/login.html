@@ -229,12 +229,18 @@
                 document.getElementById('clerk-loading').style.display = 'none';
 
                 if (window.Clerk.user) {
-                    // Already signed in — redirect to dashboard
-                    window.location.href = '/';
+                    // Already signed in — straight to staff dashboard.
+                    // `/` is the public marketing landing now; the actual
+                    // dashboard lives at `/dashboard`.
+                    window.location.href = '/dashboard';
                 } else {
                     // Mount the sign-in component
                     window.Clerk.mountSignIn(document.getElementById('sign-in'), {
-                        afterSignInUrl: '/',
+                        // Send the user to the staff dashboard after Clerk
+                        // hands the JWT cookie back.  Was `/` previously,
+                        // which is now the public marketing landing — that's
+                        // why signed-in staff were landing back on marketing.
+                        afterSignInUrl: '/dashboard',
                         appearance: {
                             elements: {
                                 rootBox: { width: '100%' },
@@ -269,7 +275,7 @@
             <p>Clerk authentication is not configured yet.<br>
                System is running in <strong>open development mode</strong>.<br>
                Add your Clerk API keys in the <code>.env</code> file to enable login.</p>
-            <a href="/">Enter ERP (Dev Mode)</a>
+            <a href="/dashboard">Enter ERP (Dev Mode)</a>
         </div>
         {% endif %}
 
