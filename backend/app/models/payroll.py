@@ -487,6 +487,52 @@ class PayrollEntry(db.Model):
         return f'<PayrollEntry emp={self.employee_id} net={self.net_pay}>'
 
 
+class PayrollInputFile(db.Model):
+    """Staff-uploaded Excel snapshot kept for audit + reuse.
+
+    Lifecycle:
+      • Every upload writes a 'draft' row, REPLACING any earlier draft for
+        the same payroll (so during multi-attempt processing only the latest
+        attempt is on file).
+      • On Finalize, the latest draft is promoted to 'finalized' (status
+        change + finalized_at timestamp) and every other row for that
+        payroll is left untouched, so all past finalized snapshots stay
+        for audit / "show client what we filed" purposes.
+      • On Reopen + new upload, a fresh draft row appears alongside the
+        previously finalized row(s); on re-finalize, the new draft is
+        promoted, the old finalized rows stay.
+
+    File data is stored byte-identical to the upload (no compression, no
+    conversion) so download gives the staff back exactly what they sent.
+    """
+    __tablename__ = 'payroll_input_files'
+
+    id               = db.Column(db.Integer, primary_key=True)
+    payroll_id       = db.Column(db.Integer, db.ForeignKey('monthly_payrolls.id', ondelete='CASCADE'),
+                                 nullable=False, index=True)
+    establishment_id = db.Column(db.Integer, db.ForeignKey('establishments.id', ondelete='CASCADE'),
+                                 nullable=False, index=True)
+    filename         = db.Column(db.String(255), nullable=False)
+    template_type    = db.Column(db.String(20), nullable=True)   # 'universal' | 'monthly'
+    file_data        = db.Column(db.LargeBinary, nullable=False)
+    file_size        = db.Column(db.Integer, nullable=False)
+    status           = db.Column(db.String(15), nullable=False, default='draft')   # 'draft' | 'finalized'
+    uploaded_by      = db.Column(db.String(100), nullable=True)
+    uploaded_at      = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    finalized_at     = db.Column(db.DateTime, nullable=True)
+
+    payroll = db.relationship('MonthlyPayroll',
+                              backref=db.backref('input_files', lazy='dynamic',
+                                                 cascade='all, delete-orphan'))
+
+    @property
+    def size_kb(self):
+        return round(self.file_size / 1024, 1)
+
+    def __repr__(self):
+        return f'<PayrollInputFile {self.filename} payroll={self.payroll_id} status={self.status}>'
+
+
 class PayrollDocument(db.Model):
     """PDF documents attached to a payroll period — stored as BYTEA in PostgreSQL.
     file_data may be zlib-compressed; is_compressed flag tells the view route whether

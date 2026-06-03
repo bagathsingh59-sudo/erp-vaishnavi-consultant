@@ -104,36 +104,20 @@ def dashboard():
     prev_month_name = cal.month_name[prev_month]
 
     # Total fees collected (from filed establishments for the filing month)
-    # Smart fee logic: Monthly fees always count; Quarterly/Yearly only in their due months
+    # Uses Establishment.is_billing_month() so per-establishment cycle anchor
+    # is honoured (Apr-Jun quarter bills in Jun, March-close yearly bills in
+    # Mar, etc.) instead of the old hard-coded Jan/Apr/Jul/Oct + Apr rule.
     total_fees = 0
     for est in establishments:
-        if est.id in filed_est_ids and est.fee_amount:
-            fee_type = (est.fee_type or 'Monthly').strip()
-            if fee_type == 'Monthly':
-                total_fees += est.fee_amount
-            elif fee_type == 'Quarterly':
-                # Quarterly months: Jan(1), Apr(4), Jul(7), Oct(10)
-                if filing_month in (1, 4, 7, 10):
-                    total_fees += est.fee_amount
-            elif fee_type == 'Yearly':
-                # Yearly fee due in April (start of FY)
-                if filing_month == 4:
-                    total_fees += est.fee_amount
+        if est.id in filed_est_ids and est.is_billing_month(filing_month):
+            total_fees += (est.fee_amount or 0)
 
     # Previous month fees (from filed establishments last month)
     prev_filed_est_ids = set(p.establishment_id for p in prev_payrolls)
     prev_fees = 0
     for est in establishments:
-        if est.id in prev_filed_est_ids and est.fee_amount:
-            fee_type = (est.fee_type or 'Monthly').strip()
-            if fee_type == 'Monthly':
-                prev_fees += est.fee_amount
-            elif fee_type == 'Quarterly':
-                if prev_month in (1, 4, 7, 10):
-                    prev_fees += est.fee_amount
-            elif fee_type == 'Yearly':
-                if prev_month == 4:
-                    prev_fees += est.fee_amount
+        if est.id in prev_filed_est_ids and est.is_billing_month(prev_month):
+            prev_fees += (est.fee_amount or 0)
 
     # Other Income for the filing month (IP & UAN Charges, Registration, etc.)
     total_other_income = 0
@@ -231,6 +215,7 @@ def dashboard():
     acc_tds_balance = _get_account_balance(tds_acct.id, fy_end) if tds_acct else 0
 
     return render_template('dashboard.html',
+                           now=now,
                            total_clients=total_clients,
                            active_clients=active_clients,
                            inactive_clients=inactive_clients,
@@ -490,6 +475,18 @@ def _save_establishment_form(est, is_new=False):
         est.fee_amount = float(request.form.get('fee_amount')) if request.form.get('fee_amount') else None
     except ValueError:
         est.fee_amount = None
+
+    # Billing-cycle anchor month — relevant only for Quarterly / Yearly.
+    # For Monthly (or no fee type), force NULL so old anchor values don't
+    # leak into the wrong cycle if the user later switches types.
+    if est.fee_type in ('Quarterly', 'Yearly'):
+        try:
+            anchor = int(request.form.get('fee_cycle_anchor_month') or 0)
+            est.fee_cycle_anchor_month = anchor if 1 <= anchor <= 12 else None
+        except ValueError:
+            est.fee_cycle_anchor_month = None
+    else:
+        est.fee_cycle_anchor_month = None
     est.tds_applicable = (request.form.get('tds_applicable') == 'yes')
     if est.tds_applicable:
         try:

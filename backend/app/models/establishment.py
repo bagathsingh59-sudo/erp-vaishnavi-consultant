@@ -42,6 +42,13 @@ class Establishment(db.Model):
     fee_amount = db.Column(db.Float, nullable=True)
     service_type = db.Column(db.String(30), nullable=True)    # With Records, Only Returns
 
+    # Fee billing cycle anchor (used only when fee_type is Quarterly or Yearly).
+    # Quarterly: the first billing month of the cycle (e.g. 6 = June).
+    #   System derives the other 3 billing months as anchor + 3, + 6, + 9.
+    # Yearly: the single year-close billing month (e.g. 3 = March).
+    # NULL for Monthly establishments (every month bills, no anchor needed).
+    fee_cycle_anchor_month = db.Column(db.Integer, nullable=True)
+
     # TDS
     tds_applicable = db.Column(db.Boolean, default=False)     # Does this client deduct TDS?
     tds_rate = db.Column(db.Float, nullable=True)             # TDS rate %, default 10 (194J)
@@ -112,6 +119,80 @@ class Establishment(db.Model):
     @property
     def is_sub_unit(self):
         return self.parent_id is not None
+
+    # ── Fee billing-cycle helpers ────────────────────────────────────────────
+    # These replace the hard-coded (1, 4, 7, 10) / April-only checks that
+    # used to live inline in the dashboard / bulk / admin routes, so the
+    # whole codebase agrees on one definition of "is this a billing month".
+
+    @property
+    def effective_fee_cycle_anchor(self):
+        """Anchor month with safe defaults if none set on the row.
+        Quarterly → June (6), Yearly → March (3). These match the backfill
+        applied by the auto-migrate on first boot.
+        """
+        if self.fee_cycle_anchor_month and 1 <= self.fee_cycle_anchor_month <= 12:
+            return self.fee_cycle_anchor_month
+        ft = (self.fee_type or '').strip()
+        if ft == 'Quarterly':
+            return 6   # April-June cycle, billed in June
+        if ft == 'Yearly':
+            return 3   # Indian FY year-close
+        return None
+
+    def is_billing_month(self, filing_month):
+        """Should this establishment's fee be added in the given filing month?
+        Monthly → always. Quarterly → every 3 months from the anchor.
+        Yearly → only the anchor month.
+        """
+        ft = (self.fee_type or 'Monthly').strip()
+        if ft == 'Monthly':
+            return True
+        anchor = self.effective_fee_cycle_anchor
+        if anchor is None:
+            return False
+        if ft == 'Yearly':
+            return filing_month == anchor
+        if ft == 'Quarterly':
+            return (filing_month - anchor) % 3 == 0
+        return False
+
+    def billing_months(self):
+        """List of months (1..12) this establishment bills in. Used to show
+        the user a preview on the establishment form, and on dashboards."""
+        ft = (self.fee_type or 'Monthly').strip()
+        if ft == 'Monthly':
+            return list(range(1, 13))
+        anchor = self.effective_fee_cycle_anchor
+        if anchor is None:
+            return []
+        if ft == 'Yearly':
+            return [anchor]
+        if ft == 'Quarterly':
+            return sorted(((anchor - 1 + 3 * i) % 12) + 1 for i in range(4))
+        return []
+
+    def next_billing_month(self, from_month, from_year):
+        """(month, year) of the NEXT billing month at or after the given
+        month. Used to render the "next bill in …" hint on the Slab column."""
+        ft = (self.fee_type or 'Monthly').strip()
+        if ft == 'Monthly':
+            return from_month, from_year
+        months = self.billing_months()
+        if not months:
+            return None, None
+        # Find the next month in the current year, else wrap to next year
+        future = [m for m in months if m >= from_month]
+        if future:
+            return future[0], from_year
+        return months[0], from_year + 1
+
+    def fee_for_filing_month(self, filing_month):
+        """Amount actually charged in the given filing month — zero if it's
+        not a billing month for this establishment, full amount otherwise."""
+        if not self.fee_amount or not self.is_billing_month(filing_month):
+            return 0
+        return self.fee_amount
 
     @property
     def expiring_licenses(self):

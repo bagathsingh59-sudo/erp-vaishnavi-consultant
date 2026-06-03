@@ -405,7 +405,7 @@ def create_app():
         from app.models.employee import Employee, Nominee, TransferHistory
         from app.models.payroll import (PayrollConfig, SalaryHead, EmployeeSalary,
                                          EmployeeSalaryHead, MonthlyPayroll, PayrollEntry,
-                                         PayrollEntryHead)
+                                         PayrollEntryHead, PayrollDocument, PayrollInputFile)
         from app.models.accounts import AccountGroup, AccountHead, Voucher, VoucherEntry
         from app.models.activity_log import ActivityLog
         from app.models.app_user import AppUser
@@ -554,6 +554,73 @@ def _auto_migrate_columns(db):
     except Exception as e:
         db.session.rollback()
         print(f"  [MIGRATE] payroll_documents.is_compressed: {e}")
+
+    # ── payroll_input_files: staff-uploaded Excel snapshots (audit trail) ──
+    # One row per upload event. Most-recent draft for a payroll gets promoted
+    # to 'finalized' when the user clicks Finalize. Older drafts are pruned.
+    # Finalized rows are kept FOREVER (user-chosen retention policy) so the
+    # consultant can always show the client the exact file that produced the
+    # finalized numbers, and reuse it to seed next month's payroll.
+    try:
+        db.session.execute(db.text("""
+            CREATE TABLE IF NOT EXISTS payroll_input_files (
+                id              SERIAL PRIMARY KEY,
+                payroll_id      INTEGER NOT NULL REFERENCES monthly_payrolls(id) ON DELETE CASCADE,
+                establishment_id INTEGER NOT NULL REFERENCES establishments(id) ON DELETE CASCADE,
+                filename        VARCHAR(255) NOT NULL,
+                template_type   VARCHAR(20),         -- 'universal' or 'monthly'
+                file_data       BYTEA NOT NULL,
+                file_size       INTEGER NOT NULL,
+                status          VARCHAR(15) NOT NULL DEFAULT 'draft',  -- 'draft' | 'finalized'
+                uploaded_by     VARCHAR(100),
+                uploaded_at     TIMESTAMP NOT NULL DEFAULT NOW(),
+                finalized_at    TIMESTAMP
+            )
+        """))
+        db.session.execute(db.text(
+            "CREATE INDEX IF NOT EXISTS ix_payroll_input_files_payroll_id ON payroll_input_files(payroll_id)"
+        ))
+        db.session.execute(db.text(
+            "CREATE INDEX IF NOT EXISTS ix_payroll_input_files_est_status ON payroll_input_files(establishment_id, status)"
+        ))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"  [MIGRATE] payroll_input_files table: {e}")
+
+    # ── Per-establishment fee-billing cycle anchor month ──
+    # NULL for Monthly establishments (unused).
+    # Quarterly: anchor = the first billing month of the cycle (e.g. 6=June).
+    #   System auto-derives the other 3 billing months as anchor+3, +6, +9.
+    # Yearly: anchor = the year-close month (e.g. 3=March).
+    # Backfill below seeds sensible defaults so the existing dashboard math
+    # produces the right answer immediately for the common Indian cases.
+    try:
+        db.session.execute(db.text(
+            "ALTER TABLE establishments ADD COLUMN IF NOT EXISTS fee_cycle_anchor_month INTEGER"
+        ))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"  [MIGRATE] establishments.fee_cycle_anchor_month: {e}")
+
+    # Backfill defaults for existing Quarterly / Yearly establishments that
+    # have no anchor set. June for Quarterly is the common school/factory
+    # cycle (Apr-Jun, Jul-Sep, Oct-Dec, Jan-Mar). March for Yearly is the
+    # Indian financial-year close.
+    try:
+        db.session.execute(db.text(
+            "UPDATE establishments SET fee_cycle_anchor_month = 6 "
+            "WHERE fee_cycle_anchor_month IS NULL AND fee_type = 'Quarterly'"
+        ))
+        db.session.execute(db.text(
+            "UPDATE establishments SET fee_cycle_anchor_month = 3 "
+            "WHERE fee_cycle_anchor_month IS NULL AND fee_type = 'Yearly'"
+        ))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"  [MIGRATE] backfill fee_cycle_anchor_month: {e}")
 
     # Widen pf_code / esic_code on establishments (and the mirror columns on
     # manual_reimbursements) from the old VARCHAR(10) to VARCHAR(50).

@@ -724,6 +724,17 @@
                             {% if item.est.fee_amount %}
                                 {{ "₹{:,.0f}".format(item.est.fee_amount) }}
                                 <span style="font-size: 0.6rem; color: #94a3b8;">/{{ (item.est.fee_type or 'M')[:1] }}</span>
+                                {# Slab line — shows the cycle + next billing month so the consultant
+                                   can immediately tell when this establishment's next bill lands.
+                                   Quarterly/Yearly only; Monthly is self-evident. #}
+                                {% if item.est.fee_type in ['Quarterly','Yearly'] %}
+                                    {% set nb_m, nb_y = item.est.next_billing_month(now.month, now.year) %}
+                                    {% if nb_m %}
+                                    <div style="font-size:0.58rem; color:#64748b; margin-top:1px;">
+                                        next bill: <strong style="color:#0369a1;">{{ ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][nb_m] }} {{ nb_y }}</strong>
+                                    </div>
+                                    {% endif %}
+                                {% endif %}
                             {% else %}
                                 —
                             {% endif %}

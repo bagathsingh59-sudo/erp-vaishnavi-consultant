@@ -242,7 +242,7 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Fee Cycle</label>
-                    <select name="fee_type" class="form-select">
+                    <select name="fee_type" id="feeTypeSelect" class="form-select" onchange="toggleFeeAnchor()">
                         <option value="">Select</option>
                         <option value="Monthly" {% if est and est.fee_type == 'Monthly' %}selected{% endif %}>Monthly</option>
                         <option value="Quarterly" {% if est and est.fee_type == 'Quarterly' %}selected{% endif %}>Quarterly</option>
@@ -253,6 +253,27 @@
                     <label class="form-label">Fee Amount (₹)</label>
                     <input type="number" name="fee_amount" class="form-control" placeholder="e.g., 5000" step="1" min="0"
                            value="{{ est.fee_amount|int if est and est.fee_amount else '' }}">
+                </div>
+                {# ── Billing Anchor Month — shown only for Quarterly / Yearly. ──
+                   Quarterly → anchor = first billing month of the cycle (e.g. June
+                              means bills in Jun, Sep, Dec, Mar).
+                   Yearly    → anchor = the single billing month (e.g. March = FY close).
+                   For Monthly establishments this control is hidden + value is NULL. #}
+                <div class="col-md-3" id="feeAnchorDiv"
+                     style="display:{% if est and est.fee_type in ['Quarterly','Yearly'] %}block{% else %}none{% endif %};">
+                    <label class="form-label" id="feeAnchorLabel">
+                        {% if est and est.fee_type == 'Yearly' %}Year-Close Month{% else %}First Billing Month{% endif %}
+                    </label>
+                    <select name="fee_cycle_anchor_month" id="feeAnchorSelect" class="form-select" onchange="updateAnchorPreview()">
+                        {% set anchor = est.fee_cycle_anchor_month if est else None %}
+                        {% for m, name in [(1,'January'),(2,'February'),(3,'March'),(4,'April'),(5,'May'),(6,'June'),
+                                           (7,'July'),(8,'August'),(9,'September'),(10,'October'),(11,'November'),(12,'December')] %}
+                        <option value="{{ m }}" {% if anchor == m %}selected{% endif %}>{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text" id="feeAnchorPreview" style="font-size:0.7rem; color:#64748b;">
+                        Preview will appear here
+                    </div>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">TDS Applicable?</label>
@@ -590,6 +611,54 @@ function toggleTds() {
     document.getElementById('tdsRateDiv').style.display =
         document.getElementById('tdsSelect').value === 'yes' ? 'block' : 'none';
 }
+
+// ── Fee billing-cycle anchor toggle + live preview ──────────────────────────
+// Shows/hides the anchor-month dropdown depending on Fee Cycle (Quarterly /
+// Yearly = visible, Monthly / blank = hidden). Live preview line tells the
+// consultant exactly which months will be billed under the chosen anchor.
+var MONTH_NAMES = ['', 'January','February','March','April','May','June',
+                   'July','August','September','October','November','December'];
+function toggleFeeAnchor() {
+    var ft = document.getElementById('feeTypeSelect').value;
+    var div = document.getElementById('feeAnchorDiv');
+    var label = document.getElementById('feeAnchorLabel');
+    var sel = document.getElementById('feeAnchorSelect');
+    if (ft === 'Quarterly') {
+        div.style.display = 'block';
+        label.textContent = 'First Billing Month';
+        // Default to June if no anchor set yet (matches the backfill rule)
+        if (!sel.value) sel.value = 6;
+    } else if (ft === 'Yearly') {
+        div.style.display = 'block';
+        label.textContent = 'Year-Close Month';
+        if (!sel.value) sel.value = 3;
+    } else {
+        div.style.display = 'none';
+        sel.value = '';
+    }
+    updateAnchorPreview();
+}
+function updateAnchorPreview() {
+    var ft = document.getElementById('feeTypeSelect').value;
+    var sel = document.getElementById('feeAnchorSelect');
+    var prev = document.getElementById('feeAnchorPreview');
+    if (!sel || !prev) return;
+    var anchor = parseInt(sel.value || '0', 10);
+    if (!anchor) { prev.textContent = ''; return; }
+    if (ft === 'Yearly') {
+        prev.textContent = 'Bills once a year in ' + MONTH_NAMES[anchor] + '.';
+    } else if (ft === 'Quarterly') {
+        var months = [];
+        for (var i = 0; i < 4; i++) {
+            months.push(MONTH_NAMES[((anchor - 1 + 3 * i) % 12) + 1]);
+        }
+        prev.textContent = 'Bills in: ' + months.join(', ') + '.';
+    } else {
+        prev.textContent = '';
+    }
+}
+// Initialise on page load so the preview is correct when editing an existing establishment
+updateAnchorPreview();
 
 // Toggle Other Industry field
 function toggleOtherIndustry() {

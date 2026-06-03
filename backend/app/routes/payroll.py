@@ -1,9 +1,10 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, send_file
+from werkzeug.utils import secure_filename
 from app import db
 from app.models.payroll import (PayrollConfig, SalaryHead, EmployeeSalary,
                                  EmployeeSalaryHead, MonthlyPayroll, PayrollEntry,
                                  PayrollEntryHead, SalaryTemplate, SalaryTemplateHead,
-                                 PayrollDocument)
+                                 PayrollDocument, PayrollInputFile)
 from io import BytesIO
 from app.models.establishment import Establishment
 from app.models.employee import Employee
@@ -1585,13 +1586,35 @@ def payroll_process(payroll_id):
             if entry.net_pay < 0:
                 red_flags.append(f"{emp.name} — Net Pay is negative (₹{entry.net_pay:,.0f}), deductions exceed earnings")
 
+    # Saved input-file snapshots for this payroll — used by the Documents
+    # area / "Finalized Input" section. Latest finalized first; any current
+    # in-progress draft is surfaced too so staff can see what's queued.
+    input_files = (PayrollInputFile.query
+                   .filter_by(payroll_id=payroll.id)
+                   .order_by(PayrollInputFile.status.desc(),         # finalized > draft alphabetically
+                             PayrollInputFile.finalized_at.desc().nullslast(),
+                             PayrollInputFile.uploaded_at.desc())
+                   .all())
+
+    # Is there a finalized input from any earlier month for this establishment
+    # that the "Copy from Previous Month" button can offer? (We want the menu
+    # item to silently no-op when nothing's available, but the simpler UX is
+    # to only enable the button when it can do something.)
+    has_previous_input = (PayrollInputFile.query
+                          .filter(PayrollInputFile.establishment_id == est.id,
+                                  PayrollInputFile.status == 'finalized',
+                                  PayrollInputFile.payroll_id != payroll.id)
+                          .first() is not None)
+
     return render_template('payroll/process.html',
                            payroll=payroll, est=est, config=config,
                            entries=entries, heads=heads,
                            num_days_in_month=num_days_in_month,
                            rest_day_count=rest_day_count,
                            holiday_count=holiday_count,
-                           red_flags=red_flags)
+                           red_flags=red_flags,
+                           input_files=input_files,
+                           has_previous_input=has_previous_input)
 
 
 @payroll_bp.route('/payroll/<int:payroll_id>/save-attendance', methods=['POST'])
@@ -2232,6 +2255,7 @@ def payroll_finalize(payroll_id):
     # --- NIL payrolls: skip holiday/EPF date logic (no employees to recalc) ---
     if payroll.is_nil:
         payroll.status = 'finalized'
+        _promote_draft_to_finalized(payroll)   # snapshot the input Excel (if any)
         log_activity('finalized', 'nil_payroll', entity_id=payroll.id,
                      entity_name=payroll.period_display,
                      details='NIL return locked',
@@ -2307,6 +2331,7 @@ def payroll_finalize(payroll_id):
         return redirect(url_for('payroll.payroll_process', payroll_id=payroll_id))
 
     payroll.status = 'finalized'
+    _promote_draft_to_finalized(payroll)   # snapshot the input Excel that produced these numbers
     log_activity('finalized', 'payroll', entity_id=payroll.id,
                  entity_name=payroll.period_display,
                  details=f'Net Pay: ₹{payroll.total_net_pay:,.0f}, '
@@ -2842,6 +2867,101 @@ def download_attendance_template(payroll_id):
     )
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# Input-file audit-trail helpers
+# ──────────────────────────────────────────────────────────────────────────
+# These maintain the rule the user agreed to in the discussion:
+#   • Every upload replaces the previous DRAFT for the same payroll, so the
+#     DB only ever holds the most-recent attempt during a processing session.
+#   • On Finalize, the latest draft is promoted to FINALIZED. All previous
+#     finalized rows are preserved (Option A: keep all forever).
+#   • The file is stored byte-identical to the upload — no compression, no
+#     conversion. Downloads give the staff the exact .xlsx they sent.
+
+def _save_draft_input(*, payroll, file_bytes, filename, template_type, uploaded_by_uid):
+    """Persist the current upload as a draft. Replaces any prior draft for
+    the same payroll so only one in-progress attempt is on file at a time."""
+    # Drop any earlier draft(s) for this payroll — only the latest attempt counts.
+    PayrollInputFile.query.filter_by(payroll_id=payroll.id, status='draft').delete(synchronize_session=False)
+    db.session.add(PayrollInputFile(
+        payroll_id       = payroll.id,
+        establishment_id = payroll.establishment_id,
+        filename         = filename[:255],
+        template_type    = template_type,
+        file_data        = file_bytes,
+        file_size        = len(file_bytes),
+        status           = 'draft',
+        uploaded_by      = uploaded_by_uid,
+        uploaded_at      = datetime.utcnow(),
+    ))
+    db.session.commit()
+
+
+def _promote_draft_to_finalized(payroll):
+    """Promote the latest draft input (if any) to finalized status. Called
+    from the finalize route AFTER payroll.status is set. Idempotent — if
+    no draft exists, this is a no-op. Older finalized rows are NOT touched
+    so the audit history persists across reopen + re-finalize cycles."""
+    draft = (PayrollInputFile.query
+             .filter_by(payroll_id=payroll.id, status='draft')
+             .order_by(PayrollInputFile.uploaded_at.desc())
+             .first())
+    if draft is None:
+        return
+    draft.status = 'finalized'
+    draft.finalized_at = datetime.utcnow()
+
+
+@payroll_bp.route('/payroll/<int:payroll_id>/input-files/<int:file_id>/download')
+def download_input_file(payroll_id, file_id):
+    """Stream a saved input Excel back to the user. Any staff who can see
+    the payroll can download — same access rule as the payroll itself."""
+    payroll = MonthlyPayroll.query.get_or_404(payroll_id)
+    verify_est_ownership(payroll.establishment)
+    rec = PayrollInputFile.query.filter_by(id=file_id, payroll_id=payroll_id).first_or_404()
+    return send_file(
+        BytesIO(rec.file_data),
+        download_name=rec.filename,
+        as_attachment=True,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+
+
+@payroll_bp.route('/payroll/<int:payroll_id>/input-files/copy-from-previous')
+def copy_input_from_previous_month(payroll_id):
+    """Hand the staff back the FINALIZED input file from the previous month
+    for the SAME establishment. They tweak it for the new month's joiners /
+    exits / day counts and re-upload. Cuts out re-typing common data.
+
+    Falls back to the latest finalized input from any earlier month for the
+    same establishment if there's no immediate-prior file (e.g. a month was
+    skipped or filed as NIL)."""
+    payroll = MonthlyPayroll.query.get_or_404(payroll_id)
+    verify_est_ownership(payroll.establishment)
+
+    # Latest finalized input for this establishment, excluding the current payroll.
+    prev = (PayrollInputFile.query
+            .filter(PayrollInputFile.establishment_id == payroll.establishment_id,
+                    PayrollInputFile.status == 'finalized',
+                    PayrollInputFile.payroll_id != payroll_id)
+            .order_by(PayrollInputFile.finalized_at.desc().nullslast(),
+                      PayrollInputFile.uploaded_at.desc())
+            .first())
+    if prev is None:
+        flash('No previous-month input file is available for this establishment yet.', 'info')
+        return redirect(url_for('payroll.payroll_process', payroll_id=payroll_id))
+
+    # Rename on download so the staff doesn't mistakenly re-finalize last month's
+    # exact filename — prefix with the current period.
+    new_name = f"{payroll.period_display.replace(' ', '_')}_seed_{prev.filename}"
+    return send_file(
+        BytesIO(prev.file_data),
+        download_name=new_name,
+        as_attachment=True,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+
+
 @payroll_bp.route('/payroll/<int:payroll_id>/upload-attendance', methods=['POST'])
 def upload_attendance(payroll_id):
     """Upload filled Excel template (monthly or universal hybrid) and populate attendance + rate overrides.
@@ -2869,8 +2989,12 @@ def upload_attendance(payroll_id):
         flash('Invalid file format. Please upload an .xlsx Excel file.', 'danger')
         return redirect(url_for('payroll.payroll_process', payroll_id=payroll_id))
 
+    # Read the upload ONCE into a buffer so we can both parse it AND keep a
+    # byte-identical copy for the audit-trail save below. After file.read()
+    # the FileStorage cursor is at EOF, so we must work from these bytes.
+    raw_bytes = file.read()
     try:
-        wb = load_workbook(io.BytesIO(file.read()), data_only=True)
+        wb = load_workbook(io.BytesIO(raw_bytes), data_only=True)
     except Exception as e:
         flash(f'Could not read Excel file: {str(e)}', 'danger')
         return redirect(url_for('payroll.payroll_process', payroll_id=payroll_id))
@@ -2907,6 +3031,25 @@ def upload_attendance(payroll_id):
         if file_payroll_id and int(file_payroll_id) != payroll_id:
             flash(f'Template mismatch! This file was generated for a different payroll (ID: {file_payroll_id}).', 'danger')
             return redirect(url_for('payroll.payroll_process', payroll_id=payroll_id))
+
+    # ── Save upload to the audit trail (draft) BEFORE processing ──────────
+    # Persists the byte-identical Excel against this payroll so the team can
+    # later show the client / auditor exactly what was submitted, and reuse
+    # it as next month's seed file. Multiple drafts during a session collapse
+    # to "the latest one" — see _save_draft_input below.
+    try:
+        _save_draft_input(
+            payroll          = payroll,
+            file_bytes       = raw_bytes,
+            filename         = secure_filename(file.filename) or file.filename,
+            template_type    = 'universal' if is_universal else 'monthly',
+            uploaded_by_uid  = current_user_id(),
+        )
+    except Exception as e:
+        # Don't block processing if the audit save fails — log it and carry on.
+        # The user's main intent (process the upload) still completes.
+        print(f"[upload_attendance] WARN: input-file save failed: {e}")
+        db.session.rollback()
 
     # ── Build employee_id mapping from ref sheet (monthly template only) ──
     ref_emp_ids = None
