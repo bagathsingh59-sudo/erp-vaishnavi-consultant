@@ -97,16 +97,21 @@ def _calculate_bonus_run(run):
     ).all()
     payroll_map = {(p.year, p.month): p for p in payrolls}
 
-    # Pre-load all entries for those payrolls
+    # Pre-load all entries for those payrolls.
+    # PayrollEntry's FK column is `monthly_payroll_id` (not `payroll_id`) —
+    # earlier code referenced a non-existent attribute which raised an
+    # AttributeError silently during bonus run creation, leaving an orphan
+    # empty BonusRun row and forcing the user to retry.
     payroll_ids = [p.id for p in payrolls]
-    entries = PayrollEntry.query.filter(PayrollEntry.payroll_id.in_(payroll_ids)).all() if payroll_ids else []
+    payroll_by_id = {p.id: p for p in payrolls}
+    entries = PayrollEntry.query.filter(PayrollEntry.monthly_payroll_id.in_(payroll_ids)).all() if payroll_ids else []
 
     # Group entries by employee_id
     emp_data = {}  # emp_id -> {monthly: {"YYYY-MM": {...}}, total_basic_da, total_capped, total_days, months_eligible}
     effective_ceiling = run.effective_ceiling
 
     for entry in entries:
-        payroll = next((p for p in payrolls if p.id == entry.payroll_id), None)
+        payroll = payroll_by_id.get(entry.monthly_payroll_id)
         if not payroll:
             continue
         emp_id = entry.employee_id
@@ -535,17 +540,21 @@ def bonus_statement_excel(run_id):
 
 def _compute_vaishnavi_bonus_data(run):
     """Return list of per-employee dicts with month-wise attendance / daily rate /
-    wage / bonus, plus grand totals. Pulls PayrollEntry rows for the FY months
-    of this run and computes everything on the fly.
+    wage / bonus, plus grand totals.
 
-    Eligibility: an employee shows up if they had at least one finalized payroll
-    entry in the FY. Sec. 8 (min 30 days) is flagged on the row via the
-    `is_eligible` field — ineligible employees are still shown so the client can
-    see why no bonus was paid.
+    NO CEILING. NO WAGE CAP. NO ELIGIBILITY CAP.
+    Pure attendance × daily rate × bonus % math, exactly the manual
+    spreadsheet calculation the consultant does today. Engine-level
+    parameters like run.wage_ceiling and run.eligibility_cap are
+    DELIBERATELY IGNORED here — they only apply to the statutory
+    (Basic+DA) export and to Form C.
+
+    Sec. 8 (min 30 days) is flagged on the row but does not zero the
+    bonus — the client decides what to do with sub-30 employees.
     """
     bonus_pct = (run.bonus_percentage or 8.33) / 100.0
 
-    # Gather all payrolls for this est in the FY
+    # Gather all payrolls for this est in the FY (Apr start_year -> Mar end_year)
     payrolls = MonthlyPayroll.query.filter(
         MonthlyPayroll.establishment_id == run.establishment_id,
         db.or_(
@@ -553,74 +562,75 @@ def _compute_vaishnavi_bonus_data(run):
             db.and_(MonthlyPayroll.year == run.end_year, MonthlyPayroll.month <= 3),
         )
     ).all()
-    payroll_by_key = {f"{p.year}-{p.month:02d}": p for p in payrolls}
-    payroll_ids = [p.id for p in payrolls]
+    if not payrolls:
+        return []
 
-    # Pull all entries for those payrolls, joined to employee.
-    # PayrollEntry uses `monthly_payroll_id` as the FK column name.
-    entries = (PayrollEntry.query
-               .filter(PayrollEntry.monthly_payroll_id.in_(payroll_ids))
-               .join(Employee, Employee.id == PayrollEntry.employee_id)
-               .order_by(Employee.name)
-               .all()) if payroll_ids else []
-
-    # Group by employee
-    emp_rows = {}   # emp_id -> { 'employee': obj, 'monthly': {key: {...}}, totals }
     payroll_by_id = {p.id: p for p in payrolls}
+    payroll_ids   = list(payroll_by_id.keys())
+
+    # All entries for those payrolls — no eager join (some DB drivers
+    # struggle with the join+order_by combo on large datasets).
+    entries = PayrollEntry.query.filter(
+        PayrollEntry.monthly_payroll_id.in_(payroll_ids)
+    ).all()
+    if not entries:
+        return []
+
+    # Bulk-load employees for the entries
+    employee_ids = list({e.employee_id for e in entries if e.employee_id})
+    employees = {e.id: e for e in Employee.query.filter(Employee.id.in_(employee_ids)).all()}
+
+    emp_rows = {}   # emp_id -> { employee, monthly, totals... }
     for entry in entries:
-        # Find which payroll month this entry belongs to
         payroll = payroll_by_id.get(entry.monthly_payroll_id)
         if not payroll:
             continue
+        emp = employees.get(entry.employee_id)
+        if not emp:
+            continue  # orphan entry — skip, don't crash
         month_key = f"{payroll.year}-{payroll.month:02d}"
 
-        # Attendance = days actually paid (worked + NPH). This is what the
-        # bonus is computed on, matching the consultant's manual workbook.
-        attendance = (entry.days_present or 0) + (entry.paid_holidays or 0)
+        # Attendance = days actually paid (worked + NPH).
+        attendance = float(entry.days_present or 0) + float(entry.paid_holidays or 0)
 
-        # Daily rate — for daily-wage employees we have the explicit rate
-        # stored as gross_salary (it IS the daily rate by convention). For
-        # monthly-fixed employees we derive: gross_salary / working_days.
+        # Daily rate detection — same heuristic as Form B / Salary Statement:
+        # gross_salary stored as the daily rate (≤ ₹2,000) for daily-wage
+        # employees; for monthly-fixed it's the monthly gross, divided by
+        # working days to derive the per-day rate.
         wd = payroll.working_days or 26
-        daily_rate = 0
-        if attendance > 0:
-            if entry.gross_salary and wd > 0:
-                # If gross_salary appears to be a daily rate (e.g. ≤ ~₹2000), use it
-                # directly; otherwise treat as monthly and divide by working days.
-                # Common Indian daily rates are < ₹2000, monthly salaries are > ₹5000,
-                # so this heuristic is safe in practice.
-                if entry.gross_salary <= 2000:
-                    daily_rate = float(entry.gross_salary)
-                else:
-                    daily_rate = float(entry.gross_salary) / wd
+        daily_rate = 0.0
+        gross = float(entry.gross_salary or 0)
+        if attendance > 0 and gross > 0 and wd > 0:
+            daily_rate = gross if gross <= 2000 else (gross / wd)
 
-        monthly_wage = round(attendance * daily_rate)
+        monthly_wage  = round(attendance * daily_rate)
         monthly_bonus = round(monthly_wage * bonus_pct)
 
-        if entry.employee_id not in emp_rows:
-            emp_rows[entry.employee_id] = {
-                'employee': entry.employee,
-                'monthly': {},
-                'total_attendance': 0,
-                'total_wage': 0,
-                'total_bonus': 0,
-            }
-        emp_rows[entry.employee_id]['monthly'][month_key] = {
-            'attendance':   attendance,
-            'daily_rate':   round(daily_rate),
-            'monthly_wage': monthly_wage,
+        bucket = emp_rows.setdefault(entry.employee_id, {
+            'employee': emp,
+            'monthly': {},
+            'total_attendance': 0.0,
+            'total_wage': 0,
+            'total_bonus': 0,
+        })
+        bucket['monthly'][month_key] = {
+            'attendance':    round(attendance, 1),
+            'daily_rate':    round(daily_rate),
+            'monthly_wage':  monthly_wage,
             'monthly_bonus': monthly_bonus,
         }
-        emp_rows[entry.employee_id]['total_attendance'] += attendance
-        emp_rows[entry.employee_id]['total_wage']       += monthly_wage
-        emp_rows[entry.employee_id]['total_bonus']      += monthly_bonus
+        bucket['total_attendance'] += attendance
+        bucket['total_wage']       += monthly_wage
+        bucket['total_bonus']      += monthly_bonus
 
-    # Sort by name for stable output
-    rows = sorted(emp_rows.values(), key=lambda r: r['employee'].name or '')
+    rows = sorted(emp_rows.values(),
+                  key=lambda r: (r['employee'].name or '').upper())
 
-    # Apply Sec. 8 eligibility flag — total days must be >= min_days_worked
+    # Sec. 8 flag (informational only — does NOT zero anything)
+    min_days = run.min_days_worked or 30
     for r in rows:
-        r['is_eligible'] = r['total_attendance'] >= (run.min_days_worked or 30)
+        r['is_eligible'] = r['total_attendance'] >= min_days
+        r['total_attendance'] = round(r['total_attendance'], 1)
 
     return rows
 
@@ -628,10 +638,29 @@ def _compute_vaishnavi_bonus_data(run):
 @bonus_bp.route('/bonus/<int:run_id>/statement/vaishnavi-excel')
 def bonus_vaishnavi_excel(run_id):
     """Vaishnavi-format Bonus Statement — Attendance × Daily Rate basis.
-    Matches the SM_Bonus client-delivery sheet exactly: 4 KYC columns
-    (UAN/ESIC, Name, Father, Bonus %) + 12 months × 4 sub-columns
-    (Attendance, Per day wage, Total Wage, Total Bonus) + 3 grand-total
-    columns."""
+    Matches the SM_Bonus client-delivery sheet exactly.
+
+    Computation is intentionally simple — NO CEILING, NO CAP:
+      Per row :  Attendance | Daily Rate | Monthly Wage | Monthly Bonus
+                 (× 12 months)
+      Totals  :  Grand Total Attendance | Grand Total Wage | Grand Total Bonus
+
+    Any error during build is caught and the user is redirected back to the
+    bonus run page with a flash message instead of seeing a raw 500 page.
+    """
+    try:
+        return _build_vaishnavi_excel(run_id)
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        flash(f'Could not build the Vaishnavi Bonus Excel: {exc}. '
+              f'Check that monthly payrolls for the FY have been finalized.', 'danger')
+        return redirect(url_for('bonus.bonus_view', run_id=run_id))
+
+
+def _build_vaishnavi_excel(run_id):
+    """Actual builder — split out so the route handler can wrap it in a
+    top-level try/except for graceful failure."""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
@@ -641,6 +670,14 @@ def bonus_vaishnavi_excel(run_id):
 
     rows = _compute_vaishnavi_bonus_data(run)
     months = _fy_month_keys(run)   # 12 tuples: (year, month, abbr, key)
+
+    if not rows:
+        flash('No finalized payroll data found in the FY '
+              f'{run.fy_label} for this establishment. '
+              'Make sure at least one monthly payroll between Apr '
+              f'{run.start_year} and Mar {run.end_year} is finalized, '
+              'then try again.', 'warning')
+        return redirect(url_for('bonus.bonus_view', run_id=run_id))
 
     wb = Workbook()
     ws = wb.active
@@ -675,8 +712,8 @@ def bonus_vaishnavi_excel(run_id):
 
     # ── Row 2: Establishment + meta line ────────────────────────────────
     meta = (f"{run.establishment.company_name}  |  {run.fy_label}  |  "
-            f"Bonus % : {run.bonus_percentage}%  |  Min Days (Sec.8) : "
-            f"{run.min_days_worked}  |  Basis : Attendance × Daily Rate")
+            f"Bonus % : {run.bonus_percentage}%  |  "
+            f"Basis : Attendance × Daily Rate (no cap, no ceiling)")
     ws.cell(row=2, column=1, value=meta).font = Font(size=9, italic=True, color='475569', name='Calibri')
     ws.cell(row=2, column=1).alignment = center
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=LAST_COL)
