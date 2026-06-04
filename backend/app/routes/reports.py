@@ -1576,7 +1576,9 @@ def _build_form_b_rows(entries, heads, head_map, config, payroll):
             if oh.id in entry.head_amounts:
                 others_amt += entry.head_amounts[oh.id].earned_amount
 
-        # NPH amount: calculate from paid holidays and rate
+        # NPH amount: calculate from paid holidays and rate (full daily rate,
+        # so this column represents the TOTAL paid-holiday earnings across
+        # all heads combined — the Form B convention).
         ph_count = entry.paid_holidays or 0
         if ph_count > 0:
             working_days = payroll.working_days or 26
@@ -1588,6 +1590,35 @@ def _build_form_b_rows(entries, heads, head_map, config, payroll):
                 nph_amt = 0
         else:
             nph_amt = 0
+
+        # ── Bugfix: NPH was being counted twice ──────────────────────────
+        # PayrollEntryHead.earned_amount is computed across the FULL payable
+        # period (days_present + paid_holidays). When we then also show the
+        # NPH amount as its own column, the NPH portion of each earning head
+        # ends up represented twice — once buried inside the Basic / HRA / DA
+        # / Others columns, and again in the NPH column.
+        #
+        # Form B's statutory layout expects each earning head column to show
+        # only the "days actually worked" portion, with NPH carried out into
+        # its own column. So we scale every earning head down by the
+        # days_present / total_payable_days ratio before storing it on the
+        # row. After this the row sums add up correctly:
+        #     Basic + Spl Basic + DA + HRA + Others + NPH + OT = Gross
+        #
+        # Verified against client data: BASALINGAPPA (Days 22, NPH 1, Rate
+        # 943) — before: Basic shown as 21,689 (= 943 × 23); after: 20,746
+        # (= 943 × 22), matching the client's wage register exactly.
+        # ----------------------------------------------------------------
+        total_payable = (entry.days_present or 0) + ph_count
+        if total_payable > 0 and ph_count > 0:
+            days_worked_ratio = (entry.days_present or 0) / total_payable
+            basic_amt     = round(basic_amt     * days_worked_ratio)
+            spl_basic_amt = round(spl_basic_amt * days_worked_ratio)
+            da_amt        = round(da_amt        * days_worked_ratio)
+            hra_amt       = round(hra_amt       * days_worked_ratio)
+            others_amt    = round(others_amt    * days_worked_ratio)
+        # When ph_count == 0 there's no NPH to extract — leave the earning
+        # amounts untouched (no rounding drift on the common case).
 
         row = {
             'sl': 0,  # Will be set in loop
