@@ -238,6 +238,28 @@ def _get_payroll_data(payroll_id, include_zero=False):
         else:
             entry._nph_amount = 0
 
+        # ── Strip NPH portion out of every earning head's earned_amount ──
+        # PayrollEntryHead.earned_amount is stored as the FULL payable-period
+        # value (days_present + paid_holidays).  The statutory wage-register
+        # convention is that each earning column shows only the
+        # days-actually-worked portion, with NPH carried out into its own
+        # column at full daily rate.  Without this scaling, the NPH pay
+        # was being double-counted: once inside Basic / HRA / DA / Others
+        # AND again in the NPH column.
+        #
+        # We mutate the in-memory PayrollEntryHead instance only — nothing
+        # persisted to the database — so Net Pay, EPF wages, ESIC wages and
+        # every other stored figure remain unaffected.
+        #
+        # Applies to ALL reports that read through _get_payroll_data:
+        # Form B, Salary Statement Fmt 2, Salary Statement Fmt 3, etc.
+        total_payable_d = (entry.days_present or 0) + ph_count
+        if ph_count > 0 and total_payable_d > 0:
+            days_worked_ratio = (entry.days_present or 0) / total_payable_d
+            for _peh in entry.head_amounts.values():
+                if _peh.earned_amount:
+                    _peh.earned_amount = round(_peh.earned_amount * days_worked_ratio)
+
     return payroll, est, config, entries, heads
 
 
@@ -1591,34 +1613,9 @@ def _build_form_b_rows(entries, heads, head_map, config, payroll):
         else:
             nph_amt = 0
 
-        # ── Bugfix: NPH was being counted twice ──────────────────────────
-        # PayrollEntryHead.earned_amount is computed across the FULL payable
-        # period (days_present + paid_holidays). When we then also show the
-        # NPH amount as its own column, the NPH portion of each earning head
-        # ends up represented twice — once buried inside the Basic / HRA / DA
-        # / Others columns, and again in the NPH column.
-        #
-        # Form B's statutory layout expects each earning head column to show
-        # only the "days actually worked" portion, with NPH carried out into
-        # its own column. So we scale every earning head down by the
-        # days_present / total_payable_days ratio before storing it on the
-        # row. After this the row sums add up correctly:
-        #     Basic + Spl Basic + DA + HRA + Others + NPH + OT = Gross
-        #
-        # Verified against client data: BASALINGAPPA (Days 22, NPH 1, Rate
-        # 943) — before: Basic shown as 21,689 (= 943 × 23); after: 20,746
-        # (= 943 × 22), matching the client's wage register exactly.
-        # ----------------------------------------------------------------
-        total_payable = (entry.days_present or 0) + ph_count
-        if total_payable > 0 and ph_count > 0:
-            days_worked_ratio = (entry.days_present or 0) / total_payable
-            basic_amt     = round(basic_amt     * days_worked_ratio)
-            spl_basic_amt = round(spl_basic_amt * days_worked_ratio)
-            da_amt        = round(da_amt        * days_worked_ratio)
-            hra_amt       = round(hra_amt       * days_worked_ratio)
-            others_amt    = round(others_amt    * days_worked_ratio)
-        # When ph_count == 0 there's no NPH to extract — leave the earning
-        # amounts untouched (no rounding drift on the common case).
+        # Note: as of the centralized fix in _get_payroll_data, earned_amount
+        # values arrive here already scaled down to the days-worked portion
+        # (NPH carried out into its own column). No further adjustment needed.
 
         row = {
             'sl': 0,  # Will be set in loop
