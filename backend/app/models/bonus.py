@@ -21,10 +21,23 @@ class BonusRun(db.Model):
 
     # Bonus configuration (editable per run, stored as snapshot)
     bonus_percentage = db.Column(db.Float, nullable=False, default=8.33)   # 8.33 to 20
-    wage_ceiling = db.Column(db.Float, nullable=False, default=7000.0)     # Sec 12
+    wage_ceiling = db.Column(db.Float, nullable=False, default=7000.0)     # Sec 12 (legacy / Statement Excel)
     min_wage_floor = db.Column(db.Float, nullable=True)                    # From establishment or manual
-    eligibility_cap = db.Column(db.Float, nullable=False, default=21000.0) # Sec 2(13)
+    eligibility_cap = db.Column(db.Float, nullable=False, default=21000.0) # Sec 2(13) (legacy)
     min_days_worked = db.Column(db.Integer, nullable=False, default=30)    # Sec 8
+
+    # ── Vaishnavi engine settings (drive the simple Attendance×Rate basis) ──
+    # include_holiday_attendance: when TRUE, paid_holidays are added to
+    #   days_present before the "Attendance" column is computed. Daily-wage
+    #   establishments that pay for declared holidays normally want this ON
+    #   so the holiday days count toward the bonus base.
+    # include_overtime_in_wage: when TRUE, ot_amount is added to the
+    #   monthly wage before bonus % is applied. Statutorily OT is NOT part
+    #   of bonus wages (Sec. 2(21) defines salary/wage excluding OT) so
+    #   the default is FALSE — but some clients voluntarily include it,
+    #   so the user can flip this per run.
+    include_holiday_attendance = db.Column(db.Boolean, nullable=False, default=True)
+    include_overtime_in_wage   = db.Column(db.Boolean, nullable=False, default=False)
 
     # Status: draft | finalized
     status = db.Column(db.String(15), nullable=False, default='draft')

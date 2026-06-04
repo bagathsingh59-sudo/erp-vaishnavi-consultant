@@ -99,6 +99,24 @@
                     <label class="form-label small mb-1">Min Days (Sec. 8)</label>
                     <input type="number" name="min_days_worked" class="form-control form-control-sm" value="{{ run.min_days_worked }}"/>
                 </div>
+                <div class="col-md-6 d-flex gap-3 align-items-end">
+                    <div class="form-check small">
+                        <input class="form-check-input" type="checkbox" id="rcHol"
+                               name="include_holiday_attendance"
+                               {% if run.include_holiday_attendance %}checked{% endif %}>
+                        <label class="form-check-label" for="rcHol">
+                            Include paid holidays in attendance
+                        </label>
+                    </div>
+                    <div class="form-check small">
+                        <input class="form-check-input" type="checkbox" id="rcOt"
+                               name="include_overtime_in_wage"
+                               {% if run.include_overtime_in_wage %}checked{% endif %}>
+                        <label class="form-check-label" for="rcOt">
+                            Include OT in monthly wage
+                        </label>
+                    </div>
+                </div>
                 <div class="col-md-3">
                     <button class="btn btn-sm btn-warning w-100"><i class="bi bi-arrow-clockwise"></i> Recalculate</button>
                 </div>
@@ -106,7 +124,9 @@
         </form>
         {% else %}
         <div class="small text-muted">
-            {{ run.bonus_percentage }}% | Min Days (Sec. 8): {{ run.min_days_worked }}
+            {{ run.bonus_percentage }}% | Min Days (Sec. 8): {{ run.min_days_worked }} |
+            Holidays in attendance: <strong>{{ 'YES' if run.include_holiday_attendance else 'NO' }}</strong> |
+            OT in wage: <strong>{{ 'YES' if run.include_overtime_in_wage else 'NO' }}</strong>
         </div>
         {% endif %}
     </div>

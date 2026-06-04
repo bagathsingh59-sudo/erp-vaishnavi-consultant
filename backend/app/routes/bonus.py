@@ -102,6 +102,8 @@ def _calculate_bonus_run(run):
     """
     bonus_pct = (run.bonus_percentage or 8.33) / 100.0
     min_days  = run.min_days_worked or 30
+    include_holidays = bool(getattr(run, 'include_holiday_attendance', True))
+    include_ot       = bool(getattr(run, 'include_overtime_in_wage',  False))
 
     # Pull all payrolls for this est across the FY months
     payrolls = MonthlyPayroll.query.filter(
@@ -128,9 +130,12 @@ def _calculate_bonus_run(run):
         if not emp_id:
             continue
 
-        # Attendance for bonus = days the employee was PAID for
-        #   (days actually worked + paid holidays).
-        attendance = float(entry.days_present or 0) + float(entry.paid_holidays or 0)
+        # Attendance per the user's chosen convention:
+        #   include_holidays = TRUE  -> days_present + paid_holidays
+        #   include_holidays = FALSE -> days_present only
+        present = float(entry.days_present or 0)
+        ph      = float(entry.paid_holidays or 0)
+        attendance = present + ph if include_holidays else present
 
         # Daily rate detection (matches Form B / Salary Statement convention):
         #   gross_salary ≤ ₹2,000 → already a daily rate (daily-wage workers)
@@ -141,7 +146,11 @@ def _calculate_bonus_run(run):
         if attendance > 0 and gross > 0:
             daily_rate = gross if gross <= 2000 else (gross / wd)
 
-        monthly_wage  = round(attendance * daily_rate)
+        # Overtime, if the user opted to include it. Sec. 2(21) of the
+        # Bonus Act excludes OT from "salary or wage", so OFF by default.
+        ot_amt = float(entry.ot_amount or 0) if include_ot else 0.0
+
+        monthly_wage  = round(attendance * daily_rate + ot_amt)
         monthly_bonus = round(monthly_wage * bonus_pct)
         month_key     = f"{payroll.year}-{payroll.month:02d}"
 
@@ -232,17 +241,13 @@ def bonus_new():
         est_id = request.form.get('establishment_id', type=int)
         start_year = request.form.get('start_year', type=int)
         bonus_pct = request.form.get('bonus_percentage', type=float) or 8.33
-        wage_ceiling = request.form.get('wage_ceiling', type=float) or 7000.0
-        min_wage_floor = request.form.get('min_wage_floor', type=float)
-        eligibility_cap = request.form.get('eligibility_cap', type=float) or 21000.0
         min_days = request.form.get('min_days_worked', type=int) or 30
+        # Vaishnavi engine toggles — checkbox presence in form = True.
+        include_holidays = 'include_holiday_attendance' in request.form
+        include_ot       = 'include_overtime_in_wage'   in request.form
 
         est = Establishment.query.get_or_404(est_id)
         verify_est_ownership(est)
-
-        # If min_wage_floor not provided, pull from establishment
-        if not min_wage_floor and est.bonus_min_wage:
-            min_wage_floor = est.bonus_min_wage
 
         # Prevent duplicate run for same est + FY
         existing = BonusRun.query.filter_by(
@@ -257,10 +262,9 @@ def bonus_new():
             start_year=start_year,
             end_year=start_year + 1,
             bonus_percentage=bonus_pct,
-            wage_ceiling=wage_ceiling,
-            min_wage_floor=min_wage_floor,
-            eligibility_cap=eligibility_cap,
             min_days_worked=min_days,
+            include_holiday_attendance=include_holidays,
+            include_overtime_in_wage=include_ot,
             status='draft',
         )
         db.session.add(run)
@@ -297,13 +301,13 @@ def bonus_recalculate(run_id):
     if run.status == 'finalized':
         flash('Cannot recalculate a finalized run. Unfinalize first.', 'warning')
         return redirect(url_for('bonus.bonus_view', run_id=run_id))
-    # Allow updating config
+    # Allow updating config — only the fields the simplified UI exposes.
+    # Wage ceiling / eligibility cap stay at whatever they were (used only
+    # by the legacy Basic+DA Statement Excel).
     run.bonus_percentage = request.form.get('bonus_percentage', type=float) or run.bonus_percentage
-    run.wage_ceiling = request.form.get('wage_ceiling', type=float) or run.wage_ceiling
-    mwf = request.form.get('min_wage_floor', type=float)
-    run.min_wage_floor = mwf if mwf else None
-    run.eligibility_cap = request.form.get('eligibility_cap', type=float) or run.eligibility_cap
-    run.min_days_worked = request.form.get('min_days_worked', type=int) or run.min_days_worked
+    run.min_days_worked  = request.form.get('min_days_worked',  type=int)   or run.min_days_worked
+    run.include_holiday_attendance = 'include_holiday_attendance' in request.form
+    run.include_overtime_in_wage   = 'include_overtime_in_wage'   in request.form
     db.session.commit()
     _calculate_bonus_run(run)
     flash('Bonus recalculated with updated configuration.', 'success')
@@ -478,10 +482,12 @@ def bonus_form_c_excel(run_id):
         ws.merge_cells(start_row=r, start_column=3, end_row=r, end_column=TOTAL_COLS)
         r += 1
 
-    # Meta strip — bonus %, payment date, etc., on one row
+    # Meta strip — bonus %, settings, payment date
     meta_parts = [
         f"Bonus Percentage: {run.bonus_percentage}%",
         f"Min Days (Sec. 8): {run.min_days_worked}",
+        f"Holidays in attendance: {'YES' if run.include_holiday_attendance else 'NO'}",
+        f"OT in wage: {'YES' if run.include_overtime_in_wage else 'NO'}",
     ]
     if run.payment_date:
         meta_parts.append(f"Date of Payment: {run.payment_date.strftime('%d-%m-%Y')}")
@@ -901,8 +907,11 @@ def _build_vaishnavi_excel(run_id):
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=LAST_COL)
 
     # ── Row 2: Establishment + meta line ────────────────────────────────
+    inc_h = 'YES' if run.include_holiday_attendance else 'NO'
+    inc_o = 'YES' if run.include_overtime_in_wage   else 'NO'
     meta = (f"{run.establishment.company_name}  |  {run.fy_label}  |  "
             f"Bonus % : {run.bonus_percentage}%  |  "
+            f"Holidays in attendance : {inc_h}  |  OT in wage : {inc_o}  |  "
             f"Basis : Attendance × Daily Rate (no cap, no ceiling)")
     ws.cell(row=2, column=1, value=meta).font = Font(size=9, italic=True, color='475569', name='Calibri')
     ws.cell(row=2, column=1).alignment = center

@@ -631,6 +631,22 @@ def _auto_migrate_columns(db):
         db.session.rollback()
         print(f"  [MIGRATE] payroll_input_files table: {e}")
 
+    # ── Bonus run: per-run wage-composition toggles ─────────────────────
+    # Lets the user pick whether attendance includes paid holidays and
+    # whether overtime wages are added into the bonus base.  Both default
+    # to the most common Indian convention for daily-wage establishments
+    # (include holidays = TRUE, include OT = FALSE).
+    for ddl in [
+        "ALTER TABLE bonus_runs ADD COLUMN IF NOT EXISTS include_holiday_attendance BOOLEAN NOT NULL DEFAULT TRUE",
+        "ALTER TABLE bonus_runs ADD COLUMN IF NOT EXISTS include_overtime_in_wage   BOOLEAN NOT NULL DEFAULT FALSE",
+    ]:
+        try:
+            db.session.execute(db.text(ddl))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"  [MIGRATE] {ddl.split(' ADD ')[0]}: {e}")
+
     # ── Per-establishment fee-billing cycle anchor month ──
     # NULL for Monthly establishments (unused).
     # Quarterly: anchor = the first billing month of the cycle (e.g. 6=June).
