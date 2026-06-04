@@ -397,6 +397,239 @@ def bonus_statement(run_id):
                            months=months, generated_on=generated_on)
 
 
+@bonus_bp.route('/bonus/<int:run_id>/form-c/excel')
+def bonus_form_c_excel(run_id):
+    """Form C (Bonus Paid Register) — Excel download in Legal Landscape.
+    Mirrors the HTML form_c view column-for-column so the statutory layout
+    stays identical between print and Excel."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    run = BonusRun.query.get_or_404(run_id)
+    verify_est_ownership(run.establishment)
+
+    entries = (BonusEntry.query
+               .filter_by(bonus_run_id=run_id)
+               .join(Employee)
+               .order_by(Employee.emp_code)
+               .all())
+    # Only eligible employees on Form C — matches the HTML view.
+    entries = [e for e in entries if e.is_eligible]
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Form C"
+
+    # ── Styles (Calibri throughout — Form C is a statutory format and
+    #    Calibri at the small body size prints cleanly on Legal sheets) ──
+    title_font   = Font(bold=True, size=14, name='Calibri')
+    subtitle_fnt = Font(bold=True, size=10, name='Calibri')
+    info_font    = Font(size=9, name='Calibri')
+    info_bold    = Font(bold=True, size=9, name='Calibri')
+    header_font  = Font(bold=True, size=8.5, name='Calibri')
+    body_font    = Font(size=9, name='Calibri')
+    body_bold    = Font(bold=True, size=9, name='Calibri')
+    total_font   = Font(bold=True, size=9.5, name='Calibri')
+
+    thin   = Side(border_style='thin', color='475569')
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    center = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    right  = Alignment(horizontal='right', vertical='center')
+    left   = Alignment(horizontal='left', vertical='center', wrap_text=True)
+
+    header_fill = PatternFill(start_color='F1F5F9', end_color='F1F5F9', fill_type='solid')
+    total_fill  = PatternFill(start_color='D9EAD3', end_color='D9EAD3', fill_type='solid')
+
+    TOTAL_COLS = 12  # Sr + 11 statutory columns
+
+    # ── Title block (centred, merged across all columns) ──
+    ws.cell(row=1, column=1, value="FORM C").font = title_font
+    ws.cell(row=1, column=1).alignment = center
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=TOTAL_COLS)
+
+    ws.cell(row=2, column=1, value="[See Rule 4(c)]").font = subtitle_fnt
+    ws.cell(row=2, column=1).alignment = center
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=TOTAL_COLS)
+
+    ws.cell(row=3, column=1, value="BONUS PAID REGISTER").font = subtitle_fnt
+    ws.cell(row=3, column=1).alignment = center
+    ws.merge_cells(start_row=3, start_column=1, end_row=3, end_column=TOTAL_COLS)
+
+    ws.cell(row=4, column=1, value="(Under the Payment of Bonus Act, 1965)").font = info_font
+    ws.cell(row=4, column=1).alignment = center
+    ws.merge_cells(start_row=4, start_column=1, end_row=4, end_column=TOTAL_COLS)
+
+    # ── Establishment info block ──
+    est = run.establishment
+    info_rows = [
+        ('Name of the Establishment:', (est.company_name or '').upper()),
+        ('Address:',                   est.address or ''),
+        ('Accounting Year:',           f"{run.fy_label} (01-Apr-{run.start_year} to 31-Mar-{run.end_year})"),
+    ]
+    r = 6
+    for label, value in info_rows:
+        ws.cell(row=r, column=1, value=label).font = info_bold
+        ws.cell(row=r, column=1).alignment = left
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=2)
+        ws.cell(row=r, column=3, value=value).font = info_font
+        ws.cell(row=r, column=3).alignment = left
+        ws.merge_cells(start_row=r, start_column=3, end_row=r, end_column=TOTAL_COLS)
+        r += 1
+
+    # Meta strip — bonus %, payment date, etc., on one row
+    meta_parts = [
+        f"Bonus Percentage: {run.bonus_percentage}%",
+        f"Min Days (Sec. 8): {run.min_days_worked}",
+    ]
+    if run.payment_date:
+        meta_parts.append(f"Date of Payment: {run.payment_date.strftime('%d-%m-%Y')}")
+    ws.cell(row=r, column=1, value='   |   '.join(meta_parts)).font = info_bold
+    ws.cell(row=r, column=1).alignment = left
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=TOTAL_COLS)
+    r += 2   # one blank row before the table
+
+    # ── Table header (12 columns matching the HTML view) ──
+    header_row = r
+    headers = [
+        'Sr\nNo.',
+        'Name of the\nEmployee',
+        "Father's /\nHusband's Name",
+        'Designation',
+        'No. of days\nworked in the\naccounting year',
+        'Total salary\nor wage in respect\nof the accounting year\n(₹)',
+        'Amount of\nbonus payable\nunder Sec. 10 or 11\n(₹)',
+        'Deductions, if any,\non a/c of Puja bonus\nor other customary\nbonus',
+        'Deductions on\naccount of financial\nloss, if any, caused\nby misconduct',
+        'Amount\nactually paid\n(₹)',
+        'Date on\nwhich paid',
+        'Signature /\nThumb impression\nof the employee',
+    ]
+    for col, h in enumerate(headers, 1):
+        c = ws.cell(row=header_row, column=col, value=h)
+        c.font = header_font
+        c.fill = header_fill
+        c.alignment = center
+        c.border = border
+    ws.row_dimensions[header_row].height = 56
+
+    # ── Data rows ──
+    data_start = header_row + 1
+    payment_date_str = run.payment_date.strftime('%d-%m-%Y') if run.payment_date else ''
+    t_wage  = 0
+    t_bonus = 0
+    t_paid  = 0
+    for idx, e in enumerate(entries, 1):
+        rr = data_start + idx - 1
+        emp = e.employee
+        bonus_val = float(e.override_amount if e.override_amount is not None else (e.bonus_at_actual or 0))
+        wage_val  = float(e.total_basic_da or 0)
+        cells = [
+            (1, idx,                                                  center, body_font),
+            (2, emp.name,                                             left,   body_bold),
+            (3, emp.father_husband_name or '',                        left,   body_font),
+            (4, emp.designation or '',                                left,   body_font),
+            (5, int(e.total_days_worked or 0),                        center, body_font),
+            (6, round(wage_val),                                      right,  body_font),
+            (7, round(bonus_val),                                     right,  body_bold),
+            (8, '',                                                   center, body_font),
+            (9, '',                                                   center, body_font),
+            (10, round(bonus_val),                                    right,  body_bold),
+            (11, payment_date_str,                                    center, body_font),
+            (12, '',                                                  center, body_font),
+        ]
+        for col, val, align, font in cells:
+            c = ws.cell(row=rr, column=col, value=val)
+            c.font = font
+            c.alignment = align
+            c.border = border
+            if col in (6, 7, 10) and isinstance(val, (int, float)) and val:
+                c.number_format = '#,##0'
+        ws.row_dimensions[rr].height = 22
+        t_wage  += wage_val
+        t_bonus += bonus_val
+        t_paid  += bonus_val
+
+    # ── Total row ──
+    total_row = data_start + len(entries)
+    label_cell = ws.cell(row=total_row, column=1, value=f"TOTAL ({len(entries)} Employees)")
+    label_cell.font = total_font
+    label_cell.alignment = center
+    label_cell.fill = total_fill
+    label_cell.border = border
+    ws.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=5)
+    # Fill borders on the merged-into cells too (openpyxl needs each cell styled)
+    for col in range(2, 6):
+        ws.cell(row=total_row, column=col).border = border
+        ws.cell(row=total_row, column=col).fill = total_fill
+
+    totals = [
+        (6,  round(t_wage),  right),
+        (7,  round(t_bonus), right),
+        (8,  '',             center),
+        (9,  '',             center),
+        (10, round(t_paid),  right),
+        (11, '',             center),
+        (12, '',             center),
+    ]
+    for col, val, align in totals:
+        c = ws.cell(row=total_row, column=col, value=val)
+        c.font = total_font
+        c.alignment = align
+        c.fill = total_fill
+        c.border = border
+        if isinstance(val, (int, float)) and val:
+            c.number_format = '#,##0'
+    ws.row_dimensions[total_row].height = 26
+
+    # ── Signature block (3 rows below totals) ──
+    sig_row = total_row + 3
+    ws.cell(row=sig_row,     column=1, value='Signature of Employer:').font = info_bold
+    ws.cell(row=sig_row + 1, column=1, value='_______________________').font = info_font
+    ws.cell(row=sig_row,     column=10, value='Date:').font = info_bold
+    ws.cell(row=sig_row,     column=11, value='_______________').font = info_font
+    ws.cell(row=sig_row + 1, column=10, value='Place:').font = info_bold
+    ws.cell(row=sig_row + 1, column=11, value='_______________').font = info_font
+
+    # ── Generated footer ──
+    footer_row = sig_row + 4
+    ws.cell(row=footer_row, column=1,
+            value=f"Generated: {datetime.now().strftime('%d %b %Y, %I:%M %p')}   |   Vaishnavi Consultant"
+            ).font = Font(size=8, italic=True, color='64748B', name='Calibri')
+    ws.cell(row=footer_row, column=1).alignment = center
+    ws.merge_cells(start_row=footer_row, start_column=1, end_row=footer_row, end_column=TOTAL_COLS)
+
+    # ── Column widths (tuned for Legal landscape fit) ──
+    widths = [5, 22, 22, 14, 11, 14, 14, 16, 18, 12, 11, 18]
+    for i, w in enumerate(widths, 1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+    # ── Print setup — Legal Landscape, fit-to-width ──
+    ws.page_setup.orientation = 'landscape'
+    ws.page_setup.paperSize   = 5   # 5 = Legal
+    ws.page_setup.fitToWidth  = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.print_options.horizontalCentered = True
+    ws.page_margins.left   = 0.4
+    ws.page_margins.right  = 0.4
+    ws.page_margins.top    = 0.5
+    ws.page_margins.bottom = 0.5
+
+    # Repeat header rows on every printed page
+    ws.print_title_rows = f'{header_row}:{header_row}'
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    safe_name = (run.establishment.company_name or 'Establishment').replace(' ', '_').replace('/', '_')[:60]
+    filename = f"Form_C_{safe_name}_{run.fy_label.replace(' ', '_')}.xlsx"
+    return send_file(output,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True, download_name=filename)
+
+
 @bonus_bp.route('/bonus/<int:run_id>/form-c')
 def bonus_form_c(run_id):
     """Form C — Bonus Paid Register (statutory format)."""

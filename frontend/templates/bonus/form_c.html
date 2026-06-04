@@ -35,6 +35,10 @@
 <div class="no-print mb-3 d-flex gap-2">
     <a href="{{ url_for('bonus.bonus_view', run_id=run.id) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
     <button onclick="window.print()" class="btn btn-sm btn-primary"><i class="bi bi-printer"></i> Print / PDF</button>
+    <a href="{{ url_for('bonus.bonus_form_c_excel', run_id=run.id) }}" class="btn btn-sm"
+       style="background:#1d4ed8; border:none; color:#fff;">
+        <i class="bi bi-file-earmark-spreadsheet-fill"></i> Download Excel (Legal Landscape)
+    </a>
 </div>
 
 <div class="fc-page">

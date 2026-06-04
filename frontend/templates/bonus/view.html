@@ -23,6 +23,15 @@
     <a href="{{ url_for('bonus.bonus_form_c', run_id=run.id) }}" class="btn btn-sm btn-primary">
         <i class="bi bi-file-earmark-check"></i> Form C (Register)
     </a>
+    {# Form C Excel — Legal landscape, statutory column order, fit-to-width.
+       Mirrors the HTML Form C view but downloads as .xlsx for clients
+       who archive in Excel rather than print to PDF. #}
+    <a href="{{ url_for('bonus.bonus_form_c_excel', run_id=run.id) }}"
+       class="btn btn-sm"
+       style="background:#1d4ed8; border:none; color:#fff; font-weight:600;"
+       title="Form C — Bonus Paid Register, Legal Landscape Excel">
+        <i class="bi bi-file-earmark-spreadsheet-fill"></i> Form C Excel
+    </a>
     {% if run.status != 'finalized' %}
     <form method="POST" action="{{ url_for('bonus.bonus_delete', run_id=run.id) }}"
           onsubmit="return confirm('Delete this bonus run? This cannot be undone.')" class="d-inline">
