@@ -1,10 +1,16 @@
 # [TRIAL: doc-pack] -----------------------------------------------------------
-# Builds the per-payroll Document Pack ZIP by re-using each existing report
-# endpoint via Flask's test_client. This means:
-#   • We DON'T duplicate any report generation logic.
-#   • We DON'T modify any existing report endpoint.
-#   • Whatever the existing UI's download button produces is what lands in
-#     the ZIP — automatic.
+# Builds the per-payroll Document Pack ZIP by calling each existing report's
+# view function DIRECTLY (no HTTP, no test_client). This means:
+#   • Auth context is already valid — we're inside the user's own request.
+#   • No duplication of report generation logic — we reuse the exact view
+#     code path the real download buttons use.
+#   • No modifications to any existing report endpoint.
+#
+# Earlier the builder used Flask's test_client to fetch each endpoint over
+# internal HTTP. That approach failed when the app uses Clerk auth (or any
+# header / context-bound auth) because cookies alone don't survive the
+# test_client's fresh request context. Result: every report got `[skip]`'d
+# and the ZIP only contained the empty 03_Govt_Receipts folder.
 #
 # To FULLY REMOVE the trial: delete this whole file. No other module imports
 # from it except backend/app/routes/doc_pack_trial.py (also part of the trial).
@@ -15,64 +21,15 @@ import re
 import zipfile
 from datetime import datetime
 
-from flask import current_app
-
 
 # ──────────────────────────────────────────────────────────────────────────
-# The catalogue: every URL we'll fetch into the ZIP, with its final
-# destination folder + filename. None values are filled in at runtime
-# from the establishment / payroll for the filename convention.
+# The catalogue: every report we'll include in the ZIP, with its final
+# destination folder + filename + a callable that returns bytes/string.
+# Each builder is a closure over (payroll, est) so we don't need to thread
+# arguments through the catalogue.
+# Any callable that raises an Exception is logged in the README.txt
+# manifest as [skip], so a partial pack is preferable to a failed pack.
 # ──────────────────────────────────────────────────────────────────────────
-# Each entry: (folder_in_zip, filename_template, endpoint_path_template)
-# {est} = sanitised establishment name, {month} = MonthName, {year} = year
-# Any endpoint that 404s, redirects or errors is logged and skipped — the
-# pack is built best-effort so a missing report (e.g. no EPF applicability)
-# doesn't break the whole pack.
-DOC_CATALOGUE = [
-    # 1. Monthly Statement to client — Format 2 (Modern Professional) view
-    ('01_Reports', 'Monthly_Statement.html',
-     '/payroll/{payroll_id}/report/statement-format2'),
-
-    # 2. Form B (Wage Register) — Excel
-    ('01_Reports', 'Form_B_Wage_Register.xlsx',
-     '/payroll/{payroll_id}/report/form-b/excel'),
-
-    # 3. Form D (Attendance) — Excel
-    ('01_Reports', 'Form_D_Attendance.xlsx',
-     '/payroll/{payroll_id}/report/form-d/excel'),
-
-    # 4. Form D (Attendance) 26-25 — Excel
-    ('01_Reports', 'Form_D_Attendance_26-25.xlsx',
-     '/payroll/{payroll_id}/report/form-d-2625/excel'),
-
-    # 5. Payslip — Form XIX HTML (print to PDF from browser if needed)
-    ('01_Reports', 'Payslip_Form_XIX.html',
-     '/payroll/{payroll_id}/report/payslip-form-xix'),
-
-    # 6a. EPF ECR — Text (.txt) for EPFO portal upload
-    ('02_Statutory_Inputs', 'EPF_ECR.txt',
-     '/payroll/{payroll_id}/report/epf-ecr-text'),
-
-    # 6b. EPF ECR — CSV
-    ('02_Statutory_Inputs', 'EPF_ECR.csv',
-     '/payroll/{payroll_id}/report/epf-ecr-csv'),
-
-    # 7. ESIC MC Template (.xls) for ESIC portal upload
-    ('02_Statutory_Inputs', 'ESIC_MC_Template.xls',
-     '/payroll/{payroll_id}/report/esic-excel'),
-
-    # 8. Reimbursement Letter — HTML
-    ('01_Reports', 'Reimbursement_Letter.html',
-     '/payroll/{payroll_id}/report/reimbursement'),
-
-    # 9a. Compliance Statement — Monthly (HTML)
-    ('01_Reports', 'Compliance_Statement_Monthly.html',
-     '/payroll/{payroll_id}/report/compliance'),
-
-    # 9b. Compliance Statement — Annual (HTML) — needs est_id (not payroll_id)
-    ('01_Reports', 'Compliance_Statement_Annual.html',
-     '/establishment/{establishment_id}/report/compliance-annual'),
-]
 
 
 def _sanitise(name):
@@ -84,27 +41,101 @@ def _sanitise(name):
     return cleaned[:80] or 'Unknown'
 
 
-def _fetch_endpoint_bytes(path, session_cookies):
-    """Internal HTTP request via Flask test_client. Returns (bytes, error_str).
-    Error string is non-None when the endpoint didn't produce content."""
-    try:
-        with current_app.test_client() as client:
-            # Forward the caller's session so verify_est_ownership() etc. work.
-            for name, value in session_cookies.items():
-                client.set_cookie('localhost', name, value)
-            resp = client.get(path, follow_redirects=False)
-            if resp.status_code == 200:
-                return resp.data, None
-            if resp.status_code in (301, 302, 303):
-                # Endpoint redirected — usually a "not applicable" flash + back to process page.
-                return None, f'skipped (redirect to {resp.headers.get("Location", "?")})'
-            return None, f'HTTP {resp.status_code}'
-    except Exception as exc:
-        return None, f'exception: {exc}'
+def _capture_view_bytes(view_func, *args, **kwargs):
+    """Call a Flask view function directly within the active request context
+    and return its response as raw bytes.
+
+    Handles:
+      • render_template strings  -> encode utf-8
+      • send_file responses      -> get_data()
+      • bytes / bytearray        -> as-is
+      • Flask Response from any  -> get_data()
+      • Redirects                -> raise so caller can [skip]
+    """
+    result = view_func(*args, **kwargs)
+    # Plain string (render_template result)
+    if isinstance(result, str):
+        return result.encode('utf-8')
+    # Bytes already
+    if isinstance(result, (bytes, bytearray)):
+        return bytes(result)
+    # Flask Response object
+    status = getattr(result, 'status_code', 200)
+    if status in (301, 302, 303, 307, 308):
+        loc = result.headers.get('Location', '?') if hasattr(result, 'headers') else '?'
+        raise RuntimeError(f'view redirected to {loc} (likely not applicable for this payroll)')
+    if status != 200:
+        raise RuntimeError(f'view returned HTTP {status}')
+    # Some responses use direct_passthrough — toggle it off so .get_data()
+    # works without raising.
+    if getattr(result, 'direct_passthrough', False):
+        result.direct_passthrough = False
+    if hasattr(result, 'get_data'):
+        return result.get_data()
+    raise RuntimeError(f'cannot extract bytes from view return type {type(result).__name__}')
 
 
-def build_pack_zip(payroll, est, session_cookies):
+def _build_catalogue(payroll, est):
+    """Returns a list of (folder, filename, fetcher_callable) tuples for the
+    requested ZIP. Each fetcher returns bytes when called with no args.
+    Imports of report view functions are LAZY so that removing the trial
+    module never breaks at import-time."""
+    from app.routes import reports as rpt
+
+    catalogue = [
+        # 1. Monthly Statement (Format 2 — Modern Professional) — HTML
+        ('01_Reports', 'Monthly_Statement.html',
+         lambda: _capture_view_bytes(rpt.statement_format2, payroll.id)),
+
+        # 2. Form B (Wage Register) — Excel
+        ('01_Reports', 'Form_B_Wage_Register.xlsx',
+         lambda: _capture_view_bytes(rpt.form_b_excel, payroll.id)),
+
+        # 3. Form D (Attendance) — Excel
+        ('01_Reports', 'Form_D_Attendance.xlsx',
+         lambda: _capture_view_bytes(rpt.form_d_excel, payroll.id)),
+
+        # 4. Form D (Attendance) 26-25 — Excel
+        ('01_Reports', 'Form_D_Attendance_26-25.xlsx',
+         lambda: _capture_view_bytes(rpt.form_d_2625_excel, payroll.id)),
+
+        # 5. Payslip — Form XIX (HTML; print to PDF from browser if needed)
+        ('01_Reports', 'Payslip_Form_XIX.html',
+         lambda: _capture_view_bytes(rpt.payslip_form_xix, payroll.id)),
+
+        # 6a. EPF ECR — Text (.txt) for EPFO portal upload
+        ('02_Statutory_Inputs', 'EPF_ECR.txt',
+         lambda: _capture_view_bytes(rpt.epf_ecr_text, payroll.id)),
+
+        # 6b. EPF ECR — CSV
+        ('02_Statutory_Inputs', 'EPF_ECR.csv',
+         lambda: _capture_view_bytes(rpt.epf_ecr_csv, payroll.id)),
+
+        # 7. ESIC MC Template (.xls) for ESIC portal upload
+        ('02_Statutory_Inputs', 'ESIC_MC_Template.xls',
+         lambda: _capture_view_bytes(rpt.esic_excel, payroll.id)),
+
+        # 8. Reimbursement Letter — HTML
+        ('01_Reports', 'Reimbursement_Letter.html',
+         lambda: _capture_view_bytes(rpt.reimbursement_view, payroll.id)),
+
+        # 9a. Compliance Statement — Monthly (HTML)
+        ('01_Reports', 'Compliance_Statement_Monthly.html',
+         lambda: _capture_view_bytes(rpt.compliance_monthly, payroll.id)),
+
+        # 9b. Compliance Statement — Annual (HTML) — keyed by est_id, not payroll_id
+        ('01_Reports', 'Compliance_Statement_Annual.html',
+         lambda: _capture_view_bytes(rpt.compliance_annual, est.id)),
+    ]
+    return catalogue
+
+
+def build_pack_zip(payroll, est, session_cookies=None):
     """Build the Document Pack ZIP for one payroll period.
+
+    `session_cookies` is accepted for backward compatibility with the
+    previous (test_client-based) signature but is now ignored — we call
+    view functions directly within the existing request context.
 
     Returns (zip_bytes, pack_filename, manifest_lines).
     manifest_lines is a list of "[ok] folder/file" or "[skip] folder/file: reason"
@@ -127,19 +158,19 @@ def build_pack_zip(payroll, est, session_cookies):
     ]
 
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-        # ── Fetch each report ─────────────────────────────────────────────
-        for folder, filename, path_template in DOC_CATALOGUE:
-            path = path_template.format(
-                payroll_id=payroll.id,
-                establishment_id=est.id,
-            )
-            data, err = _fetch_endpoint_bytes(path, session_cookies)
+        # ── Run each builder ──────────────────────────────────────────────
+        for folder, filename, fetcher in _build_catalogue(payroll, est):
             arc_path = f'{folder}/{filename}'
-            if data is not None and len(data) > 0:
+            try:
+                data = fetcher()
+                if data is None or len(data) == 0:
+                    manifest.append(f'[skip] {arc_path}  — empty response')
+                    continue
                 zf.writestr(arc_path, data)
                 manifest.append(f'[ok]   {arc_path}  ({len(data) / 1024:.1f} KB)')
-            else:
-                manifest.append(f'[skip] {arc_path}  — {err or "no content"}')
+            except Exception as exc:
+                # Catch ANY error so one bad report can't break the whole pack
+                manifest.append(f'[skip] {arc_path}  — {exc}')
 
         # ── Reserved folder for the staff to drop govt receipts into ──────
         # ZipFile doesn't write empty directories, so we drop a placeholder.

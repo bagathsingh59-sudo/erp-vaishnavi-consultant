@@ -33,12 +33,9 @@ def generate_pack(payroll_id):
     payroll = MonthlyPayroll.query.get_or_404(payroll_id)
     verify_est_ownership(payroll.establishment)
 
-    # Forward ALL request cookies (Flask session + Clerk auth + any others)
-    # to the test_client inside build_pack_zip so the view functions it
-    # invokes see the same authenticated user as this request does.
-    cookies = {k: v for k, v in request.cookies.items()}
-
-    zip_bytes, pack_name, _ = build_pack_zip(payroll, payroll.establishment, cookies)
+    # The builder now calls report view functions directly within this
+    # active request context — no test_client, no cookie forwarding needed.
+    zip_bytes, pack_name, _ = build_pack_zip(payroll, payroll.establishment)
 
     return send_file(
         io.BytesIO(zip_bytes),
