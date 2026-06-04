@@ -52,14 +52,14 @@
     </div>
     <div class="col-md-3">
         <div class="card shadow-sm"><div class="card-body py-2 px-3">
-            <div class="text-muted small">Bonus @ Ceiling (₹{{ run.effective_ceiling|int }})</div>
-            <div class="fw-bold text-success">₹{{ "{:,.0f}".format(run.total_bonus_ceiling or 0) }}</div>
+            <div class="text-muted small">Total Wage (Apr–Mar)</div>
+            <div class="fw-bold text-info">₹{{ "{:,.0f}".format(run.total_bonus_actual * 100 / (run.bonus_percentage or 8.33) if run.bonus_percentage else 0) }}</div>
         </div></div>
     </div>
     <div class="col-md-3">
         <div class="card shadow-sm"><div class="card-body py-2 px-3">
-            <div class="text-muted small">Bonus @ Actual Basic+DA</div>
-            <div class="fw-bold text-primary">₹{{ "{:,.0f}".format(run.total_bonus_actual or 0) }}</div>
+            <div class="text-muted small">Total Bonus ({{ run.bonus_percentage }}%)</div>
+            <div class="fw-bold text-success">₹{{ "{:,.0f}".format(run.total_bonus_actual or 0) }}</div>
         </div></div>
     </div>
 </div>
@@ -67,12 +67,18 @@
 <!-- Configuration card (editable if draft) -->
 <div class="card shadow-sm mb-3">
     <div class="card-body">
-        <h6 class="fw-bold text-muted mb-3">Configuration</h6>
+        <h6 class="fw-bold text-muted mb-1">Configuration</h6>
+        <p class="small text-muted mb-3">
+            <i class="bi bi-info-circle"></i>
+            Calculation: <strong>Attendance × Daily Rate × Bonus %</strong> per month, summed Apr–Mar.
+            No wage ceiling, no eligibility cap. Only Min Days (Sec. 8) decides whether an employee
+            is shown as Eligible or Not Eligible.
+        </p>
         {% if run.status != 'finalized' %}
         <form method="POST" action="{{ url_for('bonus.bonus_recalculate', run_id=run.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-            <div class="row g-2">
-                <div class="col-md-2">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-3">
                     <label class="form-label small mb-1">Bonus %</label>
                     <select name="bonus_percentage" class="form-select form-select-sm">
                         {% for v in [8.33, 10, 12, 15, 18, 20] %}
@@ -80,33 +86,18 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-2">
-                    <label class="form-label small mb-1">Wage Ceiling</label>
-                    <input type="number" step="0.01" name="wage_ceiling" class="form-control form-control-sm" value="{{ run.wage_ceiling }}"/>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label small mb-1">Min Wage Floor</label>
-                    <input type="number" step="0.01" name="min_wage_floor" class="form-control form-control-sm" value="{{ run.min_wage_floor or '' }}"/>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label small mb-1">Eligibility Cap</label>
-                    <input type="number" step="0.01" name="eligibility_cap" class="form-control form-control-sm" value="{{ run.eligibility_cap }}"/>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label small mb-1">Min Days</label>
+                <div class="col-md-3">
+                    <label class="form-label small mb-1">Min Days (Sec. 8)</label>
                     <input type="number" name="min_days_worked" class="form-control form-control-sm" value="{{ run.min_days_worked }}"/>
                 </div>
-                <div class="col-md-2 d-flex align-items-end">
+                <div class="col-md-3">
                     <button class="btn btn-sm btn-warning w-100"><i class="bi bi-arrow-clockwise"></i> Recalculate</button>
                 </div>
             </div>
         </form>
         {% else %}
         <div class="small text-muted">
-            {{ run.bonus_percentage }}% | Ceiling ₹{{ run.wage_ceiling }} |
-            Min Wage Floor ₹{{ run.min_wage_floor or '—' }} |
-            Eligibility Cap ₹{{ run.eligibility_cap }} |
-            Min Days {{ run.min_days_worked }}
+            {{ run.bonus_percentage }}% | Min Days (Sec. 8): {{ run.min_days_worked }}
         </div>
         {% endif %}
     </div>
@@ -121,33 +112,40 @@
                 <tr>
                     <th>Sr</th>
                     <th>Emp Code</th>
+                    <th>UAN / ESIC</th>
                     <th>Name</th>
-                    <th class="text-center">Months<br>Eligible</th>
-                    <th class="text-end">Days<br>Worked</th>
-                    <th class="text-end">Total<br>Basic+DA</th>
-                    <th class="text-end">Total<br>Capped</th>
-                    <th class="text-end">Bonus<br>@ Ceiling</th>
-                    <th class="text-end">Bonus<br>@ Actual</th>
+                    <th>Father</th>
+                    <th class="text-center">Months</th>
+                    <th class="text-end">Total<br>Attendance</th>
+                    <th class="text-end">Total<br>Wage</th>
+                    <th class="text-end">Bonus<br>({{ run.bonus_percentage }}%)</th>
+                    <th class="text-center">Eligibility</th>
                     <th>Remarks</th>
                     {% if run.status != 'finalized' %}<th>Action</th>{% endif %}
                 </tr>
             </thead>
             <tbody>
                 {% for e in entries %}
-                <tr class="{% if not e.is_eligible %}table-secondary text-muted{% endif %}">
+                <tr class="{% if not e.is_eligible %}table-secondary{% endif %}">
                     <td>{{ loop.index }}</td>
                     <td>{{ e.employee.emp_code }}</td>
-                    <td><strong>{{ e.employee.name }}</strong>
-                        {% if not e.is_eligible %}<br><small class="text-danger">✗ {{ e.ineligibility_reason }}</small>{% endif %}
-                    </td>
+                    <td><small class="font-monospace">{{ e.employee.uan_number or e.employee.esic_ip_number or '—' }}</small></td>
+                    <td><strong>{{ e.employee.name }}</strong></td>
+                    <td><small>{{ e.employee.father_husband_name or '' }}</small></td>
                     <td class="text-center">{{ e.months_eligible }}</td>
                     <td class="text-end">{{ e.total_days_worked|int }}</td>
                     <td class="text-end">{{ "{:,.0f}".format(e.total_basic_da) }}</td>
-                    <td class="text-end">{{ "{:,.0f}".format(e.total_capped_wage) }}</td>
-                    <td class="text-end fw-bold text-success">{{ "{:,.0f}".format(e.final_bonus_ceiling) }}
-                        {% if e.override_amount is not none %}<br><small class="text-warning">overridden</small>{% endif %}
+                    <td class="text-end fw-bold text-success">{{ "{:,.0f}".format(e.final_bonus_actual) }}
+                        {% if e.override_amount is not none %}<br><small class="text-warning">(overridden)</small>{% endif %}
                     </td>
-                    <td class="text-end fw-bold text-primary">{{ "{:,.0f}".format(e.final_bonus_actual) }}</td>
+                    <td class="text-center">
+                        {% if e.is_eligible %}
+                        <span class="badge bg-success">Eligible</span>
+                        {% else %}
+                        <span class="badge bg-danger" title="{{ e.ineligibility_reason }}">Not Eligible</span>
+                        <br><small class="text-muted">{{ e.ineligibility_reason }}</small>
+                        {% endif %}
+                    </td>
                     <td><small>{{ e.remarks or '' }}</small></td>
                     {% if run.status != 'finalized' %}
                     <td>
