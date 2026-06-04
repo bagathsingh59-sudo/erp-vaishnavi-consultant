@@ -1606,6 +1606,21 @@ def payroll_process(payroll_id):
                                   PayrollInputFile.payroll_id != payroll.id)
                           .first() is not None)
 
+    # [TRIAL: doc-pack] -- load saved packs for this payroll. When the trial
+    # is disabled (env flag false), the model is still queryable but the
+    # template section is hidden, so the list is unused.
+    doc_packs = []
+    try:
+        from app.models.doc_pack_trial import PayrollDocPack
+        doc_packs = (PayrollDocPack.query
+                     .filter_by(payroll_id=payroll.id)
+                     .order_by(PayrollDocPack.uploaded_at.desc())
+                     .all())
+    except Exception:
+        # If the trial module / table is missing (e.g. fully removed), don't crash
+        doc_packs = []
+    # [/TRIAL: doc-pack]
+
     return render_template('payroll/process.html',
                            payroll=payroll, est=est, config=config,
                            entries=entries, heads=heads,
@@ -1614,7 +1629,8 @@ def payroll_process(payroll_id):
                            holiday_count=holiday_count,
                            red_flags=red_flags,
                            input_files=input_files,
-                           has_previous_input=has_previous_input)
+                           has_previous_input=has_previous_input,
+                           doc_packs=doc_packs)
 
 
 @payroll_bp.route('/payroll/<int:payroll_id>/save-attendance', methods=['POST'])

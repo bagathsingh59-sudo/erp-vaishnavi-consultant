@@ -1,0 +1,111 @@
+{# [TRIAL: doc-pack] -----------------------------------------------------------
+   Renders the Document Pack panel on the Payroll Detail page.
+   Included by templates/payroll/process.html ONLY when
+   config.DOC_PACK_TRIAL_ENABLED is truthy — see the conditional include there.
+   Removing the include line in process.html immediately hides this whole UI.
+   Removing this file's directory removes 100% of the trial UI.
+------------------------------------------------------------------------------ #}
+
+<div class="mb-3 doc-pack-trial-section"
+     style="background:linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%);
+            border:1px solid #fde68a;
+            border-radius:10px;
+            padding:12px 16px;">
+
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <span style="font-size:1.1rem;">📦</span>
+            <div>
+                <div style="font-weight:700; font-size:0.82rem; color:#92400e;">
+                    Document Pack
+                    <span style="font-size:0.58rem; font-weight:600;
+                                 background:#fbbf24; color:#451a03;
+                                 padding:1px 6px; border-radius:6px;
+                                 margin-left:4px; vertical-align:middle;">TRIAL</span>
+                </div>
+                <div style="font-size:0.66rem; color:#78716c;">
+                    Generate the month's full report pack → work the EPFO/ESIC
+                    portals → drop the receipts in &amp; re-upload as one ZIP.
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 align-items-center">
+            {# Generate fresh ZIP — stateless, just builds + streams #}
+            <a href="{{ url_for('doc_pack_trial.generate_pack', payroll_id=payroll.id) }}"
+               class="btn btn-sm"
+               style="background:#fff; border:1px solid #d97706; color:#92400e;
+                      font-size:0.72rem; font-weight:600; padding:5px 12px;
+                      border-radius:8px;"
+               title="Build the ZIP fresh from current data and download it">
+                <i class="bi bi-download me-1"></i>Generate Pack
+            </a>
+
+            {# Upload back — opens a hidden form #}
+            <button type="button" class="btn btn-sm"
+                    onclick="document.getElementById('docPackUploadInput').click();"
+                    style="background:#d97706; border:none; color:#fff;
+                           font-size:0.72rem; font-weight:600; padding:5px 12px;
+                           border-radius:8px;"
+                    title="Upload the filled-back ZIP (with govt receipts inside)">
+                <i class="bi bi-upload me-1"></i>Upload Filled Pack
+            </button>
+
+            <form id="docPackUploadForm"
+                  method="POST" enctype="multipart/form-data"
+                  action="{{ url_for('doc_pack_trial.upload_pack', payroll_id=payroll.id) }}"
+                  style="display:none;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="file" name="pack_file" id="docPackUploadInput"
+                       accept=".zip"
+                       onchange="document.getElementById('docPackUploadForm').submit();">
+            </form>
+        </div>
+    </div>
+
+    {# ── Saved packs list ──────────────────────────────────────────────── #}
+    {% if doc_packs %}
+    <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #fcd34d;">
+        <div style="font-size:0.62rem; font-weight:700; color:#92400e;
+                    text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
+            <i class="bi bi-folder-fill"></i>
+            Saved Packs ({{ doc_packs|length }})
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            {% for p in doc_packs %}
+            <div class="d-flex align-items-center gap-1"
+                 style="background:#fff; border:1px solid #fcd34d;
+                        border-radius:8px; padding:4px 8px; font-size:0.66rem;">
+                <i class="bi bi-file-earmark-zip-fill" style="color:#d97706;"></i>
+                <a href="{{ url_for('doc_pack_trial.download_pack', payroll_id=payroll.id, pack_id=p.id) }}"
+                   class="text-decoration-none"
+                   style="color:#0369a1; font-weight:700;"
+                   title="{{ p.pack_name }} — {{ p.size_mb }} MB — uploaded by {{ p.uploaded_by or 'unknown' }} on {{ p.uploaded_at.strftime('%d %b %Y, %H:%M') }}">
+                    {{ p.pack_name }}
+                </a>
+                <span style="color:#94a3b8;">·</span>
+                <span style="color:#64748b;">{{ p.size_mb }} MB</span>
+                <span style="color:#94a3b8;">·</span>
+                <span style="color:#64748b;">{{ p.uploaded_at.strftime('%d %b') }}</span>
+                <form method="POST"
+                      action="{{ url_for('doc_pack_trial.delete_pack', payroll_id=payroll.id, pack_id=p.id) }}"
+                      style="display:inline;"
+                      onsubmit="return confirm('Delete this saved pack? This cannot be undone.');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit"
+                            style="background:none; border:none; color:#dc2626;
+                                   font-size:0.7rem; padding:0 0 0 4px; cursor:pointer;"
+                            title="Delete this saved pack">
+                        <i class="bi bi-x-circle-fill"></i>
+                    </button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div style="margin-top:8px; font-size:0.62rem; color:#a8a29e; font-style:italic;">
+        No packs saved yet. Generate first, drop govt receipts in, then upload the filled ZIP.
+    </div>
+    {% endif %}
+</div>

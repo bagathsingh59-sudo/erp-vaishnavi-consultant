@@ -382,6 +382,18 @@ def create_app():
     csrf.exempt('marketing.landing')
     csrf.exempt('marketing.about')
 
+    # [TRIAL: doc-pack] ----------------------------------------------------
+    # Document Pack trial — single env var disables the whole feature without
+    # any code change. Remove this whole block to fully strip the trial.
+    # ---------------------------------------------------------------------
+    app.config['DOC_PACK_TRIAL_ENABLED'] = (
+        os.getenv('DOC_PACK_TRIAL_ENABLED', 'true').lower() == 'true'
+    )
+    if app.config['DOC_PACK_TRIAL_ENABLED']:
+        from app.routes.doc_pack_trial import doc_pack_trial_bp
+        app.register_blueprint(doc_pack_trial_bp)
+    # [/TRIAL: doc-pack] ---------------------------------------------------
+
     # Register Vault blueprint — disabled for now, re-enable later
     # from app.routes.vault import vault_bp
     # app.register_blueprint(vault_bp)
@@ -406,6 +418,8 @@ def create_app():
         from app.models.payroll import (PayrollConfig, SalaryHead, EmployeeSalary,
                                          EmployeeSalaryHead, MonthlyPayroll, PayrollEntry,
                                          PayrollEntryHead, PayrollDocument, PayrollInputFile)
+        # [TRIAL: doc-pack] — remove this import to fully detach the trial model
+        from app.models.doc_pack_trial import PayrollDocPack  # noqa: F401
         from app.models.accounts import AccountGroup, AccountHead, Voucher, VoucherEntry
         from app.models.activity_log import ActivityLog
         from app.models.app_user import AppUser
@@ -554,6 +568,35 @@ def _auto_migrate_columns(db):
     except Exception as e:
         db.session.rollback()
         print(f"  [MIGRATE] payroll_documents.is_compressed: {e}")
+
+    # [TRIAL: doc-pack] ----------------------------------------------------
+    # Document Pack trial — one new table for the uploaded-back ZIPs.
+    # Idempotent CREATE — safe to drop this block to fully remove the trial.
+    # The table is FK'd on monthly_payrolls(id) ON DELETE CASCADE so it never
+    # outlives the payroll it belongs to.
+    # ---------------------------------------------------------------------
+    try:
+        db.session.execute(db.text("""
+            CREATE TABLE IF NOT EXISTS payroll_doc_packs (
+                id              SERIAL PRIMARY KEY,
+                payroll_id      INTEGER NOT NULL REFERENCES monthly_payrolls(id) ON DELETE CASCADE,
+                establishment_id INTEGER NOT NULL REFERENCES establishments(id) ON DELETE CASCADE,
+                pack_name       VARCHAR(255) NOT NULL,
+                file_data       BYTEA NOT NULL,
+                file_size       INTEGER NOT NULL,
+                uploaded_by     VARCHAR(100),
+                uploaded_at     TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+        """))
+        db.session.execute(db.text(
+            "CREATE INDEX IF NOT EXISTS ix_payroll_doc_packs_payroll_id "
+            "ON payroll_doc_packs(payroll_id)"
+        ))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"  [MIGRATE] payroll_doc_packs (trial) table: {e}")
+    # [/TRIAL: doc-pack] ---------------------------------------------------
 
     # ── payroll_input_files: staff-uploaded Excel snapshots (audit trail) ──
     # One row per upload event. Most-recent draft for a payroll gets promoted
