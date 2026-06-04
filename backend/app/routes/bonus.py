@@ -512,3 +512,343 @@ def bonus_statement_excel(run_id):
     return send_file(output,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                      as_attachment=True, download_name=filename)
+
+
+# =============================================================================
+# Vaishnavi-format Bonus Statement (Attendance × Daily Rate basis)
+# -----------------------------------------------------------------------------
+# Matches the SM_Bonus sample sheet's exact column layout the user uses for
+# client delivery:
+#
+#   UAN/ESIC | Name | Father | Bonus %
+#   |  Apr  : Attendance | Per day wage | Total Wage | Total Bonus  |
+#   |  May  : Attendance | Per day wage | Total Wage | Total Bonus  |
+#   |  ...  (12 months Apr..Mar)                                    |
+#   | Grand Total: Total Attendance | Total Wage | Total Bonus
+#
+# Wage basis is "earned wage" = Attendance × Daily Rate (NOT Basic + DA).
+# This is the right calculation for daily-wage establishments where the
+# single BASIC head represents the entire wage. Computed on the fly from
+# PayrollEntry rows for the FY months — no schema change, no impact on
+# the existing Form C / statutory exporter.
+# =============================================================================
+
+def _compute_vaishnavi_bonus_data(run):
+    """Return list of per-employee dicts with month-wise attendance / daily rate /
+    wage / bonus, plus grand totals. Pulls PayrollEntry rows for the FY months
+    of this run and computes everything on the fly.
+
+    Eligibility: an employee shows up if they had at least one finalized payroll
+    entry in the FY. Sec. 8 (min 30 days) is flagged on the row via the
+    `is_eligible` field — ineligible employees are still shown so the client can
+    see why no bonus was paid.
+    """
+    bonus_pct = (run.bonus_percentage or 8.33) / 100.0
+
+    # Gather all payrolls for this est in the FY
+    payrolls = MonthlyPayroll.query.filter(
+        MonthlyPayroll.establishment_id == run.establishment_id,
+        db.or_(
+            db.and_(MonthlyPayroll.year == run.start_year, MonthlyPayroll.month >= 4),
+            db.and_(MonthlyPayroll.year == run.end_year, MonthlyPayroll.month <= 3),
+        )
+    ).all()
+    payroll_by_key = {f"{p.year}-{p.month:02d}": p for p in payrolls}
+    payroll_ids = [p.id for p in payrolls]
+
+    # Pull all entries for those payrolls, joined to employee.
+    # PayrollEntry uses `monthly_payroll_id` as the FK column name.
+    entries = (PayrollEntry.query
+               .filter(PayrollEntry.monthly_payroll_id.in_(payroll_ids))
+               .join(Employee, Employee.id == PayrollEntry.employee_id)
+               .order_by(Employee.name)
+               .all()) if payroll_ids else []
+
+    # Group by employee
+    emp_rows = {}   # emp_id -> { 'employee': obj, 'monthly': {key: {...}}, totals }
+    payroll_by_id = {p.id: p for p in payrolls}
+    for entry in entries:
+        # Find which payroll month this entry belongs to
+        payroll = payroll_by_id.get(entry.monthly_payroll_id)
+        if not payroll:
+            continue
+        month_key = f"{payroll.year}-{payroll.month:02d}"
+
+        # Attendance = days actually paid (worked + NPH). This is what the
+        # bonus is computed on, matching the consultant's manual workbook.
+        attendance = (entry.days_present or 0) + (entry.paid_holidays or 0)
+
+        # Daily rate — for daily-wage employees we have the explicit rate
+        # stored as gross_salary (it IS the daily rate by convention). For
+        # monthly-fixed employees we derive: gross_salary / working_days.
+        wd = payroll.working_days or 26
+        daily_rate = 0
+        if attendance > 0:
+            if entry.gross_salary and wd > 0:
+                # If gross_salary appears to be a daily rate (e.g. ≤ ~₹2000), use it
+                # directly; otherwise treat as monthly and divide by working days.
+                # Common Indian daily rates are < ₹2000, monthly salaries are > ₹5000,
+                # so this heuristic is safe in practice.
+                if entry.gross_salary <= 2000:
+                    daily_rate = float(entry.gross_salary)
+                else:
+                    daily_rate = float(entry.gross_salary) / wd
+
+        monthly_wage = round(attendance * daily_rate)
+        monthly_bonus = round(monthly_wage * bonus_pct)
+
+        if entry.employee_id not in emp_rows:
+            emp_rows[entry.employee_id] = {
+                'employee': entry.employee,
+                'monthly': {},
+                'total_attendance': 0,
+                'total_wage': 0,
+                'total_bonus': 0,
+            }
+        emp_rows[entry.employee_id]['monthly'][month_key] = {
+            'attendance':   attendance,
+            'daily_rate':   round(daily_rate),
+            'monthly_wage': monthly_wage,
+            'monthly_bonus': monthly_bonus,
+        }
+        emp_rows[entry.employee_id]['total_attendance'] += attendance
+        emp_rows[entry.employee_id]['total_wage']       += monthly_wage
+        emp_rows[entry.employee_id]['total_bonus']      += monthly_bonus
+
+    # Sort by name for stable output
+    rows = sorted(emp_rows.values(), key=lambda r: r['employee'].name or '')
+
+    # Apply Sec. 8 eligibility flag — total days must be >= min_days_worked
+    for r in rows:
+        r['is_eligible'] = r['total_attendance'] >= (run.min_days_worked or 30)
+
+    return rows
+
+
+@bonus_bp.route('/bonus/<int:run_id>/statement/vaishnavi-excel')
+def bonus_vaishnavi_excel(run_id):
+    """Vaishnavi-format Bonus Statement — Attendance × Daily Rate basis.
+    Matches the SM_Bonus client-delivery sheet exactly: 4 KYC columns
+    (UAN/ESIC, Name, Father, Bonus %) + 12 months × 4 sub-columns
+    (Attendance, Per day wage, Total Wage, Total Bonus) + 3 grand-total
+    columns."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    run = BonusRun.query.get_or_404(run_id)
+    verify_est_ownership(run.establishment)
+
+    rows = _compute_vaishnavi_bonus_data(run)
+    months = _fy_month_keys(run)   # 12 tuples: (year, month, abbr, key)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Bonus Statement"
+
+    # ── Styles ──────────────────────────────────────────────────────────
+    bold        = Font(bold=True, size=10, name='Calibri')
+    bold_white  = Font(bold=True, size=10, color='FFFFFF', name='Calibri')
+    body        = Font(size=9, name='Calibri')
+    body_bold   = Font(bold=True, size=9, name='Calibri')
+    title_font  = Font(bold=True, size=12, name='Calibri')
+    thin        = Side(border_style='thin', color='94A3B8')
+    border      = Border(left=thin, right=thin, top=thin, bottom=thin)
+    center      = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    right       = Alignment(horizontal='right', vertical='center')
+    left        = Alignment(horizontal='left', vertical='center')
+    slate_fill  = PatternFill(start_color='1E293B', end_color='1E293B', fill_type='solid')
+    light_fill  = PatternFill(start_color='F1F5F9', end_color='F1F5F9', fill_type='solid')
+    gt_fill     = PatternFill(start_color='DCFCE7', end_color='DCFCE7', fill_type='solid')
+
+    # Layout: 4 KYC cols + 12 × 4 month cols + 3 grand-total cols = 55 cols
+    KYC_COLS = 4
+    MONTH_SUBCOLS = 4
+    LAST_COL = KYC_COLS + len(months) * MONTH_SUBCOLS + 3   # 55
+
+    # ── Row 1: Title ────────────────────────────────────────────────────
+    title = (f"BONUS FOR CONTRACT WORKMEN FROM APRIL {run.start_year} "
+             f"TO MARCH {run.end_year}")
+    ws.cell(row=1, column=1, value=title).font = title_font
+    ws.cell(row=1, column=1).alignment = center
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=LAST_COL)
+
+    # ── Row 2: Establishment + meta line ────────────────────────────────
+    meta = (f"{run.establishment.company_name}  |  {run.fy_label}  |  "
+            f"Bonus % : {run.bonus_percentage}%  |  Min Days (Sec.8) : "
+            f"{run.min_days_worked}  |  Basis : Attendance × Daily Rate")
+    ws.cell(row=2, column=1, value=meta).font = Font(size=9, italic=True, color='475569', name='Calibri')
+    ws.cell(row=2, column=1).alignment = center
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=LAST_COL)
+
+    # ── Row 3: Month group headers (merged across 4 sub-columns each) ──
+    # KYC cells (cols 1..4) — span both header rows so they're tall
+    kyc_headers = ['UAN / ESIC', 'Name', 'Father', 'Bonus %']
+    for i, h in enumerate(kyc_headers, 1):
+        c = ws.cell(row=3, column=i, value=h)
+        c.font = bold_white
+        c.fill = slate_fill
+        c.alignment = center
+        c.border = border
+        ws.merge_cells(start_row=3, start_column=i, end_row=4, end_column=i)
+
+    # 12 month group headers
+    col = KYC_COLS + 1
+    for (yr, mth, abbr, key) in months:
+        ws.cell(row=3, column=col, value=f"{abbr}-{str(yr)[-2:]}")
+        ws.cell(row=3, column=col).font = bold_white
+        ws.cell(row=3, column=col).fill = slate_fill
+        ws.cell(row=3, column=col).alignment = center
+        ws.cell(row=3, column=col).border = border
+        ws.merge_cells(start_row=3, start_column=col,
+                       end_row=3, end_column=col + MONTH_SUBCOLS - 1)
+        col += MONTH_SUBCOLS
+
+    # Grand total — 3 cols, single header on row 3
+    ws.cell(row=3, column=col, value='GRAND TOTAL')
+    ws.cell(row=3, column=col).font = bold_white
+    ws.cell(row=3, column=col).fill = slate_fill
+    ws.cell(row=3, column=col).alignment = center
+    ws.cell(row=3, column=col).border = border
+    ws.merge_cells(start_row=3, start_column=col, end_row=3, end_column=col + 2)
+
+    # ── Row 4: Sub-headers for each month (KYC already merged through) ─
+    sub_labels = ['Attendance', 'Per day wage', 'Total Wage', 'Total Bonus']
+    col = KYC_COLS + 1
+    for _ in months:
+        for j, lbl in enumerate(sub_labels):
+            c = ws.cell(row=4, column=col + j, value=lbl)
+            c.font = bold
+            c.fill = light_fill
+            c.alignment = center
+            c.border = border
+        col += MONTH_SUBCOLS
+    # Grand total sub-headers
+    for j, lbl in enumerate(['Total Attendance', 'Total Wage', 'Total Bonus']):
+        c = ws.cell(row=4, column=col + j, value=lbl)
+        c.font = bold
+        c.fill = gt_fill
+        c.alignment = center
+        c.border = border
+
+    # Row heights
+    ws.row_dimensions[1].height = 22
+    ws.row_dimensions[2].height = 18
+    ws.row_dimensions[3].height = 22
+    ws.row_dimensions[4].height = 32
+
+    # ── Data rows ──────────────────────────────────────────────────────
+    r = 5
+    gt_attendance = gt_wage = gt_bonus = 0
+    for row_data in rows:
+        emp = row_data['employee']
+        # UAN if available, else ESIC IP, else "—"
+        primary_id = (emp.uan_number or emp.esic_ip_number or '—')
+
+        # KYC columns
+        for col_idx, val, align in [
+            (1, primary_id,                left),
+            (2, emp.name,                  left),
+            (3, emp.father_husband_name,   left),
+            (4, f"{run.bonus_percentage}%", center),
+        ]:
+            c = ws.cell(row=r, column=col_idx, value=val)
+            c.font = body
+            c.alignment = align
+            c.border = border
+
+        # Monthly data — 4 sub-columns per month
+        col = KYC_COLS + 1
+        for (yr, mth, abbr, key) in months:
+            m = row_data['monthly'].get(key, {})
+            cells = [
+                m.get('attendance', '') or '',
+                m.get('daily_rate', '') or '',
+                m.get('monthly_wage', '') or '',
+                m.get('monthly_bonus', '') or '',
+            ]
+            for j, val in enumerate(cells):
+                c = ws.cell(row=r, column=col + j, value=val)
+                c.font = body
+                c.alignment = center if j == 0 else right
+                c.border = border
+                if isinstance(val, (int, float)) and val != 0 and j > 0:
+                    c.number_format = '#,##0'
+            col += MONTH_SUBCOLS
+
+        # Grand totals — bold + green fill
+        for j, val in enumerate([row_data['total_attendance'],
+                                 row_data['total_wage'],
+                                 row_data['total_bonus']]):
+            c = ws.cell(row=r, column=col + j, value=val)
+            c.font = body_bold
+            c.alignment = right if j > 0 else center
+            c.border = border
+            c.fill = gt_fill
+            if j > 0:
+                c.number_format = '#,##0'
+
+        # Flag ineligible rows by italicising the name
+        if not row_data['is_eligible']:
+            ws.cell(row=r, column=2).font = Font(size=9, italic=True, color='B45309', name='Calibri')
+            ws.cell(row=r, column=2).value = f"{emp.name}  (< {run.min_days_worked} days)"
+
+        gt_attendance += row_data['total_attendance']
+        gt_wage       += row_data['total_wage']
+        gt_bonus      += row_data['total_bonus']
+        r += 1
+
+    # ── Establishment totals row ───────────────────────────────────────
+    totals_label_cell = ws.cell(row=r, column=1, value=f"TOTAL ({len(rows)} employees)")
+    totals_label_cell.font = bold_white
+    totals_label_cell.fill = slate_fill
+    totals_label_cell.alignment = center
+    totals_label_cell.border = border
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=KYC_COLS + len(months) * MONTH_SUBCOLS)
+
+    col = KYC_COLS + len(months) * MONTH_SUBCOLS + 1
+    for j, val in enumerate([gt_attendance, gt_wage, gt_bonus]):
+        c = ws.cell(row=r, column=col + j, value=val)
+        c.font = bold
+        c.alignment = right if j > 0 else center
+        c.border = border
+        c.fill = gt_fill
+        if j > 0:
+            c.number_format = '#,##0'
+    ws.row_dimensions[r].height = 22
+
+    # ── Column widths ───────────────────────────────────────────────────
+    ws.column_dimensions['A'].width = 16  # UAN/ESIC
+    ws.column_dimensions['B'].width = 22  # Name
+    ws.column_dimensions['C'].width = 18  # Father
+    ws.column_dimensions['D'].width = 9   # Bonus %
+    col = KYC_COLS + 1
+    for _ in months:
+        ws.column_dimensions[get_column_letter(col)].width     = 8   # Attendance
+        ws.column_dimensions[get_column_letter(col + 1)].width = 9   # Per day wage
+        ws.column_dimensions[get_column_letter(col + 2)].width = 10  # Total Wage
+        ws.column_dimensions[get_column_letter(col + 3)].width = 10  # Total Bonus
+        col += MONTH_SUBCOLS
+    ws.column_dimensions[get_column_letter(col)].width     = 10  # GT Attendance
+    ws.column_dimensions[get_column_letter(col + 1)].width = 12  # GT Wage
+    ws.column_dimensions[get_column_letter(col + 2)].width = 12  # GT Bonus
+
+    # Freeze panes — keep KYC cols + 4 header rows in view while scrolling
+    ws.freeze_panes = 'E5'
+
+    # Print setup — Legal landscape, fit to one page wide
+    ws.page_setup.orientation = 'landscape'
+    ws.page_setup.paperSize = 5  # 5 = Legal in openpyxl
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.print_options.horizontalCentered = True
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    safe_name = (run.establishment.company_name or 'Establishment').replace(' ', '_').replace('/', '_')[:60]
+    filename = f"Bonus_{safe_name}_{run.fy_label.replace(' ', '_')}.xlsx"
+    return send_file(output,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True, download_name=filename)

@@ -11,6 +11,15 @@
     <a href="{{ url_for('bonus.bonus_statement_excel', run_id=run.id) }}" class="btn btn-sm btn-success">
         <i class="bi bi-file-earmark-excel"></i> Statement Excel
     </a>
+    {# Vaishnavi-format export — Attendance × Daily Rate basis, matches the
+       SM_Bonus client-delivery sheet layout exactly (UAN/ESIC, Name, Father,
+       Bonus %, then 12 months × 4 sub-columns, then Grand Total). #}
+    <a href="{{ url_for('bonus.bonus_vaishnavi_excel', run_id=run.id) }}"
+       class="btn btn-sm"
+       style="background:linear-gradient(135deg,#0ea5e9,#0369a1); border:none; color:#fff; font-weight:600;"
+       title="Download in Vaishnavi client-delivery format (12 months × 4 sub-columns + Grand Total)">
+        <i class="bi bi-file-earmark-excel-fill"></i> Vaishnavi Bonus Excel
+    </a>
     <a href="{{ url_for('bonus.bonus_form_c', run_id=run.id) }}" class="btn btn-sm btn-primary">
         <i class="bi bi-file-earmark-check"></i> Form C (Register)
     </a>
