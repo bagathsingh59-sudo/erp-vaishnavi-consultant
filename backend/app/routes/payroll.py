@@ -1606,9 +1606,12 @@ def payroll_process(payroll_id):
                                   PayrollInputFile.payroll_id != payroll.id)
                           .first() is not None)
 
-    # [TRIAL: doc-pack] -- load saved packs for this payroll. When the trial
-    # is disabled (env flag false), the model is still queryable but the
-    # template section is hidden, so the list is unused.
+    # [TRIAL: doc-pack] -- load saved packs + expose the env-gated enable flag.
+    # NOTE: this template already receives `config = PayrollConfig`, so we
+    # CAN'T reach Flask's app config via the {{ config }} global from inside
+    # this template. The flag must be passed explicitly.
+    from flask import current_app
+    doc_pack_enabled = bool(current_app.config.get('DOC_PACK_TRIAL_ENABLED', False))
     doc_packs = []
     try:
         from app.models.doc_pack_trial import PayrollDocPack
@@ -1630,7 +1633,8 @@ def payroll_process(payroll_id):
                            red_flags=red_flags,
                            input_files=input_files,
                            has_previous_input=has_previous_input,
-                           doc_packs=doc_packs)
+                           doc_packs=doc_packs,
+                           doc_pack_enabled=doc_pack_enabled)
 
 
 @payroll_bp.route('/payroll/<int:payroll_id>/save-attendance', methods=['POST'])

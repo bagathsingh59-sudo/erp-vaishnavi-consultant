@@ -238,10 +238,15 @@
 </div>
 
 {# [TRIAL: doc-pack] -- Document Pack panel (env-gated).
-   When DOC_PACK_TRIAL_ENABLED=false the include is a no-op and the panel
-   stays hidden. Removing this 3-line block hides the entire trial UI.
-   The panel is placed as its own full-width section above the action row. #}
-{% if config.DOC_PACK_TRIAL_ENABLED and payroll.status in ['processing', 'finalized'] %}
+   `doc_pack_enabled` is passed from the view based on Flask's app config
+   (DOC_PACK_TRIAL_ENABLED env var). It cannot use the Jinja `config`
+   global because this template's render_template() passes a different
+   `config` variable (the PayrollConfig object).
+
+   Shown for ALL payroll states (draft / processing / finalized) so the
+   staff can also use it during the trial on in-progress payrolls. If
+   you'd rather restrict it later, the condition is right here. #}
+{% if doc_pack_enabled %}
     {% include 'doc_pack_trial/_section.html' %}
 {% endif %}
 {# [/TRIAL: doc-pack] #}
