@@ -102,8 +102,23 @@ def _calculate_bonus_run(run):
     """
     bonus_pct = (run.bonus_percentage or 8.33) / 100.0
     min_days  = run.min_days_worked or 30
-    include_holidays = bool(getattr(run, 'include_holiday_attendance', True))
-    include_ot       = bool(getattr(run, 'include_overtime_in_wage',  False))
+
+    # ── Section 1 — Attendance ──────────────────────────────────────────
+    inc_nph_att     = bool(getattr(run, 'include_holiday_attendance', True))
+    inc_ot_days_att = bool(getattr(run, 'att_include_ot_days',        False))
+    skip_zero       = bool(getattr(run, 'att_skip_zero',              True))
+
+    # ── Section 2 — Wage ────────────────────────────────────────────────
+    use_full_gross  = bool(getattr(run, 'wage_use_full_gross',       False))
+    wage_add_nph    = bool(getattr(run, 'wage_add_nph_wages',        False))
+    wage_add_ot     = bool(getattr(run, 'include_overtime_in_wage',  False))
+    wage_add_other  = bool(getattr(run, 'wage_add_other_allowance',  False))
+
+    # ── Section 3 — Ceiling / Cap (None = not applicable) ───────────────
+    raw_ceil = getattr(run, 'wage_ceiling_per_month', None)
+    ceiling  = float(raw_ceil) if raw_ceil and float(raw_ceil) > 0 else None
+    raw_cap  = getattr(run, 'bonus_cap_per_employee', None)
+    bonus_cap = float(raw_cap) if raw_cap and float(raw_cap) > 0 else None
 
     # Pull all payrolls for this est across the FY months
     payrolls = MonthlyPayroll.query.filter(
@@ -130,27 +145,51 @@ def _calculate_bonus_run(run):
         if not emp_id:
             continue
 
-        # Attendance per the user's chosen convention:
-        #   include_holidays = TRUE  -> days_present + paid_holidays
-        #   include_holidays = FALSE -> days_present only
-        present = float(entry.days_present or 0)
-        ph      = float(entry.paid_holidays or 0)
-        attendance = present + ph if include_holidays else present
+        present  = float(entry.days_present or 0)
+        ph       = float(entry.paid_holidays or 0)
+        ot_hours = float(entry.ot_hours or 0)
+        ot_amt   = float(entry.ot_amount or 0)
+        gross    = float(entry.gross_salary or 0)
+        earned   = float(entry.earned_gross or 0)
+        tot_earn = float(entry.total_earnings or 0)
 
-        # Daily rate detection (matches Form B / Salary Statement convention):
-        #   gross_salary ≤ ₹2,000 → already a daily rate (daily-wage workers)
-        #   gross_salary > ₹2,000 → monthly gross, divide by working days
+        # ── Attendance ─────────────────────────────────────────────────
+        attendance = present
+        if inc_nph_att:
+            attendance += ph
+        if inc_ot_days_att and ot_hours > 0:
+            # Convert OT hours → days assuming a standard 8-hour day
+            attendance += round(ot_hours / 8.0, 2)
+
+        # ── Daily rate (gross ≤ ₹2,000 → already daily; else / working days)
         wd = payroll.working_days or 26
-        gross = float(entry.gross_salary or 0)
         daily_rate = 0.0
-        if attendance > 0 and gross > 0:
+        if gross > 0:
             daily_rate = gross if gross <= 2000 else (gross / wd)
 
-        # Overtime, if the user opted to include it. Sec. 2(21) of the
-        # Bonus Act excludes OT from "salary or wage", so OFF by default.
-        ot_amt = float(entry.ot_amount or 0) if include_ot else 0.0
+        # ── Monthly wage ───────────────────────────────────────────────
+        if use_full_gross:
+            # Take everything the employee actually earned for the month
+            monthly_wage = tot_earn
+        else:
+            # Base: attendance × daily rate
+            base = attendance * daily_rate
+            monthly_wage = base
+            # NPH wages — only add if not already in attendance×rate
+            if wage_add_nph and not inc_nph_att:
+                monthly_wage += ph * daily_rate
+            # OT wages
+            if wage_add_ot:
+                monthly_wage += ot_amt
+            # Other allowance: anything in earned_gross beyond the base
+            if wage_add_other:
+                monthly_wage += max(0, earned - base)
 
-        monthly_wage  = round(attendance * daily_rate + ot_amt)
+        # ── Section 3 — per-month ceiling ──────────────────────────────
+        if ceiling and monthly_wage > ceiling:
+            monthly_wage = ceiling
+
+        monthly_wage  = round(monthly_wage)
         monthly_bonus = round(monthly_wage * bonus_pct)
         month_key     = f"{payroll.year}-{payroll.month:02d}"
 
@@ -185,24 +224,36 @@ def _calculate_bonus_run(run):
     total_bonus_sum = 0.0
 
     for emp_id, d in emp_data.items():
+        total_attendance = d['total_attendance']
+
+        # Section 1 toggle — skip zero-attendance employees entirely
+        if skip_zero and total_attendance <= 0:
+            continue
+
         total_emp += 1
-        is_eligible = d['total_attendance'] >= min_days
+
+        # Sec. 8 eligibility (min days)
+        is_eligible = total_attendance >= min_days
         reason = None
         if not is_eligible:
-            reason = f"Worked only {int(d['total_attendance'])} days (need {min_days})"
+            reason = f"Worked only {int(total_attendance)} days (need {min_days})"
 
-        # Bonus is zero for ineligible employees (Sec.8 — under min days).
+        # Bonus is zero for ineligible employees (Sec. 8 — under min days)
         final_bonus = d['total_bonus'] if is_eligible else 0
+
+        # Section 3 — per-employee bonus cap
+        if bonus_cap and final_bonus > bonus_cap:
+            final_bonus = bonus_cap
 
         be = BonusEntry(
             bonus_run_id=run.id,
             employee_id=emp_id,
             monthly_data=json.dumps(d['monthly']),
             months_eligible=len(d['monthly']),
-            total_days_worked=round(d['total_attendance'], 2),
+            total_days_worked=round(total_attendance, 2),
             total_basic_da=d['total_wage'],         # repurposed: total wage
-            total_capped_wage=d['total_wage'],      # no cap, same value
-            bonus_at_ceiling=final_bonus,           # no cap, same as actual
+            total_capped_wage=d['total_wage'],      # display: same value
+            bonus_at_ceiling=final_bonus,
             bonus_at_actual=final_bonus,
             is_eligible=is_eligible,
             ineligibility_reason=reason,
@@ -242,9 +293,27 @@ def bonus_new():
         start_year = request.form.get('start_year', type=int)
         bonus_pct = request.form.get('bonus_percentage', type=float) or 8.33
         min_days = request.form.get('min_days_worked', type=int) or 30
-        # Vaishnavi engine toggles — checkbox presence in form = True.
-        include_holidays = 'include_holiday_attendance' in request.form
-        include_ot       = 'include_overtime_in_wage'   in request.form
+
+        # Section 1 — Attendance
+        att_nph    = 'include_holiday_attendance' in request.form
+        att_ot_d   = 'att_include_ot_days'        in request.form
+        skip_zero  = 'att_skip_zero'              in request.form
+        # Section 2 — Wage
+        full_gross = 'wage_use_full_gross'        in request.form
+        w_nph      = 'wage_add_nph_wages'         in request.form
+        w_ot       = 'include_overtime_in_wage'   in request.form
+        w_other    = 'wage_add_other_allowance'   in request.form
+        # Section 3 — Ceiling / Cap (blank → NULL = not applicable)
+        ceil_raw = request.form.get('wage_ceiling_per_month', '').strip()
+        cap_raw  = request.form.get('bonus_cap_per_employee', '').strip()
+        try:
+            wage_ceil = float(ceil_raw) if ceil_raw else None
+        except ValueError:
+            wage_ceil = None
+        try:
+            bonus_cap = float(cap_raw) if cap_raw else None
+        except ValueError:
+            bonus_cap = None
 
         est = Establishment.query.get_or_404(est_id)
         verify_est_ownership(est)
@@ -263,8 +332,15 @@ def bonus_new():
             end_year=start_year + 1,
             bonus_percentage=bonus_pct,
             min_days_worked=min_days,
-            include_holiday_attendance=include_holidays,
-            include_overtime_in_wage=include_ot,
+            include_holiday_attendance=att_nph,
+            att_include_ot_days=att_ot_d,
+            att_skip_zero=skip_zero,
+            wage_use_full_gross=full_gross,
+            wage_add_nph_wages=w_nph,
+            include_overtime_in_wage=w_ot,
+            wage_add_other_allowance=w_other,
+            wage_ceiling_per_month=wage_ceil,
+            bonus_cap_per_employee=bonus_cap,
             status='draft',
         )
         db.session.add(run)
@@ -301,13 +377,30 @@ def bonus_recalculate(run_id):
     if run.status == 'finalized':
         flash('Cannot recalculate a finalized run. Unfinalize first.', 'warning')
         return redirect(url_for('bonus.bonus_view', run_id=run_id))
-    # Allow updating config — only the fields the simplified UI exposes.
-    # Wage ceiling / eligibility cap stay at whatever they were (used only
-    # by the legacy Basic+DA Statement Excel).
+    # Update the engine settings — bonus %, eligibility, and all three
+    # composition sections in one go.
     run.bonus_percentage = request.form.get('bonus_percentage', type=float) or run.bonus_percentage
     run.min_days_worked  = request.form.get('min_days_worked',  type=int)   or run.min_days_worked
+    # Section 1 — Attendance
     run.include_holiday_attendance = 'include_holiday_attendance' in request.form
+    run.att_include_ot_days        = 'att_include_ot_days'        in request.form
+    run.att_skip_zero              = 'att_skip_zero'              in request.form
+    # Section 2 — Wage
+    run.wage_use_full_gross        = 'wage_use_full_gross'        in request.form
+    run.wage_add_nph_wages         = 'wage_add_nph_wages'         in request.form
     run.include_overtime_in_wage   = 'include_overtime_in_wage'   in request.form
+    run.wage_add_other_allowance   = 'wage_add_other_allowance'   in request.form
+    # Section 3 — Ceiling / Cap (blank → NULL)
+    ceil_raw = (request.form.get('wage_ceiling_per_month') or '').strip()
+    cap_raw  = (request.form.get('bonus_cap_per_employee') or '').strip()
+    try:
+        run.wage_ceiling_per_month = float(ceil_raw) if ceil_raw else None
+    except ValueError:
+        run.wage_ceiling_per_month = None
+    try:
+        run.bonus_cap_per_employee = float(cap_raw) if cap_raw else None
+    except ValueError:
+        run.bonus_cap_per_employee = None
     db.session.commit()
     _calculate_bonus_run(run)
     flash('Bonus recalculated with updated configuration.', 'success')
@@ -483,12 +576,30 @@ def bonus_form_c_excel(run_id):
         r += 1
 
     # Meta strip — bonus %, settings, payment date
+    att_bits = []
+    if run.include_holiday_attendance: att_bits.append('NPH')
+    if run.att_include_ot_days:        att_bits.append('OT(÷8)')
+    att_summary = ' + '.join(att_bits) if att_bits else 'Worked Only'
+
+    if run.wage_use_full_gross:
+        wage_summary = 'Full Gross'
+    else:
+        wb = ['Att×Rate']
+        if run.wage_add_nph_wages:       wb.append('+NPH')
+        if run.include_overtime_in_wage: wb.append('+OT')
+        if run.wage_add_other_allowance: wb.append('+OtherAlw')
+        wage_summary = ' '.join(wb)
+
     meta_parts = [
         f"Bonus Percentage: {run.bonus_percentage}%",
         f"Min Days (Sec. 8): {run.min_days_worked}",
-        f"Holidays in attendance: {'YES' if run.include_holiday_attendance else 'NO'}",
-        f"OT in wage: {'YES' if run.include_overtime_in_wage else 'NO'}",
+        f"Attendance: {att_summary}",
+        f"Wage: {wage_summary}",
     ]
+    if run.wage_ceiling_per_month:
+        meta_parts.append(f"Wage Ceiling: ₹{int(run.wage_ceiling_per_month):,}")
+    if run.bonus_cap_per_employee:
+        meta_parts.append(f"Bonus Cap: ₹{int(run.bonus_cap_per_employee):,}")
     if run.payment_date:
         meta_parts.append(f"Date of Payment: {run.payment_date.strftime('%d-%m-%Y')}")
     ws.cell(row=r, column=1, value='   |   '.join(meta_parts)).font = info_bold
@@ -906,13 +1017,31 @@ def _build_vaishnavi_excel(run_id):
     ws.cell(row=1, column=1).alignment = center
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=LAST_COL)
 
-    # ── Row 2: Establishment + meta line ────────────────────────────────
-    inc_h = 'YES' if run.include_holiday_attendance else 'NO'
-    inc_o = 'YES' if run.include_overtime_in_wage   else 'NO'
+    # ── Row 2: Establishment + meta line (single line summarising every
+    #          active setting so an auditor can read it at a glance) ────
+    att_parts = []
+    if run.include_holiday_attendance: att_parts.append('NPH')
+    if run.att_include_ot_days:        att_parts.append('OT(÷8)')
+    att_label = ' + '.join(att_parts) if att_parts else 'Worked Only'
+    if run.att_skip_zero: att_label += ', SkipZero'
+
+    if run.wage_use_full_gross:
+        wage_label = 'Full Gross'
+    else:
+        wparts = ['Att×Rate']
+        if run.wage_add_nph_wages:         wparts.append('+NPH')
+        if run.include_overtime_in_wage:   wparts.append('+OT')
+        if run.wage_add_other_allowance:   wparts.append('+OtherAlw')
+        wage_label = ' '.join(wparts)
+
+    cap_parts = []
+    if run.wage_ceiling_per_month:  cap_parts.append(f'WageCeil ₹{int(run.wage_ceiling_per_month)}')
+    if run.bonus_cap_per_employee:  cap_parts.append(f'BonusCap ₹{int(run.bonus_cap_per_employee)}')
+    cap_label = ' · '.join(cap_parts) if cap_parts else 'No cap, no ceiling'
+
     meta = (f"{run.establishment.company_name}  |  {run.fy_label}  |  "
             f"Bonus % : {run.bonus_percentage}%  |  "
-            f"Holidays in attendance : {inc_h}  |  OT in wage : {inc_o}  |  "
-            f"Basis : Attendance × Daily Rate (no cap, no ceiling)")
+            f"Attendance : {att_label}  |  Wage : {wage_label}  |  {cap_label}")
     ws.cell(row=2, column=1, value=meta).font = Font(size=9, italic=True, color='475569', name='Calibri')
     ws.cell(row=2, column=1).alignment = center
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=LAST_COL)

@@ -63,45 +63,159 @@
                 </div>
             </div>
 
-            {# ── Wage composition toggles — the two questions the user asked
-                 the system to ask before generating bonus. ────────────── #}
-            <div class="card mt-3" style="background:#fff7ed; border:1px solid #fed7aa;">
+            {# ──────────────────────────────────────────────────────────────
+                SECTION 1 — Attendance
+                User question: how should attendance be computed?
+               ───────────────────────────────────────────────────────────── #}
+            <div class="card mt-3" style="background:#eff6ff; border:1px solid #bfdbfe;">
                 <div class="card-body py-2 px-3">
-                    <h6 class="fw-bold mb-2" style="color:#9a3412;">
-                        <i class="bi bi-sliders"></i> Wage Composition
+                    <h6 class="fw-bold mb-2" style="color:#1e40af;">
+                        <i class="bi bi-1-square-fill"></i> Attendance Composition
                     </h6>
                     <p class="text-muted mb-2" style="font-size:0.78rem;">
-                        Tells the engine how to build each month's wage before applying the bonus %.
-                        These usually go ON for daily-wage establishments and OFF for fixed-monthly establishments.
+                        How should each month's attendance be computed?
+                        If neither of the first two boxes is checked, the engine uses
+                        <strong>pure worked attendance</strong> (<code>days_present</code> only).
                     </p>
 
                     <div class="form-check py-1">
-                        <input class="form-check-input" type="checkbox" id="incHolidays"
+                        <input class="form-check-input" type="checkbox" id="attNph"
                                name="include_holiday_attendance" checked>
-                        <label class="form-check-label" for="incHolidays" style="font-size:0.85rem;">
-                            <strong>Include paid holidays (NPH) in attendance.</strong>
-                            <span class="text-muted">
-                                Counted as: <code>days_present + paid_holidays</code>.
-                                ON = holiday days carry their wage into the bonus base.
-                                OFF = bonus computed only on the days actually worked.
-                            </span>
+                        <label class="form-check-label" for="attNph" style="font-size:0.85rem;">
+                            <strong>Add NPH (paid holidays) to attendance</strong>
+                            <span class="text-muted"> — counted as <code>days_present + paid_holidays</code></span>
                         </label>
                     </div>
-
                     <div class="form-check py-1">
-                        <input class="form-check-input" type="checkbox" id="incOt"
-                               name="include_overtime_in_wage">
-                        <label class="form-check-label" for="incOt" style="font-size:0.85rem;">
-                            <strong>Include overtime wages in the monthly wage.</strong>
-                            <span class="text-muted">
-                                ON = OT amount added to monthly wage before bonus % is applied.
-                                OFF (default) = OT excluded — matches Sec. 2(21) which excludes
-                                overtime from the bonus base.
-                            </span>
+                        <input class="form-check-input" type="checkbox" id="attOt"
+                               name="att_include_ot_days">
+                        <label class="form-check-label" for="attOt" style="font-size:0.85rem;">
+                            <strong>Add OT (converted from hours to days) to attendance</strong>
+                            <span class="text-muted"> — <code>ot_hours ÷ 8</code> added to the attendance count</span>
+                        </label>
+                    </div>
+                    <div class="form-check py-1">
+                        <input class="form-check-input" type="checkbox" id="attSkipZero"
+                               name="att_skip_zero" checked>
+                        <label class="form-check-label" for="attSkipZero" style="font-size:0.85rem;">
+                            <strong>Skip employees with zero attendance for the entire FY</strong>
+                            <span class="text-muted"> — they won't appear in the bonus sheet at all</span>
                         </label>
                     </div>
                 </div>
             </div>
+
+            {# ──────────────────────────────────────────────────────────────
+                SECTION 2 — Wage Composition
+                User question: what makes up the monthly wage for bonus calc?
+               ───────────────────────────────────────────────────────────── #}
+            <div class="card mt-3" style="background:#fff7ed; border:1px solid #fed7aa;">
+                <div class="card-body py-2 px-3">
+                    <h6 class="fw-bold mb-2" style="color:#9a3412;">
+                        <i class="bi bi-2-square-fill"></i> Wage Composition
+                    </h6>
+                    <p class="text-muted mb-2" style="font-size:0.78rem;">
+                        How should each month's wage be built before applying the bonus %?
+                        Base case (no boxes ticked) =
+                        <strong>Attendance × Daily Rate</strong> (daily-wage)
+                        or <strong>Basic + DA</strong> (monthly establishments).
+                    </p>
+
+                    <div class="form-check py-1">
+                        <input class="form-check-input" type="checkbox" id="wgUseFull"
+                               name="wage_use_full_gross"
+                               onchange="toggleFullGross()">
+                        <label class="form-check-label" for="wgUseFull" style="font-size:0.85rem;">
+                            <strong>Use Full Gross Salary</strong>
+                            <span class="text-muted"> — includes all earning heads + OT + arrears.
+                            Overrides every other option below.</span>
+                        </label>
+                    </div>
+
+                    <hr style="margin:6px 0;">
+
+                    <div class="form-check py-1 wage-addon">
+                        <input class="form-check-input" type="checkbox" id="wgNph"
+                               name="wage_add_nph_wages">
+                        <label class="form-check-label" for="wgNph" style="font-size:0.85rem;">
+                            <strong>Add NPH wages</strong>
+                            <span class="text-muted"> — <code>paid_holidays × daily_rate</code> added.
+                            Only takes effect when NPH is NOT already in attendance.</span>
+                        </label>
+                    </div>
+                    <div class="form-check py-1 wage-addon">
+                        <input class="form-check-input" type="checkbox" id="wgOt"
+                               name="include_overtime_in_wage">
+                        <label class="form-check-label" for="wgOt" style="font-size:0.85rem;">
+                            <strong>Add OT wages</strong>
+                            <span class="text-muted"> — <code>ot_amount</code> added to monthly wage</span>
+                        </label>
+                    </div>
+                    <div class="form-check py-1 wage-addon">
+                        <input class="form-check-input" type="checkbox" id="wgOther"
+                               name="wage_add_other_allowance">
+                        <label class="form-check-label" for="wgOther" style="font-size:0.85rem;">
+                            <strong>Add Other Allowance</strong>
+                            <span class="text-muted"> — anything in earned_gross beyond
+                            <code>attendance × daily_rate</code> (HRA, Conv, etc.)</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            {# ──────────────────────────────────────────────────────────────
+                SECTION 3 — Ceiling and Cap (optional, default not applicable)
+               ───────────────────────────────────────────────────────────── #}
+            <div class="card mt-3" style="background:#f5f3ff; border:1px solid #ddd6fe;">
+                <div class="card-body py-2 px-3">
+                    <h6 class="fw-bold mb-2" style="color:#5b21b6;">
+                        <i class="bi bi-3-square-fill"></i> Ceiling and Cap
+                        <small class="text-muted" style="font-weight:400;">(blank = not applicable, default)</small>
+                    </h6>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small mb-1">
+                                Per-Month Wage Ceiling (₹)
+                            </label>
+                            <input type="number" step="0.01" min="0"
+                                   name="wage_ceiling_per_month" class="form-control form-control-sm"
+                                   placeholder="e.g. 7000 — leave blank for none"/>
+                            <small class="text-muted" style="font-size:0.7rem;">
+                                Clamps each month's wage DOWN to this value before bonus % is applied.
+                                ₹7,000 reproduces the Sec. 12 statutory ceiling.
+                            </small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small mb-1">
+                                Max Bonus per Employee (₹)
+                            </label>
+                            <input type="number" step="0.01" min="0"
+                                   name="bonus_cap_per_employee" class="form-control form-control-sm"
+                                   placeholder="e.g. 16800 — leave blank for none"/>
+                            <small class="text-muted" style="font-size:0.7rem;">
+                                Annual ceiling on the total bonus paid to any one employee.
+                                Apply after the 12 monthly bonuses are summed.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                // When "Use Full Gross Salary" is checked, gray out the
+                // three optional add-ons since they have no effect.
+                function toggleFullGross() {
+                    var on = document.getElementById('wgUseFull').checked;
+                    document.querySelectorAll('.wage-addon input').forEach(function(cb) {
+                        cb.disabled = on;
+                        if (on) cb.checked = false;
+                    });
+                    document.querySelectorAll('.wage-addon').forEach(function(d) {
+                        d.style.opacity = on ? '0.4' : '1';
+                    });
+                }
+                toggleFullGross();
+            </script>
 
             <div class="mt-4 d-flex gap-2">
                 <button type="submit" class="btn btn-primary">

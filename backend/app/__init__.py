@@ -631,14 +631,22 @@ def _auto_migrate_columns(db):
         db.session.rollback()
         print(f"  [MIGRATE] payroll_input_files table: {e}")
 
-    # ── Bonus run: per-run wage-composition toggles ─────────────────────
-    # Lets the user pick whether attendance includes paid holidays and
-    # whether overtime wages are added into the bonus base.  Both default
-    # to the most common Indian convention for daily-wage establishments
-    # (include holidays = TRUE, include OT = FALSE).
+    # ── Bonus run: comprehensive composition toggles ─────────────────────
+    # Three sections — Attendance, Wage, Ceiling/Cap — driving the
+    # Vaishnavi simple-basis engine. All idempotent ADD IF NOT EXISTS.
     for ddl in [
+        # Section 1 — Attendance
         "ALTER TABLE bonus_runs ADD COLUMN IF NOT EXISTS include_holiday_attendance BOOLEAN NOT NULL DEFAULT TRUE",
+        "ALTER TABLE bonus_runs ADD COLUMN IF NOT EXISTS att_include_ot_days        BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE bonus_runs ADD COLUMN IF NOT EXISTS att_skip_zero              BOOLEAN NOT NULL DEFAULT TRUE",
+        # Section 2 — Wage
+        "ALTER TABLE bonus_runs ADD COLUMN IF NOT EXISTS wage_use_full_gross        BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE bonus_runs ADD COLUMN IF NOT EXISTS wage_add_nph_wages         BOOLEAN NOT NULL DEFAULT FALSE",
         "ALTER TABLE bonus_runs ADD COLUMN IF NOT EXISTS include_overtime_in_wage   BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE bonus_runs ADD COLUMN IF NOT EXISTS wage_add_other_allowance   BOOLEAN NOT NULL DEFAULT FALSE",
+        # Section 3 — Ceiling / Cap (nullable = not applicable, default)
+        "ALTER TABLE bonus_runs ADD COLUMN IF NOT EXISTS wage_ceiling_per_month     DOUBLE PRECISION",
+        "ALTER TABLE bonus_runs ADD COLUMN IF NOT EXISTS bonus_cap_per_employee     DOUBLE PRECISION",
     ]:
         try:
             db.session.execute(db.text(ddl))

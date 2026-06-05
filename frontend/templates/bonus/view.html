@@ -86,7 +86,8 @@
         {% if run.status != 'finalized' %}
         <form method="POST" action="{{ url_for('bonus.bonus_recalculate', run_id=run.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-            <div class="row g-2 align-items-end">
+
+            <div class="row g-2 mb-3">
                 <div class="col-md-3">
                     <label class="form-label small mb-1">Bonus %</label>
                     <select name="bonus_percentage" class="form-select form-select-sm">
@@ -99,34 +100,97 @@
                     <label class="form-label small mb-1">Min Days (Sec. 8)</label>
                     <input type="number" name="min_days_worked" class="form-control form-control-sm" value="{{ run.min_days_worked }}"/>
                 </div>
-                <div class="col-md-6 d-flex gap-3 align-items-end">
-                    <div class="form-check small">
-                        <input class="form-check-input" type="checkbox" id="rcHol"
-                               name="include_holiday_attendance"
-                               {% if run.include_holiday_attendance %}checked{% endif %}>
-                        <label class="form-check-label" for="rcHol">
-                            Include paid holidays in attendance
-                        </label>
-                    </div>
-                    <div class="form-check small">
-                        <input class="form-check-input" type="checkbox" id="rcOt"
-                               name="include_overtime_in_wage"
-                               {% if run.include_overtime_in_wage %}checked{% endif %}>
-                        <label class="form-check-label" for="rcOt">
-                            Include OT in monthly wage
-                        </label>
+            </div>
+
+            <div class="row g-2">
+                {# ── Section 1: Attendance ── #}
+                <div class="col-md-4">
+                    <div class="p-2 rounded" style="background:#eff6ff; border:1px solid #bfdbfe; font-size:0.78rem;">
+                        <div class="fw-bold mb-1" style="color:#1e40af;">1. Attendance</div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="rcAttNph"
+                                   name="include_holiday_attendance" {% if run.include_holiday_attendance %}checked{% endif %}>
+                            <label class="form-check-label" for="rcAttNph">Add NPH</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="rcAttOt"
+                                   name="att_include_ot_days" {% if run.att_include_ot_days %}checked{% endif %}>
+                            <label class="form-check-label" for="rcAttOt">Add OT (hrs÷8)</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="rcSkipZero"
+                                   name="att_skip_zero" {% if run.att_skip_zero %}checked{% endif %}>
+                            <label class="form-check-label" for="rcSkipZero">Skip zero-attendance</label>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <button class="btn btn-sm btn-warning w-100"><i class="bi bi-arrow-clockwise"></i> Recalculate</button>
+
+                {# ── Section 2: Wage ── #}
+                <div class="col-md-4">
+                    <div class="p-2 rounded" style="background:#fff7ed; border:1px solid #fed7aa; font-size:0.78rem;">
+                        <div class="fw-bold mb-1" style="color:#9a3412;">2. Wage</div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="rcFullGross"
+                                   name="wage_use_full_gross"
+                                   {% if run.wage_use_full_gross %}checked{% endif %}>
+                            <label class="form-check-label fw-bold" for="rcFullGross">Use Full Gross (overrides)</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="rcWageNph"
+                                   name="wage_add_nph_wages" {% if run.wage_add_nph_wages %}checked{% endif %}>
+                            <label class="form-check-label" for="rcWageNph">+ NPH wages</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="rcWageOt"
+                                   name="include_overtime_in_wage" {% if run.include_overtime_in_wage %}checked{% endif %}>
+                            <label class="form-check-label" for="rcWageOt">+ OT wages</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="rcWageOther"
+                                   name="wage_add_other_allowance" {% if run.wage_add_other_allowance %}checked{% endif %}>
+                            <label class="form-check-label" for="rcWageOther">+ Other Allowance</label>
+                        </div>
+                    </div>
                 </div>
+
+                {# ── Section 3: Ceiling/Cap ── #}
+                <div class="col-md-4">
+                    <div class="p-2 rounded" style="background:#f5f3ff; border:1px solid #ddd6fe; font-size:0.78rem;">
+                        <div class="fw-bold mb-1" style="color:#5b21b6;">3. Ceiling / Cap <small class="text-muted">(blank = none)</small></div>
+                        <div class="mb-1">
+                            <label class="form-label mb-0" style="font-size:0.72rem;">Per-month wage ceiling (₹)</label>
+                            <input type="number" step="0.01" min="0" name="wage_ceiling_per_month"
+                                   class="form-control form-control-sm"
+                                   value="{{ run.wage_ceiling_per_month|int if run.wage_ceiling_per_month else '' }}"
+                                   placeholder="e.g. 7000"/>
+                        </div>
+                        <div>
+                            <label class="form-label mb-0" style="font-size:0.72rem;">Max bonus / employee (₹)</label>
+                            <input type="number" step="0.01" min="0" name="bonus_cap_per_employee"
+                                   class="form-control form-control-sm"
+                                   value="{{ run.bonus_cap_per_employee|int if run.bonus_cap_per_employee else '' }}"
+                                   placeholder="e.g. 16800"/>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-3">
+                <button class="btn btn-sm btn-warning"><i class="bi bi-arrow-clockwise"></i> Apply Settings & Recalculate</button>
             </div>
         </form>
         {% else %}
         <div class="small text-muted">
-            {{ run.bonus_percentage }}% | Min Days (Sec. 8): {{ run.min_days_worked }} |
-            Holidays in attendance: <strong>{{ 'YES' if run.include_holiday_attendance else 'NO' }}</strong> |
-            OT in wage: <strong>{{ 'YES' if run.include_overtime_in_wage else 'NO' }}</strong>
+            {{ run.bonus_percentage }}% · Min Days {{ run.min_days_worked }} ·
+            Attendance: NPH={{ 'Y' if run.include_holiday_attendance else 'N' }},
+            OT-days={{ 'Y' if run.att_include_ot_days else 'N' }},
+            SkipZero={{ 'Y' if run.att_skip_zero else 'N' }} ·
+            Wage: FullGross={{ 'Y' if run.wage_use_full_gross else 'N' }},
+            +NPH={{ 'Y' if run.wage_add_nph_wages else 'N' }},
+            +OT={{ 'Y' if run.include_overtime_in_wage else 'N' }},
+            +Other={{ 'Y' if run.wage_add_other_allowance else 'N' }} ·
+            Ceiling: ₹{{ run.wage_ceiling_per_month|int if run.wage_ceiling_per_month else '—' }} ·
+            Bonus Cap: ₹{{ run.bonus_cap_per_employee|int if run.bonus_cap_per_employee else '—' }}
         </div>
         {% endif %}
     </div>

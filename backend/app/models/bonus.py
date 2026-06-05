@@ -26,18 +26,53 @@ class BonusRun(db.Model):
     eligibility_cap = db.Column(db.Float, nullable=False, default=21000.0) # Sec 2(13) (legacy)
     min_days_worked = db.Column(db.Integer, nullable=False, default=30)    # Sec 8
 
-    # ── Vaishnavi engine settings (drive the simple Attendance×Rate basis) ──
-    # include_holiday_attendance: when TRUE, paid_holidays are added to
-    #   days_present before the "Attendance" column is computed. Daily-wage
-    #   establishments that pay for declared holidays normally want this ON
-    #   so the holiday days count toward the bonus base.
-    # include_overtime_in_wage: when TRUE, ot_amount is added to the
-    #   monthly wage before bonus % is applied. Statutorily OT is NOT part
-    #   of bonus wages (Sec. 2(21) defines salary/wage excluding OT) so
-    #   the default is FALSE — but some clients voluntarily include it,
-    #   so the user can flip this per run.
+    # ──────────────────────────────────────────────────────────────────────
+    # Vaishnavi engine settings — three sections of toggles the user picks
+    # before generating the bonus sheet. All ignored by the legacy
+    # Basic+DA Statement Excel exporter.
+    # ──────────────────────────────────────────────────────────────────────
+
+    # ── SECTION 1: Attendance composition ─────────────────────────────────
+    # include_holiday_attendance: ON → paid_holidays added to attendance
+    # att_include_ot_days       : ON → ot_hours/8 added to attendance
+    # att_skip_zero             : ON → employees whose total FY attendance
+    #                                  is 0 are skipped from the run entirely
+    # If both include_holiday_attendance and att_include_ot_days are OFF
+    # the engine uses "pure worked attendance only" (days_present).
     include_holiday_attendance = db.Column(db.Boolean, nullable=False, default=True)
+    att_include_ot_days        = db.Column(db.Boolean, nullable=False, default=False)
+    att_skip_zero              = db.Column(db.Boolean, nullable=False, default=True)
+
+    # ── SECTION 2: Wage composition ───────────────────────────────────────
+    # wage_use_full_gross       : ON → monthly_wage = entry.total_earnings
+    #                                  (includes all earning heads + OT +
+    #                                  arrears). Overrides every other
+    #                                  wage_* flag below.
+    # wage_add_nph_wages        : ON → paid_holidays × daily_rate is added
+    #                                  to the base (only takes effect when
+    #                                  include_holiday_attendance is OFF —
+    #                                  otherwise NPH wage is already in the
+    #                                  attendance × daily_rate base)
+    # include_overtime_in_wage  : ON → ot_amount is added to the base
+    # wage_add_other_allowance  : ON → max(0, earned_gross − base) added,
+    #                                  i.e. anything earned beyond plain
+    #                                  attendance × daily_rate
+    wage_use_full_gross        = db.Column(db.Boolean, nullable=False, default=False)
+    wage_add_nph_wages         = db.Column(db.Boolean, nullable=False, default=False)
     include_overtime_in_wage   = db.Column(db.Boolean, nullable=False, default=False)
+    wage_add_other_allowance   = db.Column(db.Boolean, nullable=False, default=False)
+
+    # ── SECTION 3: Ceiling and Cap (NULL = not applicable, default) ───────
+    # wage_ceiling_per_month   : per-month maximum on the wage. If a month's
+    #                            computed wage exceeds this, it's clamped
+    #                            DOWN to the ceiling before bonus % is
+    #                            applied. e.g. 7000 reproduces the Sec. 12
+    #                            statutory cap.
+    # bonus_cap_per_employee   : annual maximum on the total bonus per
+    #                            employee. e.g. 20% × 12 × 7000 = 16,800
+    #                            reproduces Sec. 11. NULL = no cap.
+    wage_ceiling_per_month     = db.Column(db.Float, nullable=True)
+    bonus_cap_per_employee     = db.Column(db.Float, nullable=True)
 
     # Status: draft | finalized
     status = db.Column(db.String(15), nullable=False, default='draft')
