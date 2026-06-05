@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% block title %}Paid Leave — {{ run.year }}{% endblock %}
+{% block page_header %}{{ run.establishment.company_name }} — Paid Leave {{ run.year }}{% endblock %}
+
+{% block content %}
+<div class="mb-3 d-flex gap-2 flex-wrap">
+    <a href="{{ url_for('paid_leave.paid_leave_list') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+    <a href="{{ url_for('paid_leave.paid_leave_statement_excel', run_id=run.id) }}" class="btn btn-sm"
+       style="background:linear-gradient(135deg,#0ea5e9,#0369a1); border:none; color:#fff; font-weight:600;">
+        <i class="bi bi-file-earmark-excel-fill"></i> Paid Leave Statement Excel
+    </a>
+    <a href="{{ url_for('paid_leave.paid_leave_form15', run_id=run.id) }}" class="btn btn-sm"
+       style="background:#1d4ed8; border:none; color:#fff; font-weight:600;">
+        <i class="bi bi-file-earmark-check-fill"></i> Form 15 (Register) — Govt
+    </a>
+    {% if run.status != 'finalized' %}
+    <form method="POST" action="{{ url_for('paid_leave.paid_leave_delete', run_id=run.id) }}"
+          onsubmit="return confirm('Delete this paid leave run? This cannot be undone.')" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Delete</button>
+    </form>
+    {% endif %}
+</div>
+
+<!-- Summary -->
+<div class="row g-2 mb-3">
+    <div class="col-md-3"><div class="card shadow-sm"><div class="card-body py-2 px-3">
+        <div class="text-muted small">Status</div>
+        {% if run.status == 'finalized' %}
+            <div class="badge bg-success">Finalized on {{ run.finalized_at.strftime('%d %b %Y') if run.finalized_at }}</div>
+        {% else %}
+            <div class="badge bg-warning text-dark">Draft</div>
+        {% endif %}
+    </div></div></div>
+    <div class="col-md-3"><div class="card shadow-sm"><div class="card-body py-2 px-3">
+        <div class="text-muted small">Eligible / Total</div>
+        <div class="fw-bold">{{ run.eligible_employees }} / {{ run.total_employees }}</div>
+    </div></div></div>
+    <div class="col-md-3"><div class="card shadow-sm"><div class="card-body py-2 px-3">
+        <div class="text-muted small">Eligibility</div>
+        <div class="fw-bold">≥ {{ run.eligibility_threshold }} days · 1 per {{ run.eligibility_divisor }}</div>
+    </div></div></div>
+    <div class="col-md-3"><div class="card shadow-sm"><div class="card-body py-2 px-3">
+        <div class="text-muted small">Total PL Amount</div>
+        <div class="fw-bold text-success">₹{{ "{:,.0f}".format(run.total_pl_amount or 0) }}</div>
+    </div></div></div>
+</div>
+
+<!-- Configuration / Recalc -->
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <h6 class="fw-bold text-muted mb-1">Configuration</h6>
+        <p class="small text-muted mb-3">
+            <i class="bi bi-info-circle"></i>
+            Calculation: <strong>Total Attendance ÷ Divisor × December Rate</strong>.
+            Sec. 79 default: 240 days qualifying, 1 day per 20 days worked.
+        </p>
+        {% if run.status != 'finalized' %}
+        <form method="POST" action="{{ url_for('paid_leave.paid_leave_recalculate', run_id=run.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small mb-1">Eligibility threshold</label>
+                    <input type="number" name="eligibility_threshold" class="form-control form-control-sm"
+                           value="{{ run.eligibility_threshold }}" min="1"/>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small mb-1">Leave divisor</label>
+                    <input type="number" name="eligibility_divisor" class="form-control form-control-sm"
+                           value="{{ run.eligibility_divisor }}" min="1"/>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-1">Layout mode</label>
+                    <select name="layout_mode" class="form-select form-select-sm">
+                        <option value="top_bottom" {% if run.layout_mode == 'top_bottom' %}selected{% endif %}>Top–Bottom</option>
+                        <option value="separate_sheets" {% if run.layout_mode == 'separate_sheets' %}selected{% endif %}>Separate Sheets</option>
+                        <option value="mixed" {% if run.layout_mode == 'mixed' %}selected{% endif %}>Mixed</option>
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex gap-2 align-items-end">
+                    <div class="form-check small">
+                        <input class="form-check-input" type="checkbox" name="include_holiday_attendance"
+                               id="plRcNph" {% if run.include_holiday_attendance %}checked{% endif %}>
+                        <label class="form-check-label" for="plRcNph">Add NPH</label>
+                    </div>
+                    <div class="form-check small">
+                        <input class="form-check-input" type="checkbox" name="skip_zero_attendance"
+                               id="plRcSkip" {% if run.skip_zero_attendance %}checked{% endif %}>
+                        <label class="form-check-label" for="plRcSkip">Skip zero</label>
+                    </div>
+                </div>
+                <div class="col-md-12 mt-2">
+                    <button class="btn btn-sm btn-warning"><i class="bi bi-arrow-clockwise"></i> Apply & Recalculate</button>
+                </div>
+            </div>
+        </form>
+        {% else %}
+        <div class="small text-muted">
+            ≥ {{ run.eligibility_threshold }} days · ÷ {{ run.eligibility_divisor }} ·
+            NPH={{ 'Y' if run.include_holiday_attendance else 'N' }} ·
+            SkipZero={{ 'Y' if run.skip_zero_attendance else 'N' }} ·
+            Layout={{ run.layout_mode }}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Entries -->
+<div class="card shadow-sm mb-3">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" style="font-size:0.78rem;">
+            <thead class="table-light">
+                <tr>
+                    <th>Sr</th>
+                    <th>UAN / ESIC</th>
+                    <th>Name</th>
+                    <th class="text-end">Base Att.</th>
+                    <th class="text-end">+ Manual</th>
+                    <th class="text-end">Total Att.</th>
+                    <th class="text-end">Elig. Att.<br>(÷{{ run.eligibility_divisor }})</th>
+                    <th class="text-end">Dec. Rate</th>
+                    <th class="text-end">PL Amount</th>
+                    <th class="text-center">Eligibility</th>
+                    <th>Remarks</th>
+                    {% if run.status != 'finalized' %}<th>Add Days</th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in entries %}
+                <tr class="{% if not e.is_eligible %}table-secondary{% endif %}">
+                    <td>{{ loop.index }}</td>
+                    <td><small class="font-monospace">{{ e.employee.uan_number or e.employee.esic_ip_number or '—' }}</small></td>
+                    <td><strong>{{ e.employee.name }}</strong></td>
+                    <td class="text-end">{{ "%.1f"|format(e.base_attendance) }}</td>
+                    <td class="text-end {% if e.manual_addition %}fw-bold text-warning{% endif %}">
+                        {% if e.manual_addition %}+{{ "%.0f"|format(e.manual_addition) }}{% else %}—{% endif %}
+                    </td>
+                    <td class="text-end fw-bold">{{ "%.1f"|format(e.total_attendance) }}</td>
+                    <td class="text-end">{{ "%.2f"|format(e.eligible_attendance) }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(e.december_rate or 0) }}</td>
+                    <td class="text-end fw-bold text-success">₹{{ "{:,.0f}".format(e.pl_amount or 0) }}</td>
+                    <td class="text-center">
+                        {% if e.is_eligible %}
+                        <span class="badge bg-success">Eligible</span>
+                        {% else %}
+                        <span class="badge bg-danger" title="{{ e.ineligibility_reason }}">Not Eligible</span>
+                        {% endif %}
+                    </td>
+                    <td><small>{{ e.remarks or '' }}</small></td>
+                    {% if run.status != 'finalized' %}
+                    <td>
+                        <button class="btn btn-sm btn-link p-0" data-bs-toggle="modal" data-bs-target="#addm{{ e.id }}">
+                            <i class="bi bi-plus-circle-fill text-warning"></i>
+                        </button>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% if run.status != 'finalized' %}
+                <div class="modal fade" id="addm{{ e.id }}" tabindex="-1">
+                    <div class="modal-dialog">
+                        <form method="POST" action="{{ url_for('paid_leave.paid_leave_set_manual', run_id=run.id, entry_id=e.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Manually add days — {{ e.employee.name }}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p class="small text-muted">
+                                        Use this if the client wants to push this employee over the
+                                        {{ run.eligibility_threshold }}-day threshold (e.g. uncertified
+                                        leave that the client wants to count as worked).
+                                    </p>
+                                    <p class="small text-muted">
+                                        Currently base attendance is <strong>{{ "%.1f"|format(e.base_attendance) }}</strong> days.
+                                        Need at least <strong>{{ run.eligibility_threshold - e.total_attendance|round(0)|int }}</strong>
+                                        more days to qualify.
+                                    </p>
+                                    <label class="form-label">Days to add (₹0 to remove existing addition)</label>
+                                    <input type="number" step="0.5" min="0" name="manual_addition"
+                                           class="form-control" value="{{ '%.0f'|format(e.manual_addition or 0) }}"/>
+                                    <label class="form-label mt-2">Remarks</label>
+                                    <input type="text" name="remarks" class="form-control" value="{{ e.remarks or '' }}"
+                                           placeholder="e.g. Client-approved adjustment"/>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-warning">Apply</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+
+<!-- Finalize / Unfinalize -->
+{% if run.status != 'finalized' %}
+<div class="card border-success shadow-sm">
+    <div class="card-body">
+        <h6 class="fw-bold text-success">Finalize this Paid Leave Run</h6>
+        <p class="small text-muted">Finalizing locks the run and records the payment date. You can unfinalize later if needed.</p>
+        <form method="POST" action="{{ url_for('paid_leave.paid_leave_finalize', run_id=run.id) }}" class="d-flex gap-2 align-items-end">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div>
+                <label class="form-label small mb-1">Payment Date</label>
+                <input type="date" name="payment_date" class="form-control form-control-sm" required/>
+            </div>
+            <button class="btn btn-success btn-sm"><i class="bi bi-check-circle"></i> Finalize</button>
+        </form>
+    </div>
+</div>
+{% else %}
+<div class="card border-warning shadow-sm">
+    <div class="card-body d-flex justify-content-between align-items-center">
+        <div>
+            <strong>This run is finalized.</strong>
+            {% if run.payment_date %}Payment date: {{ run.payment_date.strftime('%d %b %Y') }}{% endif %}
+        </div>
+        <form method="POST" action="{{ url_for('paid_leave.paid_leave_unfinalize', run_id=run.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <button class="btn btn-sm btn-outline-warning"><i class="bi bi-unlock"></i> Unfinalize (Edit)</button>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

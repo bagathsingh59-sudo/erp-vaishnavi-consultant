@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Paid Leave Runs{% endblock %}
+{% block page_header %}Paid Leave — Earned Leave with Wages{% endblock %}
+
+{% block content %}
+<div class="mb-3 d-flex justify-content-between align-items-center">
+    <div class="text-muted small">
+        Annual Earned-Leave statement (Jan → Dec) per Karnataka Factories Act, Sec. 79.
+    </div>
+    <a href="{{ url_for('paid_leave.paid_leave_new') }}" class="btn btn-sm btn-primary">
+        <i class="bi bi-plus-lg"></i> New Paid Leave Run
+    </a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        {% if runs %}
+        <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" style="font-size:0.85rem;">
+            <thead class="table-light">
+                <tr>
+                    <th>Sr</th>
+                    <th>Establishment</th>
+                    <th>Year</th>
+                    <th class="text-center">Status</th>
+                    <th class="text-end">Eligible / Total</th>
+                    <th class="text-end">Total PL Amount</th>
+                    <th>Created</th>
+                    <th>Open</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for run in runs %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><strong>{{ run.establishment.company_name }}</strong></td>
+                    <td>{{ run.year }}</td>
+                    <td class="text-center">
+                        {% if run.status == 'finalized' %}
+                        <span class="badge bg-success">Finalized</span>
+                        {% else %}
+                        <span class="badge bg-warning text-dark">Draft</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">{{ run.eligible_employees }} / {{ run.total_employees }}</td>
+                    <td class="text-end fw-bold text-success">₹{{ "{:,.0f}".format(run.total_pl_amount or 0) }}</td>
+                    <td><small class="text-muted">{{ run.created_at.strftime('%d %b %Y') }}</small></td>
+                    <td>
+                        <a href="{{ url_for('paid_leave.paid_leave_view', run_id=run.id) }}"
+                           class="btn btn-sm btn-outline-primary"><i class="bi bi-arrow-right"></i></a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-calendar-x" style="font-size:2rem;"></i>
+            <p class="mt-2 mb-3">No paid leave runs yet.</p>
+            <a href="{{ url_for('paid_leave.paid_leave_new') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> Create the first one
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

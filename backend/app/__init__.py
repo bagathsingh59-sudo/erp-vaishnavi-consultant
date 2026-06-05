@@ -362,6 +362,10 @@ def create_app():
     from app.routes.bonus import bonus_bp
     app.register_blueprint(bonus_bp)
 
+    # Register Paid Leave blueprint
+    from app.routes.paid_leave import paid_leave_bp
+    app.register_blueprint(paid_leave_bp)
+
     # Register Manual Reimbursement blueprint
     from app.routes.manual_reimbursement import manual_reimb_bp
     app.register_blueprint(manual_reimb_bp)
@@ -420,6 +424,7 @@ def create_app():
                                          PayrollEntryHead, PayrollDocument, PayrollInputFile)
         # [TRIAL: doc-pack] — remove this import to fully detach the trial model
         from app.models.doc_pack_trial import PayrollDocPack  # noqa: F401
+        from app.models.paid_leave import PaidLeaveRun, PaidLeaveEntry  # noqa: F401
         from app.models.accounts import AccountGroup, AccountHead, Voucher, VoucherEntry
         from app.models.activity_log import ActivityLog
         from app.models.app_user import AppUser
@@ -630,6 +635,59 @@ def _auto_migrate_columns(db):
     except Exception as e:
         db.session.rollback()
         print(f"  [MIGRATE] payroll_input_files table: {e}")
+
+    # ── Paid Leave tables (annual leave-with-wages, Jan-Dec) ────────────
+    # Karnataka Factories Act 1948 Sec. 79 — 240 days qualify, 1 day
+    # earned leave per 20 days of work.  Both thresholds configurable.
+    try:
+        db.session.execute(db.text("""
+            CREATE TABLE IF NOT EXISTS paid_leave_runs (
+                id                         SERIAL PRIMARY KEY,
+                establishment_id           INTEGER NOT NULL REFERENCES establishments(id) ON DELETE CASCADE,
+                year                       INTEGER NOT NULL,
+                include_holiday_attendance BOOLEAN NOT NULL DEFAULT TRUE,
+                skip_zero_attendance       BOOLEAN NOT NULL DEFAULT TRUE,
+                eligibility_threshold      INTEGER NOT NULL DEFAULT 240,
+                eligibility_divisor        INTEGER NOT NULL DEFAULT 20,
+                layout_mode                VARCHAR(20) NOT NULL DEFAULT 'top_bottom',
+                status                     VARCHAR(15) NOT NULL DEFAULT 'draft',
+                total_employees            INTEGER DEFAULT 0,
+                eligible_employees         INTEGER DEFAULT 0,
+                total_pl_amount            DOUBLE PRECISION DEFAULT 0,
+                payment_date               DATE,
+                created_at                 TIMESTAMP NOT NULL DEFAULT NOW(),
+                finalized_at               TIMESTAMP
+            )
+        """))
+        db.session.execute(db.text("""
+            CREATE TABLE IF NOT EXISTS paid_leave_entries (
+                id                    SERIAL PRIMARY KEY,
+                paid_leave_run_id     INTEGER NOT NULL REFERENCES paid_leave_runs(id) ON DELETE CASCADE,
+                employee_id           INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+                monthly_data          TEXT,
+                base_attendance       DOUBLE PRECISION DEFAULT 0,
+                manual_addition       DOUBLE PRECISION DEFAULT 0,
+                total_attendance      DOUBLE PRECISION DEFAULT 0,
+                eligible_attendance   DOUBLE PRECISION DEFAULT 0,
+                december_rate         DOUBLE PRECISION DEFAULT 0,
+                pl_amount             DOUBLE PRECISION DEFAULT 0,
+                is_eligible           BOOLEAN DEFAULT FALSE,
+                ineligibility_reason  VARCHAR(200),
+                remarks               VARCHAR(200)
+            )
+        """))
+        db.session.execute(db.text(
+            "CREATE INDEX IF NOT EXISTS ix_paid_leave_runs_est_year "
+            "ON paid_leave_runs(establishment_id, year)"
+        ))
+        db.session.execute(db.text(
+            "CREATE INDEX IF NOT EXISTS ix_paid_leave_entries_run "
+            "ON paid_leave_entries(paid_leave_run_id)"
+        ))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"  [MIGRATE] paid_leave tables: {e}")
 
     # ── Bonus run: comprehensive composition toggles ─────────────────────
     # Three sections — Attendance, Wage, Ceiling/Cap — driving the

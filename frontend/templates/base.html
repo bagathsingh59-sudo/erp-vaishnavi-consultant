@@ -330,6 +330,12 @@
                 <span>Bonus</span>
             </a>
 
+            <a href="{{ url_for('paid_leave.paid_leave_list') }}"
+               class="sidebar-link {% if request.endpoint and request.endpoint.startswith('paid_leave.') %}active{% endif %}">
+                <i class="bi bi-calendar2-check"></i>
+                <span>Paid Leave</span>
+            </a>
+
             {# Document Vault — disabled for now, will enable after 3-6 months #}
 
             <a href="{{ url_for('payroll.payroll_list', tab='reports', establishment=selected_est.id) }}"

@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}New Paid Leave Run{% endblock %}
+{% block page_header %}Create New Paid Leave Run{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm" style="max-width:900px;">
+    <div class="card-body">
+
+        <div class="alert alert-info py-2 px-3" style="font-size:0.82rem;">
+            <i class="bi bi-info-circle-fill me-1"></i>
+            <strong>What is a Paid Leave Run?</strong>
+            Computes annual Earned Leave with Wages per the Karnataka Factories Act (Sec. 79):
+            sums each employee's attendance Jan → Dec, derives leave days
+            (Total Attendance ÷ 20), and multiplies by the December daily rate to get the
+            encashment amount. Eligible employees are those with ≥ 240 days worked.
+        </div>
+
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">Establishment <span class="text-danger">*</span></label>
+                <select name="establishment_id" class="form-select" required>
+                    <option value="">-- Select --</option>
+                    {% for e in establishments %}
+                    <option value="{{ e.id }}">{{ e.company_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">Calendar Year <span class="text-danger">*</span></label>
+                <select name="year" class="form-select" required>
+                    {% for y in years|reverse %}
+                    <option value="{{ y }}" {% if y == current_year - 1 %}selected{% endif %}>
+                        {{ y }} (Jan-{{ y }} → Dec-{{ y }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <hr>
+            <h6 class="fw-bold text-muted">Configuration</h6>
+
+            {# Section 1 — Attendance #}
+            <div class="card mt-2" style="background:#eff6ff; border:1px solid #bfdbfe;">
+                <div class="card-body py-2 px-3">
+                    <h6 class="fw-bold mb-2" style="color:#1e40af;">
+                        <i class="bi bi-1-square-fill"></i> Attendance
+                    </h6>
+                    <div class="form-check py-1">
+                        <input class="form-check-input" type="checkbox" id="plAttNph"
+                               name="include_holiday_attendance" checked>
+                        <label class="form-check-label" for="plAttNph">
+                            <strong>Add NPH (paid holidays) to attendance</strong>
+                            <span class="text-muted small"> — attendance = days_present + paid_holidays</span>
+                        </label>
+                    </div>
+                    <div class="form-check py-1">
+                        <input class="form-check-input" type="checkbox" id="plSkipZero"
+                               name="skip_zero_attendance" checked>
+                        <label class="form-check-label" for="plSkipZero">
+                            <strong>Skip employees with zero total attendance</strong>
+                            <span class="text-muted small"> — they won't appear in the statement at all</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            {# Section 2 — Eligibility #}
+            <div class="card mt-2" style="background:#fff7ed; border:1px solid #fed7aa;">
+                <div class="card-body py-2 px-3">
+                    <h6 class="fw-bold mb-2" style="color:#9a3412;">
+                        <i class="bi bi-2-square-fill"></i> Eligibility Rule
+                    </h6>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label small mb-1">Minimum days to qualify</label>
+                            <input type="number" name="eligibility_threshold" class="form-control form-control-sm"
+                                   value="240" min="1"/>
+                            <small class="text-muted">Sec. 79 default: 240 days in the calendar year</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small mb-1">Earn 1 day of leave per</label>
+                            <div class="input-group input-group-sm">
+                                <input type="number" name="eligibility_divisor" class="form-control"
+                                       value="20" min="1"/>
+                                <span class="input-group-text">days worked</span>
+                            </div>
+                            <small class="text-muted">Sec. 79(1)(i) default: 20</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {# Section 3 — Layout #}
+            <div class="card mt-2" style="background:#f5f3ff; border:1px solid #ddd6fe;">
+                <div class="card-body py-2 px-3">
+                    <h6 class="fw-bold mb-2" style="color:#5b21b6;">
+                        <i class="bi bi-3-square-fill"></i> Statement Layout
+                    </h6>
+                    <div class="form-check py-1">
+                        <input class="form-check-input" type="radio" name="layout_mode" id="lyTopBottom"
+                               value="top_bottom" checked>
+                        <label class="form-check-label" for="lyTopBottom">
+                            <strong>Top–Bottom</strong>
+                            <span class="text-muted small"> — single sheet: Eligible block on top, Not Eligible below</span>
+                        </label>
+                    </div>
+                    <div class="form-check py-1">
+                        <input class="form-check-input" type="radio" name="layout_mode" id="lySeparate"
+                               value="separate_sheets">
+                        <label class="form-check-label" for="lySeparate">
+                            <strong>Separate Sheets</strong>
+                            <span class="text-muted small"> — two sheets in the workbook (Eligible / Not Eligible)</span>
+                        </label>
+                    </div>
+                    <div class="form-check py-1">
+                        <input class="form-check-input" type="radio" name="layout_mode" id="lyMixed"
+                               value="mixed">
+                        <label class="form-check-label" for="lyMixed">
+                            <strong>Mixed</strong>
+                            <span class="text-muted small"> — single sheet, employees mixed (sorted by name)</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-calculator"></i> Create & Calculate
+                </button>
+                <a href="{{ url_for('paid_leave.paid_leave_list') }}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
