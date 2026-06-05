@@ -3179,3 +3179,109 @@ def compliance_annual(est_id):
                            monthly_data=monthly_data,
                            grand=grand,
                            generated_on=generated_on)
+
+
+@reports_bp.route('/establishment/<int:est_id>/report/ca-audit')
+def ca_audit_report(est_id):
+    """CA (Audit) Report — Annual FY statement tailored for a Chartered
+    Accountant filing the audit. Same April–March structure as the Annual
+    Compliance Statement, but presented audit-style with explicit
+    Employee Share / Employer Share columns for EPF & ESIC, plus
+    Professional Tax, Net Pay and consolidated Employee/Employer totals.
+    """
+    est = Establishment.query.get_or_404(est_id)
+    verify_est_ownership(est)
+    config = PayrollConfig.query.filter_by(establishment_id=est.id).first()
+
+    # Determine financial year from query param or current date
+    fy = request.args.get('fy', None)
+    if fy:
+        fy_start_year = int(fy)
+    else:
+        now = datetime.now()
+        fy_start_year = now.year if now.month >= 4 else now.year - 1
+
+    fy_end_year = fy_start_year + 1
+    fy_label = f'{fy_start_year}-{str(fy_end_year)[-2:]}'
+
+    # Build 12 months: Apr(start_year) to Mar(end_year)
+    months_order = []
+    for m in range(4, 13):
+        months_order.append((m, fy_start_year))
+    for m in range(1, 4):
+        months_order.append((m, fy_end_year))
+
+    month_names = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+    monthly_data = []
+    grand = {
+        'employees': 0, 'gross': 0,
+        'epf_wages': 0, 'esic_wages': 0,
+        'epf_ee': 0, 'epf_er': 0,
+        'esic_ee': 0, 'esic_er': 0,
+        'pt': 0, 'net_pay': 0,
+        'total_ee': 0, 'total_er': 0,
+        'total_deposit': 0, 'total_statutory': 0,
+    }
+
+    for month_num, year in months_order:
+        payroll = MonthlyPayroll.query.filter_by(
+            establishment_id=est.id, month=month_num, year=year
+        ).first()
+
+        label = f'{month_names[month_num]}-{year}'
+
+        if payroll and payroll.status in ['processing', 'finalized']:
+            entries = PayrollEntry.query.filter_by(monthly_payroll_id=payroll.id).all()
+
+            m_epf_wages = sum(e.epf_wages for e in entries)
+            m_esic_wages = sum(e.esic_wages for e in entries)
+            m_epf_ee = sum(e.epf_employee for e in entries)
+            m_epf_er = sum(e.epf_ac01 + e.epf_eps + e.epf_edli + e.epf_admin for e in entries)
+            m_esic_ee = sum(e.esic_employee for e in entries)
+            m_esic_er = sum(e.esic_employer for e in entries)
+            m_pt = sum(e.professional_tax for e in entries)
+            m_net_pay = sum(e.net_pay for e in entries)
+            m_total_ee = m_epf_ee + m_esic_ee
+            m_total_er = m_epf_er + m_esic_er
+            m_total_deposit = m_total_ee + m_total_er          # EPF + ESIC challan
+            m_total_statutory = m_total_deposit + m_pt          # incl. Professional Tax
+
+            row = {
+                'month': label,
+                'employees': payroll.total_employees,
+                'gross': payroll.total_gross,
+                'epf_wages': m_epf_wages,
+                'esic_wages': m_esic_wages,
+                'epf_ee': m_epf_ee,
+                'epf_er': m_epf_er,
+                'esic_ee': m_esic_ee,
+                'esic_er': m_esic_er,
+                'pt': m_pt,
+                'net_pay': m_net_pay,
+                'total_ee': m_total_ee,
+                'total_er': m_total_er,
+                'total_deposit': m_total_deposit,
+                'total_statutory': m_total_statutory,
+                'has_data': True,
+                'payroll_id': payroll.id,
+            }
+
+            for key in grand:
+                if key in row:
+                    grand[key] += row[key]
+        else:
+            row = {'month': label, 'has_data': False}
+
+        monthly_data.append(row)
+
+    generated_on = datetime.now().strftime('%d %b %Y, %I:%M %p')
+
+    return render_template('reports/ca_audit.html',
+                           est=est, config=config,
+                           fy_label=fy_label,
+                           fy_start_year=fy_start_year,
+                           monthly_data=monthly_data,
+                           grand=grand,
+                           generated_on=generated_on)

@@ -6,7 +6,7 @@
     'epf':           {'icon': 'bi-shield-check',         'title': 'EPF Returns',             'subtitle': 'EPF ECR Text / CSV for Portal Upload'},
     'esic':          {'icon': 'bi-hospital',             'title': 'ESIC Returns',            'subtitle': 'ESIC MC Template for Portal Upload'},
     'reports':       {'icon': 'bi-file-earmark-bar-graph','title': 'Reports & Downloads',    'subtitle': 'Salary Statement, Form B, Attendance Register'},
-    'compliance':    {'icon': 'bi-clipboard-data',       'title': 'Compliance Statement',    'subtitle': 'Monthly & Annual EPF/ESIC Compliance'},
+    'compliance':    {'icon': 'bi-clipboard-data',       'title': 'Compliance Statement',    'subtitle': 'Monthly, Annual (FY) & CA (Audit) EPF/ESIC Compliance'},
     'reimbursement': {'icon': 'bi-envelope-paper',       'title': 'Reimbursement',           'subtitle': 'EPF/ESIC Employer Share Reimbursement Letter'},
 } %}
 
@@ -346,11 +346,14 @@
     <!-- ==================== COMPLIANCE TAB ==================== -->
     {% elif active_tab == 'compliance' %}
 
-    <!-- Annual Statement Button -->
+    <!-- Annual Statement + CA (Audit) Report Buttons -->
     {% if payrolls|length > 0 %}
-    <div class="mb-3">
+    <div class="mb-3 d-flex flex-wrap gap-2">
         <a href="{{ url_for('reports.compliance_annual', est_id=payrolls[0].establishment.id) }}" class="btn btn-primary" target="_blank">
             <i class="bi bi-calendar-range me-1"></i>Generate Annual Compliance Statement
+        </a>
+        <a href="{{ url_for('reports.ca_audit_report', est_id=payrolls[0].establishment.id) }}" class="btn" style="background:#4a148c; color:#fff;" target="_blank">
+            <i class="bi bi-file-earmark-check me-1"></i>CA (Audit) Report
         </a>
     </div>
     {% endif %}
