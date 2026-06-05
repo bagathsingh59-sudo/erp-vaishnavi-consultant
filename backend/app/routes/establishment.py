@@ -842,9 +842,87 @@ def establishment_delete(id):
               f'Delete or reopen those payrolls first.', 'danger')
         return redirect(url_for('establishment.establishment_view', id=id))
 
-    # Delete all related records in correct order (child → parent)
+    # Import all related models
+    from app.models.accounts import AccountHead, Voucher, VoucherEntry
+    from app.models.assignment_log import EstablishmentAssignmentLog
+    from app.models.activity_log import ActivityLog
+    from app.models.daily_mis import DailyMISEntry
+    from app.models.enrollment import Enrollment
+    from app.models.manual_reimbursement import ManualReimbursement
+    from app.models.vault import VaultFile
+    from app.models.loan import LoanAccount
+    from app.models.bonus import BonusRun
+    from app.models.paid_leave import PaidLeaveRun
+    from app.models.payroll import SalaryTemplate
 
-    # 1. PayrollEntryHeads → PayrollEntries → MonthlyPayrolls
+    # Delete all related records in correct order (deepest child → parent)
+
+    # 1. BonusRun (cascades BonusEntry) — before employees
+    for run in BonusRun.query.filter_by(establishment_id=id).all():
+        db.session.delete(run)
+    db.session.flush()
+
+    # 2. PaidLeaveRun (cascades PaidLeaveEntry) — before employees
+    for run in PaidLeaveRun.query.filter_by(establishment_id=id).all():
+        db.session.delete(run)
+    db.session.flush()
+
+    # 3. Enrollment (has linked_employee_id FK) — before employees
+    Enrollment.query.filter_by(establishment_id=id).delete()
+
+    # 4. TransferHistory where this establishment is source or destination
+    TransferHistory.query.filter(
+        db.or_(
+            TransferHistory.from_establishment_id == id,
+            TransferHistory.to_establishment_id == id
+        )
+    ).delete(synchronize_session='fetch')
+
+    # 5. Vouchers — delete VoucherEntries referencing this est's AccountHeads first,
+    #    then delete the establishment's own Vouchers (and remaining VoucherEntries)
+    acct_head_ids = [a.id for a in AccountHead.query.filter_by(establishment_id=id).all()]
+    if acct_head_ids:
+        VoucherEntry.query.filter(
+            VoucherEntry.account_id.in_(acct_head_ids)
+        ).delete(synchronize_session='fetch')
+    voucher_ids = [v.id for v in Voucher.query.filter_by(establishment_id=id).all()]
+    if voucher_ids:
+        VoucherEntry.query.filter(
+            VoucherEntry.voucher_id.in_(voucher_ids)
+        ).delete(synchronize_session='fetch')
+        Voucher.query.filter_by(establishment_id=id).delete()
+
+    # 6. AccountHead (Sundry Debtor)
+    AccountHead.query.filter_by(establishment_id=id).delete()
+
+    # 7. AssignmentLog
+    EstablishmentAssignmentLog.query.filter_by(establishment_id=id).delete()
+
+    # 8. ActivityLog — NULL out establishment_id to preserve audit trail
+    ActivityLog.query.filter_by(establishment_id=id).update(
+        {'establishment_id': None}, synchronize_session=False
+    )
+
+    # 9. DailyMISEntry
+    DailyMISEntry.query.filter_by(establishment_id=id).delete()
+
+    # 10. ManualReimbursement
+    ManualReimbursement.query.filter_by(establishment_id=id).delete()
+
+    # 11. VaultFile
+    VaultFile.query.filter_by(establishment_id=id).delete()
+
+    # 12. LoanAccount — NULL out establishment_id to preserve loan records
+    LoanAccount.query.filter_by(establishment_id=id).update(
+        {'establishment_id': None}, synchronize_session=False
+    )
+
+    # 13. SalaryTemplate (cascades SalaryTemplateHead)
+    for tmpl in SalaryTemplate.query.filter_by(establishment_id=id).all():
+        db.session.delete(tmpl)
+    db.session.flush()
+
+    # 14. PayrollEntryHeads → PayrollEntries → MonthlyPayrolls
     payrolls = MonthlyPayroll.query.filter_by(establishment_id=id).all()
     for payroll in payrolls:
         entries = PayrollEntry.query.filter_by(monthly_payroll_id=payroll.id).all()
@@ -853,7 +931,7 @@ def establishment_delete(id):
         PayrollEntry.query.filter_by(monthly_payroll_id=payroll.id).delete()
         db.session.delete(payroll)
 
-    # 2. Employee related: Salary heads → Salaries → Nominees → Transfers → Employees
+    # 15. Employee related: Salaries → Nominees → Employees
     employees = Employee.query.filter_by(establishment_id=id).all()
     for emp in employees:
         salaries = EmployeeSalary.query.filter_by(employee_id=emp.id).all()
@@ -861,19 +939,18 @@ def establishment_delete(id):
             EmployeeSalaryHead.query.filter_by(employee_salary_id=sal.id).delete()
             db.session.delete(sal)
         Nominee.query.filter_by(employee_id=emp.id).delete()
-        TransferHistory.query.filter_by(employee_id=emp.id).delete()
         db.session.delete(emp)
 
-    # 3. Salary Heads
+    # 16. Salary Heads
     SalaryHead.query.filter_by(establishment_id=id).delete()
 
-    # 4. Payroll Config
+    # 17. Payroll Config
     PayrollConfig.query.filter_by(establishment_id=id).delete()
 
-    # 5. Portal Credentials (cascade should handle, but explicit)
+    # 18. Portal Credentials (cascade should handle, but explicit)
     PortalCredential.query.filter_by(establishment_id=id).delete()
 
-    # 6. Finally delete the establishment
+    # 19. Finally delete the establishment
     db.session.delete(establishment)
     log_activity('deleted', 'establishment', entity_id=id, entity_name=name)
     db.session.commit()
