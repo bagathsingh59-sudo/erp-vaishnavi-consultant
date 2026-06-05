@@ -854,6 +854,8 @@ def establishment_delete(id):
     from app.models.bonus import BonusRun
     from app.models.paid_leave import PaidLeaveRun
     from app.models.payroll import SalaryTemplate
+    from app.models.client_user import ClientUser
+    from app.models.doc_pack_trial import PayrollDocPack
 
     from sqlalchemy.exc import IntegrityError
 
@@ -865,6 +867,23 @@ def establishment_delete(id):
 
     try:
         # Delete all related records in correct order (deepest child → parent)
+
+        # 0a. Client portal login(s) — table is created/owned by the Spring Boot
+        #     portal, so its ON DELETE CASCADE is NOT reliably applied here.
+        #     Delete explicitly. Wrapped because the table may not exist if the
+        #     portal has never been deployed in this environment.
+        try:
+            ClientUser.query.filter_by(establishment_id=id).delete()
+            db.session.flush()
+        except Exception:
+            db.session.rollback()
+
+        # 0b. Document Pack trial blobs (FK to both monthly_payrolls + establishment)
+        try:
+            PayrollDocPack.query.filter_by(establishment_id=id).delete()
+            db.session.flush()
+        except Exception:
+            db.session.rollback()
 
         # 1. BonusRun (cascades BonusEntry) — before employees
         for run in BonusRun.query.filter_by(establishment_id=id).all():
@@ -971,11 +990,20 @@ def establishment_delete(id):
         db.session.rollback()
         import re
         detail = str(getattr(e, 'orig', e))
-        # Postgres puts the offending table in: 'is still referenced from table "xyz"'
-        m = re.search(r'table "([^"]+)"', detail)
-        blocking = m.group(1) if m else 'a related record'
-        flash(f'Could not delete "{name}" — it still has linked data in '
-              f'"{blocking}". Please remove that first, then try again.', 'danger')
+        # Postgres DETAIL line names the CHILD table that still references us:
+        #   'Key (id)=(5) is still referenced from table "client_users".'
+        m = re.search(r'referenced from table "([^"]+)"', detail)
+        if not m:
+            # Fallback: the constraint line '... on table "child"'
+            m = re.search(r'on table "([^"]+)"', detail)
+        blocking = m.group(1) if m else None
+        if blocking and blocking != 'establishments':
+            flash(f'Could not delete "{name}" — it still has linked data in '
+                  f'"{blocking}". Please remove that first, then try again.', 'danger')
+        else:
+            # Show the raw DB detail so the exact blocker is never hidden.
+            snippet = detail.strip().split('\n')[-1][:300]
+            flash(f'Could not delete "{name}" — database blocked it: {snippet}', 'danger')
         return redirect(url_for('establishment.establishment_view', id=id))
 
     flash(f'Establishment "{name}" and all its data deleted permanently.', 'warning')
