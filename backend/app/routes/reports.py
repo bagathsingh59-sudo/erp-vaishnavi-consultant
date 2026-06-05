@@ -2329,13 +2329,17 @@ def esic_excel(payroll_id):
             flash('No employees with ESIC IP Number found. Cannot generate template.', 'warning')
             return redirect(request.referrer or url_for('reports.esic_view', payroll_id=payroll_id))
 
-        output = _generate_esic_xls(payroll, est, config, rows)
+        # Generate as modern .xlsx (openpyxl) — produces a fully standard
+        # workbook the ESIC portal accepts on first upload, without the user
+        # having to open + Enable Editing + re-save. The legacy .xls builder
+        # (_generate_esic_xls) is kept as a fallback if ESIC rejects .xlsx.
+        output = _generate_esic_xlsx(payroll, est, config, rows)
 
         # Clean filename — remove special characters that may cause issues
         safe_name = ''.join(c if c.isalnum() or c in ('_', '-') else '_' for c in est.company_name)
-        filename = f"MC_Template_{safe_name}_{payroll.month_name}_{payroll.year}.xls"
+        filename = f"MC_Template_{safe_name}_{payroll.month_name}_{payroll.year}.xlsx"
         return send_file(output, as_attachment=True, download_name=filename,
-                         mimetype='application/vnd.ms-excel')
+                         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -2566,6 +2570,118 @@ def _generate_esic_xls(payroll, est, config, rows):
         ws2.write(instr_row + 1 + i, 0, instr)
 
     # Save to BytesIO — ESIC XLS
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output
+
+
+def _generate_esic_xlsx(payroll, est, config, rows):
+    """Generate ESIC MC Template in modern .xlsx format (openpyxl).
+
+    Produces the SAME content as _generate_esic_xls but as a fully
+    standard-compliant .xlsx so the ESIC portal accepts it on the first
+    upload — without the user needing to open, Enable Editing and re-save.
+    All data cells are written as TEXT (string + '@' number format) per the
+    ESIC instruction that every column must be in Text format.
+    """
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+
+    # ---- Sheet 1: Data ----
+    ws = wb.active
+    ws.title = 'Sheet1'
+
+    # Column widths (approx character units)
+    widths = [20, 39, 20, 24, 32, 28]
+    for ci, w in enumerate(widths, 1):
+        ws.column_dimensions[get_column_letter(ci)].width = w
+
+    hdr_font = Font(bold=True)
+    hdr_align = Alignment(wrap_text=True, vertical='center', horizontal='center')
+
+    # Exact ESIC portal header texts (same as .xls version)
+    headers = [
+        'IP Number \n(10 Digits)',
+        'IP Name\n( Only alphabets and space )',
+        'No of Days for which wages paid/payable during the month',
+        'Total Monthly Wages',
+        'Reason Code for Zero workings days(numeric only; provide 0 for all other reasons- Click on the link for reference)',
+        'Last Working Day\n( Format DD/MM/YYYY  or DD-MM-YYYY)',
+    ]
+    for ci, hdr in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=ci, value=hdr)
+        cell.font = hdr_font
+        cell.alignment = hdr_align
+
+    # Data rows — all as TEXT (strings), with explicit text number format
+    for ri, r in enumerate(rows, 2):
+        values = [
+            r['ip_number'],
+            r['ip_name'],
+            r['no_of_days'],
+            r['total_wages'],
+            r['reason_code'],
+            r['last_working_day'],
+        ]
+        for ci, val in enumerate(values, 1):
+            cell = ws.cell(row=ri, column=ci, value=val)
+            cell.number_format = '@'  # Text
+
+    # ---- Sheet 2: Instructions & Reason Codes ----
+    ws2 = wb.create_sheet('Instructions & Reason Codes')
+    ws2.column_dimensions['A'].width = 58
+    ws2.column_dimensions['B'].width = 12
+    ws2.column_dimensions['C'].width = 98
+
+    bold = Font(bold=True)
+
+    ws2.cell(row=2, column=1, value='Reason').font = bold
+    ws2.cell(row=2, column=2, value='Code').font = bold
+    ws2.cell(row=2, column=3, value='Note').font = bold
+
+    reason_codes = [
+        ('Without Reason', '0', 'Leave last working day as blank'),
+        ('On Leave', '1', 'Leave last working day as blank'),
+        ('Left Service', '2', 'Please provide last working day (dd/mm/yyyy). IP will not appear from next wage period'),
+        ('Retired', '3', 'Please provide last working day (dd/mm/yyyy). IP will not appear from next wage period'),
+        ('Out of Coverage', '4', 'Please provide last working day (dd/mm/yyyy). IP will not appear from next contribution period. This option is valid only if Wage Period is April/October.'),
+        ('Expired', '5', 'Please provide last working day (dd/mm/yyyy). IP will not appear from next wage period'),
+        ('Non Implemented area', '6', 'Please provide last working day (dd/mm/yyyy).'),
+        ('Compliance by Immediate Employer', '7', 'Leave last working day as blank'),
+        ('Suspension of work', '8', 'Leave last working day as blank'),
+        ('Strike/Lockout', '9', 'Leave last working day as blank'),
+        ('Retrenchment', '10', 'Please provide last working day (dd/mm/yyyy). IP will not appear from next wage period'),
+        ('No Work', '11', 'Leave last working day as blank'),
+        ('Doesnt Belong To This Employer', '12', 'Leave last working day as blank'),
+        ('Duplicate IP', '13', 'Leave last working day as blank'),
+    ]
+    for ri, (reason, code, note) in enumerate(reason_codes, 3):
+        ws2.cell(row=ri, column=1, value=reason)
+        ws2.cell(row=ri, column=2, value=code)
+        ws2.cell(row=ri, column=3, value=note)
+
+    instr_row = len(reason_codes) + 6
+    ws2.cell(row=instr_row, column=1, value='Instructions to fill in the excel file:').font = bold
+    instructions = [
+        '1. Enter IP number, IP name, No. of Days, Total Monthly Wages, Reason for 0 wages (If Wages=0) & Last Working Day.',
+        '2. Number of days must be a whole number. Fractions should be rounded up to next higher whole number.',
+        '3. All Employees currently mapped in the system must be entered in the excel sheet.',
+        '4. Reasons are to be assigned numeric code and date has to be provided as mentioned in the table above.',
+        '5. Once 0 wages given and last working day is mentioned (reason codes 2,3,4,5,10) IP will be removed from employer record.',
+        '6. If IP has worked for part of the month (at least 1 day), last working day should NOT be mentioned.',
+        '7. IP Contribution and Employer contribution calculation will be automatically done by the system.',
+        '8. Date column format is dd/mm/yyyy or dd-mm-yyyy. Pad single digit dates with 0. Eg: 02/05/2010',
+        '9. Excel file should be saved in .xls format (Excel 97-2003).',
+        '10. All columns including date column should be in Text format.',
+    ]
+    for i, instr in enumerate(instructions):
+        ws2.cell(row=instr_row + 1 + i, column=1, value=instr)
+
+    # Save to BytesIO — ESIC XLSX
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
