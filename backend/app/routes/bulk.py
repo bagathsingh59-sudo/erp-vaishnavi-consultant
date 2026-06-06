@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, current_app
 from app import db
-from app.models.establishment import Establishment
+from app.models.establishment import Establishment, PortalCredential
+from app.models.payroll import PayrollConfig
 from app.user_context import current_user_id, user_establishments
 from datetime import datetime
 import os
@@ -23,17 +24,29 @@ TEMPLATE_COLUMNS = [
     'GST Number',
     'Fee Type (Monthly/Quarterly/Yearly)',
     'Fee Amount',
+    'Fee Cycle Anchor Month (1-12, only for Quarterly/Yearly)',
     'Service Type (With Records/Only Returns)',
     'Status (Active/Inactive)',
     'Compliance Payment Mode (Through Us/Client Direct)',
+    'Nil Filing Fee',
+    'Nil EPF Admin Charge',
+    'EPF Applicable (Yes/No)',
+    'ESIC Applicable (Yes/No)',
+    'PT Applicable (Yes/No)',
+    'LWF Applicable (Yes/No)',
+    'EPF Portal Username',
+    'EPF Portal Password',
+    'ESIC Portal Username',
+    'ESIC Portal Password',
     'Opening Balance',
     'Opening Balance Type (Dr/Cr)',
 ]
 
-# Column widths for better readability
-COLUMN_WIDTHS = [35, 22, 28, 45, 25, 18, 30, 25, 25, 15, 20, 32, 14, 35, 22, 35, 18, 25]
+# Column widths for better readability (one per TEMPLATE_COLUMNS entry)
+COLUMN_WIDTHS = [35, 22, 28, 45, 25, 18, 30, 25, 25, 15, 20, 32, 14, 30,
+                 35, 22, 35, 16, 22, 18, 18, 18, 18, 24, 24, 24, 24, 18, 25]
 
-# Sample data row for reference
+# Sample data row for reference (one per TEMPLATE_COLUMNS entry)
 SAMPLE_ROW = [
     'ABC Enterprises Pvt Ltd',
     'Manufacturing',
@@ -48,9 +61,20 @@ SAMPLE_ROW = [
     '29ABCDE1234F1Z5',
     'Monthly',
     '2000',
+    '',                  # Fee Cycle Anchor Month (blank for Monthly)
     'With Records',
     'Active',
     'Through Us',
+    '500',               # Nil Filing Fee
+    '75',                # Nil EPF Admin Charge
+    'Yes',               # EPF Applicable
+    'Yes',               # ESIC Applicable
+    'Yes',               # PT Applicable
+    'No',                # LWF Applicable
+    'GBGLB1234567000',   # EPF Portal Username
+    'epf@1234',          # EPF Portal Password
+    '71000012340000606', # ESIC Portal Username
+    'esic@1234',         # ESIC Portal Password
     '0',
     'Dr',
 ]
@@ -101,7 +125,10 @@ def download_template():
     inst_cell.value = ('Instructions: Fill data from Row 4 onwards. Row 3 is a sample '
                        '(delete it before uploading). Fields marked with * are required. '
                        'For "Compliance Payment Mode" enter "Through Us" or "Client Direct". '
-                       'For "Opening Balance Type" enter Dr (client owes us) or Cr (excess).')
+                       'For "Opening Balance Type" enter Dr (client owes us) or Cr (excess). '
+                       'Fee Cycle Anchor Month: enter 1-12 only for Quarterly/Yearly (leave blank for Monthly). '
+                       'Applicability columns (EPF/ESIC/PT/LWF): enter Yes or No. '
+                       'EPF/ESIC Portal Username & Password are optional login credentials.')
     inst_cell.font = Font(name='Calibri', size=10, color='E53E3E', italic=True)
     inst_cell.alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
     ws.row_dimensions[2].height = 36
@@ -422,6 +449,46 @@ def _parse_ob_type(value):
     return 'Dr'
 
 
+def _parse_yes_no(value):
+    """Parse a Yes/No applicability cell to boolean. Blank/unknown = False."""
+    if value is None:
+        return False
+    v = str(value).strip().lower()
+    return v in ('yes', 'y', 'true', '1', 'applicable', 'enable', 'enabled', 'on', 'a')
+
+
+def _parse_anchor_month(value):
+    """Parse fee cycle anchor month (1-12). Returns int or None."""
+    if value is None or str(value).strip() == '':
+        return None
+    try:
+        m = int(float(str(value).strip()))
+        return m if 1 <= m <= 12 else None
+    except (ValueError, TypeError):
+        return None
+
+
+def _clean_pan(value):
+    """Return a clean PAN (exactly 10 chars, uppercase) or None.
+
+    Defence-in-depth: even if column mapping ever misfires and a long value
+    (e.g. a company name) lands in this field, we drop it instead of letting
+    the 10-char DB column abort the whole row's insert.
+    """
+    if not value:
+        return None
+    v = str(value).strip().upper()
+    return v if len(v) == 10 else None
+
+
+def _clean_gst(value):
+    """Return a clean GST (<=15 chars, uppercase) or None — same safety idea."""
+    if not value:
+        return None
+    v = str(value).strip().upper()
+    return v if len(v) <= 15 else None
+
+
 def _process_xlsx(file):
     """Process .xlsx file"""
     from openpyxl import load_workbook
@@ -489,11 +556,29 @@ def _process_xls(file):
 
 
 def _map_column(headers, possible_names):
-    """Find column index by trying multiple possible header names"""
-    for idx, header in enumerate(headers):
-        h = header.lower().strip().replace('_', '').replace(' ', '')
-        for name in possible_names:
-            if name.lower().replace('_', '').replace(' ', '') in h:
+    """Find column index by trying multiple possible header names.
+
+    Two-pass match:
+      1. EXACT (normalised) equality — most reliable. This prevents false hits
+         like 'pan' (PAN Number) matching 'com-PAN-y name', which previously
+         routed the company name into the 10-char PAN column and made every
+         PostgreSQL insert fail with 'value too long'.
+      2. SUBSTRING fallback — keeps fuzzy support for the user's own Excel
+         layouts (e.g. 'feetype' inside 'Fee Type (Monthly/Quarterly/Yearly)').
+    """
+    norm_names = [n.lower().strip().replace('_', '').replace(' ', '') for n in possible_names]
+    norm_headers = [(idx, (h or '').lower().strip().replace('_', '').replace(' ', ''))
+                    for idx, h in enumerate(headers)]
+    # Pass 1 — exact normalised equality
+    for idx, h in norm_headers:
+        if h and h in norm_names:
+            return idx
+    # Pass 2 — substring (fuzzy) match. Skip very short tokens (<=3 chars such
+    # as 'pan'/'gst'/'epf') here: those are handled safely by the exact pass
+    # above, and as substrings they cause false hits (e.g. 'pan' in 'company').
+    for idx, h in norm_headers:
+        for name in norm_names:
+            if name and len(name) >= 4 and name in h:
                 return idx
     return None
 
@@ -521,6 +606,21 @@ def _import_rows(rows, headers):
         'compliance_payment_mode': _map_column(headers, ['compliance payment mode', 'compliance mode', 'payment mode', 'compliancepaymentmode']),
         'opening_balance': _map_column(headers, ['opening balance', 'openingbalance', 'opening bal']),
         'opening_balance_type': _map_column(headers, ['opening balance type', 'ob type', 'openingbalancetype', 'balance type']),
+        # NEW: Service & Fee (quarterly/yearly anchor)
+        'fee_cycle_anchor_month': _map_column(headers, ['fee cycle anchor month', 'fee cycle anchor', 'feecycleanchormonth', 'anchor month', 'cycle anchor']),
+        # NEW: Nil Filing details
+        'nil_filing_fee': _map_column(headers, ['nil filing fee', 'nilfilingfee', 'nil fee']),
+        'nil_epf_admin_charge': _map_column(headers, ['nil epf admin charge', 'nil epf admin', 'nilepfadmincharge', 'nil admin charge']),
+        # NEW: Statutory applicability (4 flags)
+        'epf_applicable': _map_column(headers, ['epf applicable', 'epfapplicable']),
+        'esic_applicable': _map_column(headers, ['esic applicable', 'esicapplicable']),
+        'pt_applicable': _map_column(headers, ['pt applicable', 'professional tax applicable', 'ptapplicable']),
+        'lwf_applicable': _map_column(headers, ['lwf applicable', 'lwfapplicable', 'labour welfare']),
+        # NEW: Portal login credentials (EPF + ESIC)
+        'epf_portal_username': _map_column(headers, ['epf portal username', 'epfportalusername']),
+        'epf_portal_password': _map_column(headers, ['epf portal password', 'epfportalpassword']),
+        'esic_portal_username': _map_column(headers, ['esic portal username', 'esicportalusername']),
+        'esic_portal_password': _map_column(headers, ['esic portal password', 'esicportalpassword']),
     }
 
     if col_map['company_name'] is None:
@@ -564,6 +664,12 @@ def _import_rows(rows, headers):
             ob_amount = _parse_fee(row[col_map['opening_balance']] if col_map['opening_balance'] is not None and col_map['opening_balance'] < len(row) else None) or 0
             ob_type = _parse_ob_type(get_val('opening_balance_type'))
 
+            # Service & Fee — fee type + anchor (anchor only for Quarterly/Yearly)
+            fee_type = _parse_fee_type(get_val('fee_type'))
+            anchor = _parse_anchor_month(get_val('fee_cycle_anchor_month'))
+            if fee_type not in ('Quarterly', 'Yearly'):
+                anchor = None  # Monthly (or unset) never carries an anchor
+
             est = Establishment(
                 company_name=company_name,
                 type_of_industry=get_val('type_of_industry'),
@@ -574,19 +680,52 @@ def _import_rows(rows, headers):
                 contact_email=get_val('contact_email'),
                 pf_code=get_val('pf_code'),
                 esic_code=get_val('esic_code'),
-                pan_number=get_val('pan_number').upper() if get_val('pan_number') else None,
-                gst_number=get_val('gst_number').upper() if get_val('gst_number') else None,
-                fee_type=_parse_fee_type(get_val('fee_type')),
+                pan_number=_clean_pan(get_val('pan_number')),
+                gst_number=_clean_gst(get_val('gst_number')),
+                fee_type=fee_type,
                 fee_amount=_parse_fee(row[col_map['fee_amount']] if col_map['fee_amount'] is not None and col_map['fee_amount'] < len(row) else None),
+                fee_cycle_anchor_month=anchor,
                 service_type=_parse_service_type(get_val('service_type')),
                 is_active=_parse_status(get_val('status')),
                 compliance_payment_mode=mode,
+                nil_filing_fee=_parse_fee(row[col_map['nil_filing_fee']] if col_map['nil_filing_fee'] is not None and col_map['nil_filing_fee'] < len(row) else None),
+                nil_epf_admin_charge=_parse_fee(row[col_map['nil_epf_admin_charge']] if col_map['nil_epf_admin_charge'] is not None and col_map['nil_epf_admin_charge'] < len(row) else None),
                 owner_id=current_user_id(),
                 assigned_to_id=current_user_id(),  # auto-assign to importer
             )
 
             db.session.add(est)
             db.session.flush()  # Get est.id for debtor creation
+
+            # NEW: Statutory Applicability — create PayrollConfig only if the
+            # sheet actually specifies at least one of the 4 flags. Otherwise
+            # leave it for manual setup (don't guess EPF/ESIC = off).
+            statutory_fields = ['epf_applicable', 'esic_applicable', 'pt_applicable', 'lwf_applicable']
+            if any(get_val(f) is not None for f in statutory_fields):
+                config = PayrollConfig(
+                    establishment_id=est.id,
+                    epf_applicable=_parse_yes_no(get_val('epf_applicable')),
+                    esic_applicable=_parse_yes_no(get_val('esic_applicable')),
+                    pt_applicable=_parse_yes_no(get_val('pt_applicable')),
+                    lwf_applicable=_parse_yes_no(get_val('lwf_applicable')),
+                    pt_state='karnataka',
+                )
+                db.session.add(config)
+
+            # NEW: Portal Login Details — EPF + ESIC credentials if a username
+            # is provided. Password column is NOT NULL, so fall back to ''.
+            epf_user = get_val('epf_portal_username')
+            if epf_user:
+                db.session.add(PortalCredential(
+                    establishment_id=est.id, portal_name='EPF',
+                    username=epf_user, password=get_val('epf_portal_password') or ''
+                ))
+            esic_user = get_val('esic_portal_username')
+            if esic_user:
+                db.session.add(PortalCredential(
+                    establishment_id=est.id, portal_name='ESIC',
+                    username=esic_user, password=get_val('esic_portal_password') or ''
+                ))
 
             # Create linked Sundry Debtor account with opening balance
             if ob_amount > 0:
@@ -633,8 +772,11 @@ def _import_rows(rows, headers):
     else:
         flash('No records were imported. ' + '. '.join(msg_parts), 'warning')
 
-    if errors and len(errors) <= 5:
-        for err in errors:
-            flash(err, 'danger')
+    # Always surface the actual row errors (up to 10) so problems are
+    # diagnosable instead of hidden behind a bare "N rows had errors" count.
+    for err in errors[:10]:
+        flash(err, 'danger')
+    if len(errors) > 10:
+        flash(f'…and {len(errors) - 10} more row(s) had errors.', 'danger')
 
     return redirect(url_for('establishment.establishment_list'))
