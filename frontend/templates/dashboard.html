@@ -100,12 +100,15 @@
     padding: 28px 32px 24px;
     margin-bottom: 20px;
     position: relative;
-    overflow: hidden;
     box-shadow: 0 8px 32px rgba(67,56,202,0.25);
 ">
-    <!-- Decorative circles -->
-    <div style="position:absolute; top:-40px; right:-20px; width:160px; height:160px; border-radius:50%; background:rgba(255,255,255,0.04);"></div>
-    <div style="position:absolute; bottom:-50px; left:10%; width:200px; height:200px; border-radius:50%; background:rgba(255,255,255,0.03);"></div>
+    <!-- Decorative circles — wrapped in their own clipped layer so the hero
+         box itself does NOT need overflow:hidden. This lets the search-results
+         dropdown extend below the box instead of being cut off after one row. -->
+    <div style="position:absolute; inset:0; overflow:hidden; border-radius:16px; z-index:0; pointer-events:none;">
+        <div style="position:absolute; top:-40px; right:-20px; width:160px; height:160px; border-radius:50%; background:rgba(255,255,255,0.04);"></div>
+        <div style="position:absolute; bottom:-50px; left:10%; width:200px; height:200px; border-radius:50%; background:rgba(255,255,255,0.03);"></div>
+    </div>
 
     <!-- Header Row -->
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; position:relative; z-index:1;">
@@ -162,7 +165,7 @@
             background:#fff;
             border-radius:14px;
             box-shadow:0 20px 60px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05);
-            max-height:380px;
+            max-height:460px;
             overflow-y:auto;
             z-index:100;
         ">
