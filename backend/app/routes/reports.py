@@ -754,17 +754,51 @@ def attendance_excel(payroll_id):
 # loans (Sec. 12 & 12-A). In most consultancy practice the register is NIL
 # every month, but it still has to be available for the labour inspector.
 #
-# This endpoint generates the NIL-by-default monthly register in Excel
-# (Legal Landscape). One row per active employee with the deduction columns
-# blank. Footer carries a "NIL TOTAL" line and the employer signature block.
+# Two endpoints — preview HTML (with "Download Excel" + "Print / PDF" buttons
+# at the top, matching Form B / Form D conventions) and the Excel download.
+# Both reuse the same data-gathering helper.
 # ==============================================================================
+def _build_form_c_data(payroll_id):
+    """Returns (payroll, est, employees) for Form C rendering."""
+    from app.models.employee import Employee
+    payroll, est, config, entries, _heads = _get_payroll_data(payroll_id, include_zero=True)
+
+    # Active roster first; fall back to payroll-entry employees if needed.
+    employees = (Employee.query
+                 .filter_by(establishment_id=est.id, is_active=True)
+                 .order_by(Employee.emp_code)
+                 .all())
+    if not employees:
+        seen = set()
+        for entry in entries:
+            if entry.employee and entry.employee.id not in seen:
+                employees.append(entry.employee)
+                seen.add(entry.employee.id)
+    return payroll, est, employees
+
+
+@reports_bp.route('/payroll/<int:payroll_id>/report/form-c-fines')
+def form_c_fines_view(payroll_id):
+    """Form C — Register of Fines / Damages / Advances / Loans (HTML preview).
+
+    Mirrors the Form B / Form D pattern: the preview lives here and carries
+    the "Download Excel" and "Print / PDF" buttons at the top.
+    """
+    payroll, est, employees = _build_form_c_data(payroll_id)
+    generated_on = datetime.now().strftime('%d %b %Y, %I:%M %p')
+    last_day = calendar.monthrange(payroll.year, payroll.month)[1]
+    return render_template('reports/form_c.html',
+                           payroll=payroll, est=est, employees=employees,
+                           last_day=last_day, generated_on=generated_on)
+
+
 @reports_bp.route('/payroll/<int:payroll_id>/report/form-c-fines/excel')
 def form_c_fines_excel(payroll_id):
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
     from openpyxl.utils import get_column_letter
 
-    payroll, est, config, entries, heads = _get_payroll_data(payroll_id, include_zero=True)
+    payroll, est, employees = _build_form_c_data(payroll_id)
 
     wb = Workbook()
     ws = wb.active
@@ -854,22 +888,8 @@ def form_c_fines_excel(payroll_id):
     ws.row_dimensions[header_row].height = 60
 
     # ── Data rows (NIL by default) ──────────────────────────────────────
-    # Pull active employees from the establishment so the register reflects
-    # the current roster, not just the payroll entries. Falls back to
-    # payroll-entry employees if the establishment relationship is empty.
-    from app.models.employee import Employee
-    employees = (Employee.query
-                 .filter_by(establishment_id=est.id, is_active=True)
-                 .order_by(Employee.emp_code)
-                 .all())
-    if not employees:
-        # Fallback: use whoever is on the payroll
-        seen = set()
-        for entry in entries:
-            if entry.employee and entry.employee.id not in seen:
-                employees.append(entry.employee)
-                seen.add(entry.employee.id)
-
+    # Employees come from _build_form_c_data — active roster of the
+    # establishment, falling back to payroll-entry employees if needed.
     data_start = header_row + 1
     for idx, emp in enumerate(employees, 1):
         rr = data_start + idx - 1

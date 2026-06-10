@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Form C — Register of Fines / Damages / Advances / Loans — {{ payroll.period_display }}{% endblock %}
+{% block page_header %}Form C — Register of Fines / Damages / Advances / Loans{% endblock %}
+
+{% block content %}
+{% set print_size = 'legal-landscape' %}
+{% include '_print_common.html' %}
+
+<style>
+    @media print {
+        html, body { width: 14in; }
+        .page-content { padding: 0 !important; }
+        .fc-page {
+            box-shadow: none !important;
+            border: none !important;
+            margin: 0 !important;
+            padding: 8px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow: visible !important;
+        }
+        .fc-table { width: 100% !important; page-break-inside: auto; }
+        .fc-table th, .fc-table td { font-size: 8px !important; padding: 3px !important; }
+        .fc-table thead { display: table-header-group; }
+        .fc-table tr { page-break-inside: avoid; }
+    }
+    .fc-page  { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:24px 28px; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+    .fc-title { text-align:center; margin-bottom:14px; }
+    .fc-title h2 { font-size:1.35rem; font-weight:800; margin:0; letter-spacing:2px; color:#1e293b; }
+    .fc-title h4 { font-size:0.95rem; font-weight:700; margin:4px 0 0; letter-spacing:1px; color:#334155; }
+    .fc-title p  { font-size:0.78rem; margin:2px 0 0; color:#64748b; font-style:italic; }
+
+    .fc-info { font-size:0.82rem; margin-bottom:14px; }
+    .fc-info div { margin-bottom:4px; }
+    .fc-info strong { color:#334155; }
+
+    .fc-table { width:100%; border-collapse:collapse; font-size:0.74rem; }
+    .fc-table th {
+        background:#f1f5f9; font-weight:700; padding:6px 5px;
+        border:1px solid #475569; text-align:center; vertical-align:middle;
+        font-size:0.7rem; color:#1e293b;
+    }
+    .fc-table td { padding:5px; border:1px solid #94a3b8; text-align:center; vertical-align:middle; }
+    .fc-table td.name { text-align:left; font-weight:600; }
+    .fc-table td.left { text-align:left; }
+    .fc-table td.nil  { background:#fefce8; color:#92400e; font-style:italic; font-weight:600; }
+    .fc-table .total-row td { background:#d9ead3; font-weight:700; border-top:2px solid #1e293b; }
+    .fc-table .total-row .label { text-align:center; font-size:0.85rem; letter-spacing:0.5px; }
+
+    .fc-cert { margin-top:18px; font-size:0.82rem; color:#475569; font-style:italic; padding:8px 12px; background:#f8fafc; border-left:3px solid #6366f1; }
+    .fc-sign-block { margin-top:32px; display:flex; justify-content:space-between; font-size:0.82rem; }
+    .fc-sign-block .signature-line { border-top:1px solid #333; padding-top:4px; min-width:230px; text-align:center; }
+    .fc-footer { margin-top:14px; font-size:0.7rem; color:#64748b; text-align:center; }
+</style>
+
+<div class="no-print mb-3 d-flex justify-content-between align-items-center">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb" style="font-size:0.85rem; margin:0;">
+            <li class="breadcrumb-item"><a href="{{ url_for('payroll.payroll_list') }}" class="text-decoration-none">Salary Processing</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('payroll.payroll_process', payroll_id=payroll.id) }}" class="text-decoration-none">{{ payroll.period_display }}</a></li>
+            <li class="breadcrumb-item active">Form C</li>
+        </ol>
+    </nav>
+    <div class="d-flex gap-2">
+        <button onclick="window.history.back()" style="background:#e5e7eb; color:#333; border:none; padding:6px 16px; border-radius:6px; cursor:pointer; font-size:0.82rem;"><i class="bi bi-arrow-left me-1"></i> Back</button>
+        <a href="{{ url_for('reports.form_c_fines_excel', payroll_id=payroll.id) }}" class="btn btn-success btn-sm">
+            <i class="bi bi-file-earmark-excel me-1"></i> Download Excel
+        </a>
+        <button onclick="window.print()" class="btn btn-primary btn-sm">
+            <i class="bi bi-printer me-1"></i> Print / PDF
+        </button>
+    </div>
+</div>
+
+<div class="no-print alert alert-warning py-2 px-3 mb-3" style="font-size:0.82rem;">
+    <i class="bi bi-info-circle-fill me-1"></i>
+    <strong>Printing / Save as PDF:</strong> Click <b>Print / PDF</b>, then set
+    <b>Layout = Landscape</b> and <b>Paper size = Legal</b>.
+    The register defaults to <strong>NIL</strong> for all amount columns —
+    standard for our area's Payment of Wages Act compliance.
+</div>
+
+<div class="fc-page">
+    <div class="fc-title">
+        <h2>FORM C</h2>
+        <h4>REGISTER OF FINES, DAMAGES, ADVANCES AND LOANS</h4>
+        <p>(Under the Payment of Wages Act, 1936)</p>
+    </div>
+
+    <div class="fc-info">
+        <div><strong>Name of the Establishment:</strong> {{ (est.company_name or '')|upper }}</div>
+        <div><strong>Address:</strong> {{ est.address or '—' }}</div>
+        <div>
+            <strong>PF Code / ESIC Code:</strong>
+            {{ est.pf_code or '—' }} / {{ est.esic_code or '—' }}
+        </div>
+        <div>
+            <strong>Wage Period:</strong>
+            01-{{ payroll.month_name[:3] }}-{{ payroll.year }}
+            to {{ last_day }}-{{ payroll.month_name[:3] }}-{{ payroll.year }}
+            &nbsp;|&nbsp;
+            <strong>Total Employees:</strong> {{ employees|length }}
+        </div>
+    </div>
+
+    <table class="fc-table">
+        <thead>
+            <tr>
+                <th rowspan="2" style="width:3.5%;">Sr<br>No.</th>
+                <th rowspan="2" style="width:14%;">Name of the<br>Employee</th>
+                <th rowspan="2" style="width:13%;">Father's /<br>Husband's Name</th>
+                <th rowspan="2" style="width:9%;">Designation</th>
+                <th rowspan="2" style="width:9%;">UAN /<br>ESIC IP</th>
+                <th rowspan="2" style="width:8%;">Amount of<br>Fine (₹)<br><small style="font-weight:500;">[Sec. 8]</small></th>
+                <th rowspan="2" style="width:8%;">Damage / Loss<br>(₹)<br><small style="font-weight:500;">[Sec. 10]</small></th>
+                <th rowspan="2" style="width:9%;">Advance / Loan<br>granted (₹)<br><small style="font-weight:500;">[Sec. 12 / 12-A]</small></th>
+                <th rowspan="2" style="width:7%;">Recovery<br>this month<br>(₹)</th>
+                <th rowspan="2" style="width:7%;">Balance<br>Outstanding<br>(₹)</th>
+                <th rowspan="2" style="width:8%;">Remarks</th>
+                <th rowspan="2" style="width:9%;">Signature /<br>Thumb impression</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for emp in employees %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td class="name">{{ emp.name }}</td>
+                <td class="left">{{ emp.father_husband_name or '—' }}</td>
+                <td class="left">{{ emp.designation or '—' }}</td>
+                <td><small style="font-family:monospace;">{{ emp.uan_number or emp.esic_ip_number or '—' }}</small></td>
+                <td class="nil">NIL</td>
+                <td class="nil">NIL</td>
+                <td class="nil">NIL</td>
+                <td class="nil">NIL</td>
+                <td class="nil">NIL</td>
+                <td></td>
+                <td></td>
+            </tr>
+            {% endfor %}
+            <tr class="total-row">
+                <td colspan="5" class="label">TOTAL ({{ employees|length }} Employees) — NIL</td>
+                <td>NIL</td>
+                <td>NIL</td>
+                <td>NIL</td>
+                <td>NIL</td>
+                <td>NIL</td>
+                <td></td>
+                <td></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="fc-cert">
+        Certified that no fines, deductions for damage or loss, advances
+        or loans were imposed / recovered during the wage period
+        <strong>{{ payroll.month_name }} {{ payroll.year }}</strong>.
+    </div>
+
+    <div class="fc-sign-block">
+        <div>
+            <div class="signature-line">Signature of Employer</div>
+        </div>
+        <div style="text-align:right;">
+            <div>Date: ______________</div>
+            <div style="margin-top:6px;">Place: _____________</div>
+        </div>
+    </div>
+
+    <div class="fc-footer">
+        Generated: {{ generated_on }} &nbsp;|&nbsp; Vaishnavi Consultant
+    </div>
+</div>
+{% endblock %}
