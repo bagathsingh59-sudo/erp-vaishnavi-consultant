@@ -746,6 +746,240 @@ def attendance_excel(payroll_id):
     )
 
 
+# ==============================================================================
+# FORM C — REGISTER OF FINES / DAMAGES / ADVANCES / LOANS  (Monthly NIL register)
+# ==============================================================================
+# Under the Payment of Wages Act, 1936 the establishment must maintain a register
+# of fines (Sec. 8), deductions for damage / loss (Sec. 10) and advances /
+# loans (Sec. 12 & 12-A). In most consultancy practice the register is NIL
+# every month, but it still has to be available for the labour inspector.
+#
+# This endpoint generates the NIL-by-default monthly register in Excel
+# (Legal Landscape). One row per active employee with the deduction columns
+# blank. Footer carries a "NIL TOTAL" line and the employer signature block.
+# ==============================================================================
+@reports_bp.route('/payroll/<int:payroll_id>/report/form-c-fines/excel')
+def form_c_fines_excel(payroll_id):
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    payroll, est, config, entries, heads = _get_payroll_data(payroll_id, include_zero=True)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Form C"
+
+    # ── Style helpers ────────────────────────────────────────────────────
+    title_font   = Font(bold=True, size=14, name='Calibri')
+    subtitle_fnt = Font(bold=True, size=10, name='Calibri')
+    info_font    = Font(size=9, name='Calibri')
+    info_bold    = Font(bold=True, size=9, name='Calibri')
+    header_font  = Font(bold=True, size=8.5, name='Calibri')
+    body_font    = Font(size=9, name='Calibri')
+    body_bold    = Font(bold=True, size=9, name='Calibri')
+    total_font   = Font(bold=True, size=9.5, name='Calibri')
+    nil_font     = Font(size=9, italic=True, color='64748B', name='Calibri')
+
+    thin = Side(border_style='thin', color='475569')
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    center = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    right  = Alignment(horizontal='right',  vertical='center')
+    left   = Alignment(horizontal='left',   vertical='center', wrap_text=True)
+
+    header_fill = PatternFill(start_color='F1F5F9', end_color='F1F5F9', fill_type='solid')
+    nil_fill    = PatternFill(start_color='FEFCE8', end_color='FEFCE8', fill_type='solid')
+    total_fill  = PatternFill(start_color='D9EAD3', end_color='D9EAD3', fill_type='solid')
+
+    # 12 columns: Sr · Name · Father · Designation · UAN/ESIC ·
+    # Fine · Damage/Loss · Advance/Loan · Recovery · Balance · Remarks · Signature
+    TOTAL_COLS = 12
+
+    # ── Title block ─────────────────────────────────────────────────────
+    ws.cell(row=1, column=1, value="FORM C").font = title_font
+    ws.cell(row=1, column=1).alignment = center
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=TOTAL_COLS)
+
+    ws.cell(row=2, column=1, value="REGISTER OF FINES, DAMAGES, ADVANCES AND LOANS").font = subtitle_fnt
+    ws.cell(row=2, column=1).alignment = center
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=TOTAL_COLS)
+
+    ws.cell(row=3, column=1, value="(Under the Payment of Wages Act, 1936)").font = info_font
+    ws.cell(row=3, column=1).alignment = center
+    ws.merge_cells(start_row=3, start_column=1, end_row=3, end_column=TOTAL_COLS)
+
+    # ── Establishment info block ────────────────────────────────────────
+    info_rows = [
+        ('Name of the Establishment:', (est.company_name or '').upper()),
+        ('Address:',                   est.address or ''),
+        ('PF Code / ESIC Code:',       ' / '.join([x for x in [est.pf_code, est.esic_code] if x]) or '—'),
+        ('Wage Period:',               f"01-{payroll.month_name[:3]}-{payroll.year} to "
+                                       f"{calendar.monthrange(payroll.year, payroll.month)[1]}"
+                                       f"-{payroll.month_name[:3]}-{payroll.year}"),
+    ]
+    r = 5
+    for label, value in info_rows:
+        ws.cell(row=r, column=1, value=label).font = info_bold
+        ws.cell(row=r, column=1).alignment = left
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=3)
+        ws.cell(row=r, column=4, value=value).font = info_font
+        ws.cell(row=r, column=4).alignment = left
+        ws.merge_cells(start_row=r, start_column=4, end_row=r, end_column=TOTAL_COLS)
+        r += 1
+    r += 1  # spacer
+
+    # ── Column headers ──────────────────────────────────────────────────
+    header_row = r
+    headers = [
+        'Sr\nNo.',
+        'Name of the\nEmployee',
+        "Father's /\nHusband's Name",
+        'Designation',
+        'UAN /\nESIC IP',
+        'Amount of\nFine (₹)\n[Sec. 8]',
+        'Damage / Loss\n(₹)\n[Sec. 10]',
+        'Advance / Loan\ngranted (₹)\n[Sec. 12 / 12-A]',
+        'Recovery\nthis month\n(₹)',
+        'Balance\nOutstanding\n(₹)',
+        'Remarks',
+        'Signature /\nThumb impression',
+    ]
+    for col, h in enumerate(headers, 1):
+        c = ws.cell(row=header_row, column=col, value=h)
+        c.font = header_font
+        c.fill = header_fill
+        c.alignment = center
+        c.border = border
+    ws.row_dimensions[header_row].height = 60
+
+    # ── Data rows (NIL by default) ──────────────────────────────────────
+    # Pull active employees from the establishment so the register reflects
+    # the current roster, not just the payroll entries. Falls back to
+    # payroll-entry employees if the establishment relationship is empty.
+    from app.models.employee import Employee
+    employees = (Employee.query
+                 .filter_by(establishment_id=est.id, is_active=True)
+                 .order_by(Employee.emp_code)
+                 .all())
+    if not employees:
+        # Fallback: use whoever is on the payroll
+        seen = set()
+        for entry in entries:
+            if entry.employee and entry.employee.id not in seen:
+                employees.append(entry.employee)
+                seen.add(entry.employee.id)
+
+    data_start = header_row + 1
+    for idx, emp in enumerate(employees, 1):
+        rr = data_start + idx - 1
+        primary_id = emp.uan_number or emp.esic_ip_number or '—'
+        cells = [
+            (1,  idx,                                center, body_font, None),
+            (2,  emp.name,                           left,   body_bold, None),
+            (3,  emp.father_husband_name or '',      left,   body_font, None),
+            (4,  emp.designation or '',              left,   body_font, None),
+            (5,  primary_id,                         center, body_font, None),
+            (6,  'NIL',                              center, nil_font,  nil_fill),
+            (7,  'NIL',                              center, nil_font,  nil_fill),
+            (8,  'NIL',                              center, nil_font,  nil_fill),
+            (9,  'NIL',                              center, nil_font,  nil_fill),
+            (10, 'NIL',                              center, nil_font,  nil_fill),
+            (11, '',                                 left,   body_font, None),
+            (12, '',                                 center, body_font, None),
+        ]
+        for col, val, align, font, fill in cells:
+            c = ws.cell(row=rr, column=col, value=val)
+            c.font = font
+            c.alignment = align
+            c.border = border
+            if fill:
+                c.fill = fill
+        ws.row_dimensions[rr].height = 22
+
+    # ── TOTAL (NIL) row ─────────────────────────────────────────────────
+    total_row = data_start + len(employees)
+    label = ws.cell(row=total_row, column=1,
+                    value=f"TOTAL ({len(employees)} Employees) — NIL")
+    label.font = total_font
+    label.alignment = center
+    label.fill = total_fill
+    label.border = border
+    ws.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=5)
+    for col in range(2, 6):
+        ws.cell(row=total_row, column=col).border = border
+        ws.cell(row=total_row, column=col).fill = total_fill
+
+    for col in range(6, 11):
+        c = ws.cell(row=total_row, column=col, value='NIL')
+        c.font = total_font
+        c.alignment = center
+        c.fill = total_fill
+        c.border = border
+    for col in (11, 12):
+        c = ws.cell(row=total_row, column=col, value='')
+        c.fill = total_fill
+        c.border = border
+    ws.row_dimensions[total_row].height = 26
+
+    # ── Certification / signature block ─────────────────────────────────
+    cert_row = total_row + 2
+    ws.cell(row=cert_row, column=1,
+            value=("Certified that no fines, deductions for damage or loss, "
+                   "advances or loans were imposed / recovered during the wage "
+                   f"period {payroll.month_name} {payroll.year}.")
+            ).font = Font(size=9, italic=True, name='Calibri')
+    ws.cell(row=cert_row, column=1).alignment = left
+    ws.merge_cells(start_row=cert_row, start_column=1, end_row=cert_row, end_column=TOTAL_COLS)
+    ws.row_dimensions[cert_row].height = 24
+
+    sig_row = cert_row + 3
+    ws.cell(row=sig_row,     column=1, value='Signature of Employer:').font = info_bold
+    ws.cell(row=sig_row + 1, column=1, value='_______________________').font = info_font
+    ws.cell(row=sig_row,     column=10, value='Date:').font = info_bold
+    ws.cell(row=sig_row,     column=11, value='_______________').font = info_font
+    ws.cell(row=sig_row + 1, column=10, value='Place:').font = info_bold
+    ws.cell(row=sig_row + 1, column=11, value='_______________').font = info_font
+
+    # ── Footer ──────────────────────────────────────────────────────────
+    footer_row = sig_row + 4
+    ws.cell(row=footer_row, column=1,
+            value=f"Generated: {datetime.now().strftime('%d %b %Y, %I:%M %p')}   |   Vaishnavi Consultant"
+            ).font = Font(size=8, italic=True, color='64748B', name='Calibri')
+    ws.cell(row=footer_row, column=1).alignment = center
+    ws.merge_cells(start_row=footer_row, start_column=1, end_row=footer_row, end_column=TOTAL_COLS)
+
+    # ── Column widths (Legal landscape fit) ─────────────────────────────
+    widths = [5, 22, 22, 14, 14, 12, 13, 14, 11, 11, 16, 16]
+    for i, w in enumerate(widths, 1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+    # ── Print setup — Legal Landscape, fit-to-width ─────────────────────
+    ws.page_setup.orientation = 'landscape'
+    ws.page_setup.paperSize   = 5   # Legal
+    ws.page_setup.fitToWidth  = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.print_options.horizontalCentered = True
+    ws.page_margins.left   = 0.4
+    ws.page_margins.right  = 0.4
+    ws.page_margins.top    = 0.5
+    ws.page_margins.bottom = 0.5
+    ws.print_title_rows = f'{header_row}:{header_row}'
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    safe_name = (est.company_name or 'Establishment').replace(' ', '_').replace('/', '_')[:60]
+    filename = f"Form_C_Fines_Register_{safe_name}_{payroll.month_name}_{payroll.year}.xlsx"
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=filename,
+    )
+
+
 def _generate_form_d_excel(payroll, est, config, attendance, num_days, rest_days, holiday_days):
     """Generate Form D Excel — exact government format"""
     from openpyxl import Workbook
