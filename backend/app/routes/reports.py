@@ -747,6 +747,319 @@ def attendance_excel(payroll_id):
 
 
 # ==============================================================================
+# FORM A — EMPLOYEE REGISTER (Code on Wages (Central) Rules, 2020 — Rule 2(1))
+# ==============================================================================
+# Unified Employee Register that replaces multiple older state-specific
+# registers (Karnataka MW Form A, Factories Form 22, etc.) under the new
+# Labour Codes. Mandatory for all establishments. Personnel-level register
+# carrying KYC + employment master data per worker.
+#
+# Sample sheet from a real Karnataka factory (ORIENT CEMENT / BALABHEEM GROUP)
+# uses 30 columns. We map every column to an Employee model field where
+# available; the rest stay blank for the client to fill (Education Level,
+# Category HS/S/SS/US, LWF No., Photo, Specimen Signature, etc.).
+# ==============================================================================
+FORM_A_COLUMNS = [
+    'SI. No',
+    'Employee Code',
+    'Name',
+    'Surname',
+    'Gender',
+    "Father's / Spouse Name",
+    'Date of Birth#',
+    'Nationality',
+    'Education Level',
+    'Date of Joining',
+    'Designation',
+    'Category Address\n*(HS/S/SS/US)',
+    'Type of Employment',
+    'Mobile',
+    'UAN',
+    'PAN',
+    'ESIC IP',
+    'LWF',
+    'AADHAR',
+    'Bank A/c Number',
+    'Bank',
+    'Branch (IFSC)',
+    'Present Address',
+    'Permanent',
+    'Service Book No',
+    'Date of Exit',
+    'Reason for Exit',
+    'Mark of Identification',
+    'Photo',
+    'Specimen Signature / Thumb Impression',
+]
+
+
+def _form_a_row(emp, sl):
+    """Map one Employee row into the 30-column Form A schedule order."""
+    # Split name → first / surname. Most rosters store full name in `name`;
+    # we take the last whitespace-separated token as surname, the rest as
+    # given name. If only one token, surname stays blank.
+    name = (emp.name or '').strip()
+    parts = name.split()
+    first_name = ' '.join(parts[:-1]) if len(parts) > 1 else name
+    surname    = parts[-1]            if len(parts) > 1 else ''
+
+    def _date(d):
+        return d.strftime('%d-%m-%Y') if d else ''
+
+    return [
+        sl,
+        emp.emp_code or '',
+        first_name,
+        surname,
+        emp.gender or '',
+        emp.father_husband_name or '',
+        _date(emp.date_of_birth),
+        'INDIAN',                       # Nationality — default; ERP doesn't store this yet
+        '',                             # Education Level — not stored
+        _date(emp.date_of_joining),
+        emp.designation or '',
+        '',                             # Category (HS/S/SS/US) — not stored
+        'Regular',                      # Type of Employment — default
+        emp.mobile_number or '',
+        emp.uan_number or '',
+        emp.pan_number or '',
+        emp.esic_ip_number or '',
+        '',                             # LWF — not stored
+        emp.aadhaar_number or '',
+        emp.bank_account_number or '',
+        emp.bank_name or '',
+        emp.bank_ifsc_code or '',
+        emp.address or '',              # Present Address
+        emp.address or '',              # Permanent (same field for now)
+        '',                             # Service Book No — not stored
+        _date(emp.date_of_exit),
+        emp.exit_reason or '',
+        '',                             # Mark of Identification — not stored
+        '',                             # Photo — not stored
+        '',                             # Specimen Signature — not stored
+    ]
+
+
+def _build_form_a_data(payroll_id):
+    """Returns (payroll, est, employees) for Form A rendering — active roster of
+    the establishment as of this payroll period."""
+    from app.models.employee import Employee
+    payroll, est, _config, entries, _heads = _get_payroll_data(payroll_id, include_zero=True)
+
+    employees = (Employee.query
+                 .filter_by(establishment_id=est.id, is_active=True)
+                 .order_by(Employee.emp_code)
+                 .all())
+    if not employees:
+        seen = set()
+        for entry in entries:
+            if entry.employee and entry.employee.id not in seen:
+                employees.append(entry.employee)
+                seen.add(entry.employee.id)
+    return payroll, est, employees
+
+
+@reports_bp.route('/payroll/<int:payroll_id>/report/form-a')
+def form_a_view(payroll_id):
+    """Form A — Employee Register (HTML preview).
+
+    Carries the Download Excel + Print/PDF buttons at the top, same
+    convention as Form B / Form C / Form D.
+    """
+    payroll, est, employees = _build_form_a_data(payroll_id)
+    rows = [_form_a_row(emp, i) for i, emp in enumerate(employees, 1)]
+    generated_on = datetime.now().strftime('%d %b %Y, %I:%M %p')
+    return render_template('reports/form_a.html',
+                           payroll=payroll, est=est, employees=employees,
+                           rows=rows, headers=FORM_A_COLUMNS,
+                           generated_on=generated_on)
+
+
+@reports_bp.route('/payroll/<int:payroll_id>/report/form-a/excel')
+def form_a_excel(payroll_id):
+    """Form A — Employee Register (Excel download, A3 Landscape).
+    A3 because 30 columns don't comfortably fit on Legal — A3 landscape
+    is what most clients use for this register in practice."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    payroll, est, employees = _build_form_a_data(payroll_id)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Form A Employee Register"
+
+    # ── Style helpers ────────────────────────────────────────────────────
+    schedule_font = Font(bold=True, size=11, name='Calibri')
+    rule_font     = Font(italic=True, size=9, name='Calibri')
+    title_font    = Font(bold=True, size=16, name='Calibri')
+    sub_font      = Font(bold=True, size=11, name='Calibri')
+    part_font     = Font(bold=True, size=9, italic=True, name='Calibri')
+    info_label    = Font(bold=True, size=9, name='Calibri')
+    info_value    = Font(size=9, name='Calibri')
+    header_font   = Font(bold=True, size=8, color='FFFFFF', name='Calibri')
+    body_font     = Font(size=8, name='Calibri')
+
+    thin = Side(border_style='thin', color='475569')
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    center = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    left   = Alignment(horizontal='left',   vertical='center', wrap_text=True)
+
+    slate_fill  = PatternFill(start_color='1E293B', end_color='1E293B', fill_type='solid')
+    header_band = PatternFill(start_color='F1F5F9', end_color='F1F5F9', fill_type='solid')
+
+    TOTAL_COLS = 30
+
+    # ── Header block (matches sample exactly) ───────────────────────────
+    ws.cell(row=1, column=1, value='SCHEDULE').font = schedule_font
+    ws.cell(row=1, column=1).alignment = center
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=TOTAL_COLS)
+
+    ws.cell(row=2, column=1, value='[See rule 2 (1)]').font = rule_font
+    ws.cell(row=2, column=1).alignment = center
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=TOTAL_COLS)
+
+    ws.cell(row=4, column=1, value='FORM A').font = title_font
+    ws.cell(row=4, column=1).alignment = center
+    ws.merge_cells(start_row=4, start_column=1, end_row=4, end_column=TOTAL_COLS)
+
+    ws.cell(row=5, column=1, value='FORMAT OF EMPLOYEE REGISTER').font = sub_font
+    ws.cell(row=5, column=1).alignment = center
+    ws.merge_cells(start_row=5, start_column=1, end_row=5, end_column=TOTAL_COLS)
+
+    ws.cell(row=6, column=1, value='[Part-A: For all Establishments]').font = part_font
+    ws.cell(row=6, column=1).alignment = center
+    ws.merge_cells(start_row=6, start_column=1, end_row=6, end_column=TOTAL_COLS)
+
+    # ── Establishment info block ────────────────────────────────────────
+    # Two rows of label-value pairs spread across the page.
+    def write_info(row, col, label, value, label_cols=3, value_cols=5):
+        ws.cell(row=row, column=col, value=label).font = info_label
+        ws.cell(row=row, column=col).alignment = left
+        ws.merge_cells(start_row=row, start_column=col,
+                       end_row=row, end_column=col + label_cols - 1)
+        ws.cell(row=row, column=col + label_cols, value=value).font = info_value
+        ws.cell(row=row, column=col + label_cols).alignment = left
+        ws.merge_cells(start_row=row, start_column=col + label_cols,
+                       end_row=row, end_column=col + label_cols + value_cols - 1)
+
+    info_row = 8
+    write_info(info_row, 1,  'Name of Establishment:', (est.company_name or '').upper())
+    write_info(info_row, 9,  'Name of Owner:',          '')
+    write_info(info_row, 17, 'LIN:',                    '')
+    write_info(info_row, 25, '',                        '')
+
+    write_info(info_row + 1, 1,
+               'Name of the Principal Employer:',
+               (est.company_name or '').upper())
+    write_info(info_row + 1, 17,
+               'Address of the Principal Employer:',
+               est.address or '')
+
+    # ── Column header row ───────────────────────────────────────────────
+    header_row = 12
+    for col, h in enumerate(FORM_A_COLUMNS, 1):
+        c = ws.cell(row=header_row, column=col, value=h)
+        c.font = header_font
+        c.fill = slate_fill
+        c.alignment = center
+        c.border = border
+    ws.row_dimensions[header_row].height = 44
+
+    # Column-number indicator row (1..30) — matches sample
+    num_row = header_row + 1
+    for col in range(1, TOTAL_COLS + 1):
+        c = ws.cell(row=num_row, column=col, value=col)
+        c.font = Font(bold=True, size=8, name='Calibri')
+        c.fill = header_band
+        c.alignment = center
+        c.border = border
+    ws.row_dimensions[num_row].height = 16
+
+    # ── Data rows ────────────────────────────────────────────────────────
+    data_start = num_row + 1
+    for idx, emp in enumerate(employees, 1):
+        rr = data_start + idx - 1
+        row_values = _form_a_row(emp, idx)
+        for col, val in enumerate(row_values, 1):
+            c = ws.cell(row=rr, column=col, value=val)
+            c.font = body_font
+            c.alignment = left if col in (3, 4, 6, 11, 23, 24, 27) else center
+            c.border = border
+        ws.row_dimensions[rr].height = 22
+
+    # ── Footer ──────────────────────────────────────────────────────────
+    footer_row = data_start + len(employees) + 2
+    ws.cell(row=footer_row, column=1,
+            value=f"Generated: {datetime.now().strftime('%d %b %Y, %I:%M %p')}   |   Vaishnavi Consultant"
+            ).font = Font(size=8, italic=True, color='64748B', name='Calibri')
+    ws.cell(row=footer_row, column=1).alignment = center
+    ws.merge_cells(start_row=footer_row, start_column=1,
+                   end_row=footer_row, end_column=TOTAL_COLS)
+
+    # ── Column widths (sized for 30 cols on A3 landscape) ──────────────
+    widths = [
+        5,   # Sl. No
+        11,  # Emp Code
+        14, 12,  # Name, Surname
+        7,       # Gender
+        16,      # Father's/Spouse
+        11,      # DOB
+        9,       # Nationality
+        11,      # Education
+        11,      # DOJ
+        14,      # Designation
+        10,      # Category
+        12,      # Type of Employment
+        12,      # Mobile
+        14,      # UAN
+        12,      # PAN
+        13,      # ESIC IP
+        10,      # LWF
+        13,      # Aadhaar
+        16,      # Bank A/c
+        14,      # Bank
+        12,      # IFSC
+        22, 22,  # Present, Permanent
+        12,      # Service Book
+        11,      # DOE
+        12,      # Reason for Exit
+        14,      # Mark
+        10,      # Photo
+        16,      # Signature
+    ]
+    for i, w in enumerate(widths, 1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+    # ── Print setup — A3 Landscape (30 cols too wide for Legal) ────────
+    ws.page_setup.orientation = 'landscape'
+    ws.page_setup.paperSize   = 8   # 8 = A3 in openpyxl
+    ws.page_setup.fitToWidth  = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.print_options.horizontalCentered = True
+    ws.page_margins.left   = 0.3
+    ws.page_margins.right  = 0.3
+    ws.page_margins.top    = 0.4
+    ws.page_margins.bottom = 0.4
+    ws.print_title_rows = f'{header_row}:{num_row}'
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    safe_name = (est.company_name or 'Establishment').replace(' ', '_').replace('/', '_')[:60]
+    filename = f"Form_A_Employee_Register_{safe_name}_{payroll.month_name}_{payroll.year}.xlsx"
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=filename,
+    )
+
+
+# ==============================================================================
 # FORM C — REGISTER OF FINES / DAMAGES / ADVANCES / LOANS  (Monthly NIL register)
 # ==============================================================================
 # Under the Payment of Wages Act, 1936 the establishment must maintain a register

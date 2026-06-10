@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Form A — Employee Register — {{ payroll.period_display }}{% endblock %}
+{% block page_header %}Form A — Employee Register{% endblock %}
+
+{% block content %}
+{% set print_size = 'legal-landscape' %}
+{% include '_print_common.html' %}
+
+<style>
+    @media print {
+        html, body { width: 16.5in; }
+        .page-content { padding: 0 !important; }
+        .fa-page {
+            box-shadow: none !important;
+            border: none !important;
+            margin: 0 !important;
+            padding: 6px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+        .fa-table { width: 100% !important; page-break-inside: auto; }
+        .fa-table th, .fa-table td { font-size: 6.5px !important; padding: 2px !important; }
+        .fa-table thead { display: table-header-group; }
+        .fa-table tr { page-break-inside: avoid; }
+    }
+    .fa-page  { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:24px 28px; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.1); overflow-x:auto; }
+    .fa-title { text-align:center; margin-bottom:14px; }
+    .fa-title .schedule { font-weight:700; font-size:0.95rem; letter-spacing:1.5px; color:#1e293b; margin:0; }
+    .fa-title .rule { font-style:italic; font-size:0.78rem; color:#64748b; margin:1px 0 12px; }
+    .fa-title h2 { font-size:1.5rem; font-weight:800; letter-spacing:2px; color:#1e293b; margin:0; }
+    .fa-title h4 { font-size:1rem; font-weight:700; letter-spacing:1px; margin:4px 0 0; color:#334155; }
+    .fa-title .part { font-size:0.78rem; font-style:italic; color:#475569; margin:4px 0 0; }
+
+    .fa-info { font-size:0.8rem; margin-bottom:14px; }
+    .fa-info table { width:100%; border-collapse:collapse; }
+    .fa-info td { padding:3px 6px; vertical-align:top; }
+    .fa-info .label { font-weight:700; color:#334155; white-space:nowrap; }
+
+    .fa-table { width:100%; border-collapse:collapse; font-size:0.65rem; }
+    .fa-table th {
+        background:#1e293b; color:#fff; font-weight:700;
+        padding:6px 3px; border:1px solid #475569;
+        text-align:center; vertical-align:middle; font-size:0.6rem;
+    }
+    .fa-table td {
+        padding:4px 3px; border:1px solid #94a3b8;
+        vertical-align:middle; font-size:0.62rem;
+    }
+    .fa-table td.txt-left  { text-align:left; }
+    .fa-table td.txt-ctr   { text-align:center; }
+    .fa-table tr.numrow td {
+        background:#f1f5f9; font-weight:700; text-align:center;
+        font-size:0.65rem; padding:2px;
+    }
+
+    .fa-footer { margin-top:18px; font-size:0.7rem; color:#64748b; text-align:center; }
+</style>
+
+<div class="no-print mb-3 d-flex justify-content-between align-items-center">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb" style="font-size:0.85rem; margin:0;">
+            <li class="breadcrumb-item"><a href="{{ url_for('payroll.payroll_list') }}" class="text-decoration-none">Salary Processing</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('payroll.payroll_process', payroll_id=payroll.id) }}" class="text-decoration-none">{{ payroll.period_display }}</a></li>
+            <li class="breadcrumb-item active">Form A</li>
+        </ol>
+    </nav>
+    <div class="d-flex gap-2">
+        <button onclick="window.history.back()" style="background:#e5e7eb; color:#333; border:none; padding:6px 16px; border-radius:6px; cursor:pointer; font-size:0.82rem;"><i class="bi bi-arrow-left me-1"></i> Back</button>
+        <a href="{{ url_for('reports.form_a_excel', payroll_id=payroll.id) }}" class="btn btn-success btn-sm">
+            <i class="bi bi-file-earmark-excel me-1"></i> Download Excel
+        </a>
+        <button onclick="window.print()" class="btn btn-primary btn-sm">
+            <i class="bi bi-printer me-1"></i> Print / PDF
+        </button>
+    </div>
+</div>
+
+<div class="no-print alert alert-warning py-2 px-3 mb-3" style="font-size:0.82rem;">
+    <i class="bi bi-info-circle-fill me-1"></i>
+    <strong>30-column register.</strong>
+    Printing / Save as PDF: click <b>Print / PDF</b>, then set <b>Layout = Landscape</b> and
+    <b>Paper size = A3</b> (Legal won't fit all 30 columns).
+    Fields not yet captured in the ERP (Education Level, Category HS/S/SS/US,
+    LWF, Service Book No., Photo, Specimen Signature) appear blank — the
+    client can fill those by hand or you can enrich the employee master.
+</div>
+
+<div class="fa-page">
+    <div class="fa-title">
+        <p class="schedule">SCHEDULE</p>
+        <p class="rule">[See rule 2 (1)]</p>
+        <h2>FORM A</h2>
+        <h4>FORMAT OF EMPLOYEE REGISTER</h4>
+        <p class="part">[Part-A: For all Establishments]</p>
+    </div>
+
+    <div class="fa-info">
+        <table>
+            <tr>
+                <td class="label" style="width:18%;">Name of Establishment:</td>
+                <td style="width:32%;">{{ (est.company_name or '')|upper }}</td>
+                <td class="label" style="width:14%;">Name of Owner:</td>
+                <td style="width:18%;">______________________</td>
+                <td class="label" style="width:8%;">LIN:</td>
+                <td style="width:10%;">______________</td>
+            </tr>
+            <tr>
+                <td class="label">Name of Principal Employer:</td>
+                <td>{{ (est.company_name or '')|upper }}</td>
+                <td class="label">Address of Principal Employer:</td>
+                <td colspan="3">{{ est.address or '—' }}</td>
+            </tr>
+            <tr>
+                <td class="label">Total Employees:</td>
+                <td><strong>{{ employees|length }}</strong></td>
+                <td class="label">Period:</td>
+                <td>{{ payroll.period_display }}</td>
+                <td colspan="2"></td>
+            </tr>
+        </table>
+    </div>
+
+    <table class="fa-table">
+        <thead>
+            <tr>
+                {% for h in headers %}
+                <th>{{ h }}</th>
+                {% endfor %}
+            </tr>
+            <tr class="numrow">
+                {% for h in headers %}
+                <td>{{ loop.index }}</td>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% set ls = [3, 4, 6, 11, 23, 24, 27] %}
+            {% for row in rows %}
+            <tr>
+                {% for val in row %}
+                <td class="{% if loop.index in ls %}txt-left{% else %}txt-ctr{% endif %}">
+                    {{ val }}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+            {% if not rows %}
+            <tr>
+                <td colspan="{{ headers|length }}" style="text-align:center; padding:14px; font-style:italic; color:#94a3b8;">
+                    No active employees in this establishment.
+                </td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <div class="fa-footer">
+        Generated: {{ generated_on }} &nbsp;|&nbsp; Vaishnavi Consultant
+    </div>
+</div>
+{% endblock %}
