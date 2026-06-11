@@ -1740,36 +1740,24 @@ def save_attendance(payroll_id):
                 if not _ovr_heads:
                     _ovr_heads = None
 
-            # ── Bugfix 2: daily wages — fill BASIC as the remainder ───────
-            # For a daily-wages employee the head columns are PER-DAY rates
-            # that are COMPONENTS of the all-inclusive daily rate. The
-            # template typically specifies only the carved-out heads (e.g.
-            # HRA = 15/day) and leaves BASIC blank — BASIC is meant to be
-            # "whatever's left of the daily rate".
-            #
-            # The old code created a PayrollEntryHead for each provided head
-            # (HRA → 315) but NEVER created the BASIC remainder, so:
-            #   • Form B Basic column stayed blank
-            #   • compliance wages saw only HRA (a non-compliance head) → 0
-            #     → EPF stopped deducting
-            #
-            # Fix: when heads are provided for a daily-wages employee and
-            # BASIC isn't among them, inject BASIC = daily_rate − Σ(other
-            # per-day head rates). The breakup then sums back to the daily
-            # rate, Form B shows both Basic and HRA, and EPF is computed on
-            # the compliance heads (Basic/DA) as it should be.
+            # ── Daily wages: rate = BASIC/day, template heads are ADD-ONS ──
+            # For a daily-wages employee the "Rate / Gross" column is the
+            # BASIC daily rate. Any head columns in the template (HRA, etc.)
+            # are ADDITIONAL per-day allowances paid ON TOP of the basic, so
+            # the gross is bigger than rate × days.
+            #   MR. RAVIKUMAR — rate 640.82, HRA 181/day, 26 days:
+            #       Basic = 640.82 × 26 = 16,661
+            #       HRA   = 181    × 26 = 4,706
+            #       Gross = 16,661 + 4,706 = 21,367
+            # Inject BASIC = daily_rate into the head set so the head-wise
+            # breakup AND the gross both account for it. If the template
+            # already lists BASIC explicitly we leave it as-is.
             if _ovr_daily and _ovr_heads:
                 _basic_head = SalaryHead.query.filter_by(
                     establishment_id=est.id, short_code='BASIC', is_active=True
                 ).first()
                 if _basic_head and str(_basic_head.id) not in _ovr_heads:
-                    try:
-                        _other_per_day = sum(float(v) for v in _ovr_heads.values())
-                    except (TypeError, ValueError):
-                        _other_per_day = 0.0
-                    _basic_per_day = float(_ovr_daily) - _other_per_day
-                    if _basic_per_day > 0:
-                        _ovr_heads[str(_basic_head.id)] = round(_basic_per_day, 2)
+                    _ovr_heads[str(_basic_head.id)] = float(_ovr_daily)
 
             # Determine type from the override itself (NOT from config)
             is_daily_wages = bool(_ovr_daily)
@@ -1785,8 +1773,18 @@ def save_attendance(payroll_id):
 
             # Earned gross: rate × days (daily) or proportionate (gross)
             if _ovr_daily:
-                entry.earned_gross = round(_ovr_daily * entry.total_payable_days)
-                full_gross = round(_ovr_daily * working_days) if working_days > 0 else entry.earned_gross
+                # Daily: BASIC daily rate PLUS any additional per-day head
+                # allowances (HRA etc.), all × payable days. _ovr_heads (when
+                # present) already includes the injected BASIC = daily_rate,
+                # so summing the head per-day rates gives the full per-day
+                # wage. When there are no heads, the daily rate alone is the
+                # whole wage.
+                if _ovr_heads:
+                    _per_day_total = sum(float(v) for v in _ovr_heads.values())
+                else:
+                    _per_day_total = float(_ovr_daily)
+                entry.earned_gross = round(_per_day_total * entry.total_payable_days)
+                full_gross = round(_per_day_total * working_days) if working_days > 0 else entry.earned_gross
             elif _ovr_gross:
                 full_gross = _ovr_gross
                 if working_days > 0:
@@ -1884,14 +1882,25 @@ def save_attendance(payroll_id):
 
             # Compliance wages: use head breakup if available, else full earned gross
             if _use_head_values and config.compliance_basis != 'gross':
-                compliance_total = sum(
-                    hv_dict['amount'] for hv_dict in _use_head_values
-                    if hv_dict['salary_head'] and hv_dict['salary_head'].is_for_compliance
-                )
-                if full_gross > 0:
-                    compliance_wages = round(entry.earned_gross * (compliance_total / full_gross))
+                if _ovr_daily:
+                    # Daily: compliance heads are per-day rates → multiply by
+                    # payable days directly. (The earlier ratio formula mixed
+                    # per-day head amounts with the monthly full_gross and
+                    # produced wrong / near-zero EPF wages.)
+                    compliance_wages = round(sum(
+                        hv_dict['amount'] * entry.total_payable_days
+                        for hv_dict in _use_head_values
+                        if hv_dict['salary_head'] and hv_dict['salary_head'].is_for_compliance
+                    ))
                 else:
-                    compliance_wages = entry.earned_gross
+                    compliance_total = sum(
+                        hv_dict['amount'] for hv_dict in _use_head_values
+                        if hv_dict['salary_head'] and hv_dict['salary_head'].is_for_compliance
+                    )
+                    if full_gross > 0:
+                        compliance_wages = round(entry.earned_gross * (compliance_total / full_gross))
+                    else:
+                        compliance_wages = entry.earned_gross
             else:
                 compliance_wages = entry.earned_gross
 
