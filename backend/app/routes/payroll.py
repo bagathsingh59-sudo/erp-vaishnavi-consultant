@@ -1726,6 +1726,20 @@ def save_attendance(payroll_id):
             _ovr_gross = _rate_overrides.get('gross', 0)
             _ovr_heads = _rate_overrides.get('heads')
 
+            # ── Bugfix: drop zero-value heads ────────────────────────────
+            # A stray 0 in any head column of the universal template (e.g.
+            # HRA=0 pre-filled while BASIC/DA are blank) used to count as
+            # "head breakup provided". For a daily-wages employee that
+            # silently skipped the "map full earning to BASIC" fallback
+            # (Form B Basic went blank) AND collapsed compliance wages to 0
+            # (EPF stopped deducting). A head worth 0 contributes nothing,
+            # so treat it as not-provided.
+            if _ovr_heads:
+                _ovr_heads = {k: v for k, v in _ovr_heads.items()
+                              if v not in (None, '') and float(v) != 0}
+                if not _ovr_heads:
+                    _ovr_heads = None
+
             # Determine type from the override itself (NOT from config)
             is_daily_wages = bool(_ovr_daily)
             _eff_daily_rate = _ovr_daily
@@ -3334,7 +3348,14 @@ def upload_attendance(payroll_id):
                     try:
                         val = row[int(cidx) - 1].value
                         if val is not None and str(val).strip() != '':
-                            heads_override[head_id_str] = float(val)
+                            fval = float(val)
+                            # Skip zero-value heads — a 0 contributes nothing
+                            # to gross and must NOT count as "head breakup
+                            # provided", otherwise a daily-wages employee
+                            # loses the BASIC mapping and EPF wages collapse
+                            # to 0 (see matching guard in the calc path).
+                            if fval != 0:
+                                heads_override[head_id_str] = fval
                     except (ValueError, TypeError, IndexError):
                         pass
                 if heads_override:
