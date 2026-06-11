@@ -1726,7 +1726,7 @@ def save_attendance(payroll_id):
             _ovr_gross = _rate_overrides.get('gross', 0)
             _ovr_heads = _rate_overrides.get('heads')
 
-            # ── Bugfix: drop zero-value heads ────────────────────────────
+            # ── Bugfix 1: drop zero-value heads ──────────────────────────
             # A stray 0 in any head column of the universal template (e.g.
             # HRA=0 pre-filled while BASIC/DA are blank) used to count as
             # "head breakup provided". For a daily-wages employee that
@@ -1738,6 +1738,25 @@ def save_attendance(payroll_id):
                 _ovr_heads = {k: v for k, v in _ovr_heads.items()
                               if v not in (None, '') and float(v) != 0}
                 if not _ovr_heads:
+                    _ovr_heads = None
+
+            # ── Bugfix 2: ignore a spurious partial head breakup on daily ──
+            # For a daily-wages employee the "Rate / Gross" column carries the
+            # FULL daily wage, so a valid head breakup must sum (per-day) to
+            # that daily rate. If the provided heads sum to materially less
+            # (or more) than the daily rate, they're stale leftover data
+            # (e.g. a small HRA pulled from the employee master while the
+            # actual wage is the all-inclusive daily rate). Honouring them
+            # leaves BASIC blank and the non-compliance HRA zeroes EPF wages.
+            # Discard such a partial breakup so the full earning maps to
+            # BASIC and EPF is computed on the whole wage — exactly like the
+            # employees whose head columns were blank.
+            if _ovr_daily and _ovr_heads:
+                try:
+                    _head_sum = sum(float(v) for v in _ovr_heads.values())
+                except (TypeError, ValueError):
+                    _head_sum = 0.0
+                if abs(_head_sum - float(_ovr_daily)) > 1.0:
                     _ovr_heads = None
 
             # Determine type from the override itself (NOT from config)
