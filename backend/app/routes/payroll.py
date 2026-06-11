@@ -1740,24 +1740,36 @@ def save_attendance(payroll_id):
                 if not _ovr_heads:
                     _ovr_heads = None
 
-            # ── Bugfix 2: ignore a spurious partial head breakup on daily ──
-            # For a daily-wages employee the "Rate / Gross" column carries the
-            # FULL daily wage, so a valid head breakup must sum (per-day) to
-            # that daily rate. If the provided heads sum to materially less
-            # (or more) than the daily rate, they're stale leftover data
-            # (e.g. a small HRA pulled from the employee master while the
-            # actual wage is the all-inclusive daily rate). Honouring them
-            # leaves BASIC blank and the non-compliance HRA zeroes EPF wages.
-            # Discard such a partial breakup so the full earning maps to
-            # BASIC and EPF is computed on the whole wage — exactly like the
-            # employees whose head columns were blank.
+            # ── Bugfix 2: daily wages — fill BASIC as the remainder ───────
+            # For a daily-wages employee the head columns are PER-DAY rates
+            # that are COMPONENTS of the all-inclusive daily rate. The
+            # template typically specifies only the carved-out heads (e.g.
+            # HRA = 15/day) and leaves BASIC blank — BASIC is meant to be
+            # "whatever's left of the daily rate".
+            #
+            # The old code created a PayrollEntryHead for each provided head
+            # (HRA → 315) but NEVER created the BASIC remainder, so:
+            #   • Form B Basic column stayed blank
+            #   • compliance wages saw only HRA (a non-compliance head) → 0
+            #     → EPF stopped deducting
+            #
+            # Fix: when heads are provided for a daily-wages employee and
+            # BASIC isn't among them, inject BASIC = daily_rate − Σ(other
+            # per-day head rates). The breakup then sums back to the daily
+            # rate, Form B shows both Basic and HRA, and EPF is computed on
+            # the compliance heads (Basic/DA) as it should be.
             if _ovr_daily and _ovr_heads:
-                try:
-                    _head_sum = sum(float(v) for v in _ovr_heads.values())
-                except (TypeError, ValueError):
-                    _head_sum = 0.0
-                if abs(_head_sum - float(_ovr_daily)) > 1.0:
-                    _ovr_heads = None
+                _basic_head = SalaryHead.query.filter_by(
+                    establishment_id=est.id, short_code='BASIC', is_active=True
+                ).first()
+                if _basic_head and str(_basic_head.id) not in _ovr_heads:
+                    try:
+                        _other_per_day = sum(float(v) for v in _ovr_heads.values())
+                    except (TypeError, ValueError):
+                        _other_per_day = 0.0
+                    _basic_per_day = float(_ovr_daily) - _other_per_day
+                    if _basic_per_day > 0:
+                        _ovr_heads[str(_basic_head.id)] = round(_basic_per_day, 2)
 
             # Determine type from the override itself (NOT from config)
             is_daily_wages = bool(_ovr_daily)
