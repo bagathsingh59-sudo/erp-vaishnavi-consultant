@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Gratuity Liability — {{ est.company_name }}{% endblock %}
+{% block page_header %}Gratuity Liability Statement{% endblock %}
+
+{% block content %}
+{% set print_size = 'legal-landscape' %}
+{% include '_print_common.html' %}
+<style>
+    @media print {
+        .page-content { padding: 0 !important; }
+        .pg { box-shadow:none !important; border:none !important; padding:8px !important; }
+        .t th, .t td { font-size:8px !important; padding:3px !important; }
+        .t thead { display: table-header-group; }
+    }
+    .pg { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:24px 28px; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+    .ttl { text-align:center; margin-bottom:6px; }
+    .ttl h2 { font-size:1.4rem; font-weight:800; letter-spacing:1px; margin:0; }
+    .meta { text-align:center; font-size:0.78rem; color:#475569; font-style:italic; margin-bottom:14px; }
+    .t { width:100%; border-collapse:collapse; font-size:0.78rem; }
+    .t th { background:#1e293b; color:#fff; padding:6px 5px; border:1px solid #475569; text-align:center; font-size:0.7rem; }
+    .t td { padding:5px; border:1px solid #94a3b8; }
+    .t td.r { text-align:right; } .t td.c { text-align:center; } .t td.l { text-align:left; }
+    .t .tot td { background:#d9ead3; font-weight:700; border-top:2px solid #1e293b; }
+    .badge-e { background:#dcfce7; color:#15803d; padding:1px 7px; border-radius:6px; font-size:0.66rem; font-weight:700; }
+    .badge-n { background:#fef3c7; color:#92400e; padding:1px 7px; border-radius:6px; font-size:0.66rem; font-weight:700; }
+    .ft { margin-top:18px; font-size:0.7rem; color:#64748b; text-align:center; }
+</style>
+
+<div class="no-print mb-3 d-flex justify-content-between align-items-center">
+    <a href="{{ url_for('annual_returns.annual_returns_home', establishment_id=est.id) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="GET" class="d-flex gap-1 align-items-center">
+            <label class="small mb-0 text-muted">As on:</label>
+            <input type="date" name="as_on" value="{{ as_on.strftime('%Y-%m-%d') }}" class="form-control form-control-sm" style="width:auto;">
+            <button class="btn btn-sm btn-outline-secondary">Apply</button>
+        </form>
+        <a href="{{ url_for('annual_returns.gratuity_report', est_id=est.id, as_on=as_on.strftime('%Y-%m-%d'), format='excel') }}" class="btn btn-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i> Excel</a>
+        <button onclick="window.print()" class="btn btn-primary btn-sm"><i class="bi bi-printer me-1"></i> Print / PDF</button>
+    </div>
+</div>
+
+<div class="pg">
+    <div class="ttl"><h2>GRATUITY LIABILITY STATEMENT</h2></div>
+    <div class="meta">
+        {{ (est.company_name or '')|upper }} &nbsp;|&nbsp; As on {{ as_on.strftime('%d-%m-%Y') }} &nbsp;|&nbsp;
+        Formula: (Last Basic+DA) × 15 / {{ divisor }} × completed years &nbsp;|&nbsp;
+        Eligibility: 5 years &nbsp;|&nbsp; Cap: ₹20,00,000
+    </div>
+    <table class="t">
+        <thead>
+            <tr>
+                <th>Sl.</th><th>Emp Code</th><th>Name</th><th>Date of Joining</th>
+                <th>Service (Yrs)</th><th>Last Basic+DA (₹)</th><th>Gratuity Payable (₹)</th><th>Eligibility</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% set ns = namespace(tot=0) %}
+            {% for b in rows %}
+            <tr>
+                <td class="c">{{ loop.index }}</td>
+                <td class="c">{{ b.employee.emp_code or '' }}</td>
+                <td class="l"><strong>{{ b.employee.name }}</strong></td>
+                <td class="c">{{ b.doj.strftime('%d-%m-%Y') if b.doj else '—' }}</td>
+                <td class="c">{{ b.rounded_years }}</td>
+                <td class="r">{{ "{:,.0f}".format(b.last_basic_da) }}</td>
+                <td class="r"><strong>{{ "{:,.0f}".format(b.gratuity) }}</strong></td>
+                <td class="c">{% if b.eligible %}<span class="badge-e">Eligible</span>{% else %}<span class="badge-n">&lt; 5 yrs</span>{% endif %}</td>
+            </tr>
+            {% set ns.tot = ns.tot + b.gratuity %}
+            {% endfor %}
+            <tr class="tot">
+                <td colspan="6" class="c">TOTAL LIABILITY ({{ rows|length }} employees)</td>
+                <td class="r">{{ "{:,.0f}".format(ns.tot) }}</td>
+                <td></td>
+            </tr>
+            {% if not rows %}
+            <tr><td colspan="8" class="c" style="padding:14px; color:#94a3b8; font-style:italic;">No active employees found.</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+    <div class="ft">Generated: {{ generated_on }} &nbsp;|&nbsp; Vaishnavi Consultant</div>
+</div>
+{% endblock %}

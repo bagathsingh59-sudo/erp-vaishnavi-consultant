@@ -336,6 +336,12 @@
                 <span>Paid Leave</span>
             </a>
 
+            <a href="{{ url_for('annual_returns.annual_returns_home') }}"
+               class="sidebar-link {% if request.endpoint and request.endpoint.startswith('annual_returns.') %}active{% endif %}">
+                <i class="bi bi-file-earmark-medical"></i>
+                <span>Annual Returns</span>
+            </a>
+
             {# Document Vault — disabled for now, will enable after 3-6 months #}
 
             <a href="{{ url_for('payroll.payroll_list', tab='reports', establishment=selected_est.id) }}"

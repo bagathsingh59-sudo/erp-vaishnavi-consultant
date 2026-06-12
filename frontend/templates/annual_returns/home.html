@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Annual Returns{% endblock %}
+{% block page_header %}Annual / Statutory Returns{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <form method="GET" class="row g-2 align-items-end">
+            <div class="col-md-5">
+                <label class="form-label fw-bold">Establishment</label>
+                <select name="establishment_id" class="form-select" required>
+                    <option value="">-- Select --</option>
+                    {% for e in establishments %}
+                    <option value="{{ e.id }}" {% if sel_est and sel_est.id == e.id %}selected{% endif %}>{{ e.company_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-bold">Year</label>
+                <select name="year" class="form-select">
+                    {% for y in years|reverse %}
+                    <option value="{{ y }}" {% if sel_year == y %}selected{% endif %}>
+                        {{ y }} <span>(EPF: Mar {{ y }} – Feb {{ y+1 }})</span>
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-primary w-100"><i class="bi bi-search"></i> Load Reports</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if sel_est %}
+<div class="row g-3">
+    <!-- EPF -->
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100" style="border-top:3px solid #2563eb;">
+            <div class="card-body">
+                <h6 class="fw-bold" style="color:#1e40af;"><i class="bi bi-bank2 me-1"></i> EPF Annual Returns</h6>
+                <p class="small text-muted mb-3">Contribution year: <strong>March {{ sel_year }} – February {{ sel_year + 1 }}</strong>. Built from finalized monthly payrolls.</p>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="{{ url_for('annual_returns.epf_form_6a', est_id=sel_est.id, year=sel_year) }}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-file-earmark-text"></i> Form 6A (Preview)
+                    </a>
+                    <a href="{{ url_for('annual_returns.epf_form_6a', est_id=sel_est.id, year=sel_year, format='excel') }}" class="btn btn-sm btn-success">
+                        <i class="bi bi-file-earmark-excel"></i> 6A Excel
+                    </a>
+                    <a href="{{ url_for('annual_returns.epf_form_3a', est_id=sel_est.id, year=sel_year) }}" class="btn btn-sm btn-success">
+                        <i class="bi bi-file-earmark-excel"></i> Form 3A (per-member) Excel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gratuity -->
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100" style="border-top:3px solid #16a34a;">
+            <div class="card-body">
+                <h6 class="fw-bold" style="color:#15803d;"><i class="bi bi-cash-stack me-1"></i> Gratuity</h6>
+                <p class="small text-muted mb-3">Liability as on date, divisor from establishment config. Plus Form F nomination.</p>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="{{ url_for('annual_returns.gratuity_report', est_id=sel_est.id) }}" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-file-earmark-text"></i> Liability (Preview)
+                    </a>
+                    <a href="{{ url_for('annual_returns.gratuity_report', est_id=sel_est.id, format='excel') }}" class="btn btn-sm btn-success">
+                        <i class="bi bi-file-earmark-excel"></i> Liability Excel
+                    </a>
+                    <a href="{{ url_for('annual_returns.gratuity_form_f', est_id=sel_est.id) }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-file-earmark-person"></i> Form F (Nomination)
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LWF -->
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100" style="border-top:3px solid #9333ea;">
+            <div class="card-body">
+                <h6 class="fw-bold" style="color:#7e22ce;"><i class="bi bi-people me-1"></i> Labour Welfare Fund (Karnataka)</h6>
+                <p class="small text-muted mb-3">Annual return — Employee ₹40 + Employer ₹60 = ₹100 per employee.</p>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="{{ url_for('annual_returns.lwf_return', est_id=sel_est.id, year=sel_year) }}" class="btn btn-sm btn-outline-primary" style="border-color:#9333ea; color:#7e22ce;">
+                        <i class="bi bi-file-earmark-text"></i> LWF Return (Preview)
+                    </a>
+                    <a href="{{ url_for('annual_returns.lwf_return', est_id=sel_est.id, year=sel_year, format='excel') }}" class="btn btn-sm btn-success">
+                        <i class="bi bi-file-earmark-excel"></i> LWF Excel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle me-1"></i> Select an establishment and year, then click <strong>Load Reports</strong>.
+</div>
+{% endif %}
+{% endblock %}

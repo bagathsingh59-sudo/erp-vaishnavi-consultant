@@ -366,6 +366,10 @@ def create_app():
     from app.routes.paid_leave import paid_leave_bp
     app.register_blueprint(paid_leave_bp)
 
+    # Register Annual / Statutory Returns blueprint (EPF 3A/6A, Gratuity, LWF)
+    from app.routes.annual_returns import annual_bp
+    app.register_blueprint(annual_bp)
+
     # Register Manual Reimbursement blueprint
     from app.routes.manual_reimbursement import manual_reimb_bp
     app.register_blueprint(manual_reimb_bp)

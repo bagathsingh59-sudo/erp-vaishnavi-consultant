@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}LWF Return — {{ est.company_name }}{% endblock %}
+{% block page_header %}Labour Welfare Fund — Annual Return{% endblock %}
+
+{% block content %}
+{% set print_size = 'a4-portrait' %}
+{% include '_print_common.html' %}
+<style>
+    @media print {
+        .page-content { padding: 0 !important; }
+        .pg { box-shadow:none !important; border:none !important; padding:8px !important; }
+        .t th, .t td { font-size:8.5px !important; padding:3px !important; }
+        .t thead { display: table-header-group; }
+    }
+    .pg { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:24px 28px; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.1); max-width:900px; margin-left:auto; margin-right:auto; }
+    .ttl { text-align:center; margin-bottom:12px; }
+    .ttl h2 { font-size:1.4rem; font-weight:800; letter-spacing:1px; margin:0; }
+    .ttl h4 { font-size:0.9rem; font-weight:700; margin:3px 0 0; color:#334155; }
+    .ttl p  { font-size:0.76rem; font-style:italic; color:#64748b; margin:2px 0 0; }
+    .info { font-size:0.82rem; margin-bottom:12px; }
+    .info div { margin-bottom:3px; }
+    .info strong { color:#334155; }
+    .t { width:100%; border-collapse:collapse; font-size:0.82rem; }
+    .t th { background:#1e293b; color:#fff; padding:6px 5px; border:1px solid #475569; text-align:center; font-size:0.72rem; }
+    .t td { padding:5px; border:1px solid #94a3b8; }
+    .t td.r { text-align:right; } .t td.c { text-align:center; } .t td.l { text-align:left; }
+    .t .tot td { background:#d9ead3; font-weight:700; border-top:2px solid #1e293b; }
+    .ft { margin-top:18px; font-size:0.7rem; color:#64748b; text-align:center; }
+    .sign { margin-top:28px; display:flex; justify-content:space-between; font-size:0.82rem; }
+    .sign .line { border-top:1px solid #333; padding-top:4px; min-width:200px; }
+</style>
+
+<div class="no-print mb-3 d-flex justify-content-between align-items-center">
+    <a href="{{ url_for('annual_returns.annual_returns_home', establishment_id=est.id, year=year) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('annual_returns.lwf_return', est_id=est.id, year=year, format='excel') }}" class="btn btn-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i> Download Excel</a>
+        <button onclick="window.print()" class="btn btn-primary btn-sm"><i class="bi bi-printer me-1"></i> Print / PDF</button>
+    </div>
+</div>
+
+<div class="pg">
+    <div class="ttl">
+        <h2>FORM D</h2>
+        <h4>ANNUAL STATEMENT OF CONTRIBUTION — LABOUR WELFARE FUND</h4>
+        <p>(The Karnataka Labour Welfare Fund Act, 1965)</p>
+    </div>
+    <div class="info">
+        <div><strong>Name of Establishment:</strong> {{ (est.company_name or '')|upper }}</div>
+        <div><strong>Address:</strong> {{ est.address or '—' }}</div>
+        <div><strong>Year:</strong> {{ year }}
+            &nbsp;|&nbsp; <strong>Rate:</strong> Employee ₹{{ emp_rate }} + Employer ₹{{ empr_rate }} = ₹{{ emp_rate + empr_rate }} per employee
+            &nbsp;|&nbsp; <strong>Employees:</strong> {{ employees|length }}</div>
+    </div>
+
+    <table class="t">
+        <thead>
+            <tr>
+                <th>Sl.</th><th>Emp Code</th><th>Name of Employee</th>
+                <th>Employee Contribution (₹)</th><th>Employer Contribution (₹)</th><th>Total (₹)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for emp in employees %}
+            <tr>
+                <td class="c">{{ loop.index }}</td>
+                <td class="c">{{ emp.emp_code or '' }}</td>
+                <td class="l"><strong>{{ emp.name }}</strong></td>
+                <td class="r">{{ emp_rate }}</td>
+                <td class="r">{{ empr_rate }}</td>
+                <td class="r"><strong>{{ emp_rate + empr_rate }}</strong></td>
+            </tr>
+            {% endfor %}
+            <tr class="tot">
+                <td colspan="3" class="c">TOTAL ({{ employees|length }} employees)</td>
+                <td class="r">{{ "{:,.0f}".format(employees|length * emp_rate) }}</td>
+                <td class="r">{{ "{:,.0f}".format(employees|length * empr_rate) }}</td>
+                <td class="r">{{ "{:,.0f}".format(employees|length * (emp_rate + empr_rate)) }}</td>
+            </tr>
+            {% if not employees %}
+            <tr><td colspan="6" class="c" style="padding:14px; color:#94a3b8; font-style:italic;">No active employees found.</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <div class="sign">
+        <div><div class="line">Signature of Employer</div></div>
+        <div style="text-align:right;"><div>Date: ______________</div><div style="margin-top:6px;">Place: _____________</div></div>
+    </div>
+    <div class="ft">Generated: {{ generated_on }} &nbsp;|&nbsp; Vaishnavi Consultant</div>
+</div>
+{% endblock %}

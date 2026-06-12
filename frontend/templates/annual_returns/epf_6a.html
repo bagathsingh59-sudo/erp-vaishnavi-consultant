@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}EPF Form 6A — {{ est.company_name }}{% endblock %}
+{% block page_header %}EPF Form 6A — Annual Consolidated Statement{% endblock %}
+
+{% block content %}
+{% set print_size = 'legal-landscape' %}
+{% include '_print_common.html' %}
+<style>
+    @media print {
+        .page-content { padding: 0 !important; }
+        .pg { box-shadow:none !important; border:none !important; padding:8px !important; }
+        .t th, .t td { font-size:8px !important; padding:3px !important; }
+        .t thead { display: table-header-group; }
+    }
+    .pg { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:24px 28px; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+    .ttl { text-align:center; margin-bottom:12px; }
+    .ttl h2 { font-size:1.4rem; font-weight:800; letter-spacing:2px; margin:0; }
+    .ttl h4 { font-size:0.95rem; font-weight:700; margin:3px 0 0; color:#334155; }
+    .ttl p  { font-size:0.76rem; font-style:italic; color:#64748b; margin:2px 0 0; }
+    .info { font-size:0.82rem; margin-bottom:12px; }
+    .info div { margin-bottom:3px; }
+    .info strong { color:#334155; }
+    .t { width:100%; border-collapse:collapse; font-size:0.78rem; }
+    .t th { background:#1e293b; color:#fff; padding:6px 5px; border:1px solid #475569; text-align:center; font-size:0.7rem; }
+    .t td { padding:5px; border:1px solid #94a3b8; vertical-align:middle; }
+    .t td.r { text-align:right; } .t td.c { text-align:center; } .t td.l { text-align:left; }
+    .t .tot td { background:#d9ead3; font-weight:700; border-top:2px solid #1e293b; }
+    .ft { margin-top:20px; font-size:0.7rem; color:#64748b; text-align:center; }
+    .sign { margin-top:30px; display:flex; justify-content:space-between; font-size:0.82rem; }
+    .sign .line { border-top:1px solid #333; padding-top:4px; min-width:220px; }
+</style>
+
+<div class="no-print mb-3 d-flex justify-content-between align-items-center">
+    <a href="{{ url_for('annual_returns.annual_returns_home', establishment_id=est.id, year=start_year) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('annual_returns.epf_form_6a', est_id=est.id, year=start_year, format='excel') }}" class="btn btn-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i> Download Excel</a>
+        <button onclick="window.print()" class="btn btn-primary btn-sm"><i class="bi bi-printer me-1"></i> Print / PDF</button>
+    </div>
+</div>
+
+<div class="pg">
+    <div class="ttl">
+        <h2>FORM 6A</h2>
+        <h4>ANNUAL CONSOLIDATED STATEMENT OF CONTRIBUTIONS</h4>
+        <p>(Para 43 of the EPF Scheme, 1952 &amp; Para 20 of the EPS, 1995)</p>
+    </div>
+    <div class="info">
+        <div><strong>Name &amp; Address of Establishment:</strong> {{ (est.company_name or '')|upper }}{% if est.address %} — {{ est.address }}{% endif %}</div>
+        <div><strong>Code No. (PF):</strong> {{ est.pf_code or '—' }}
+            &nbsp;|&nbsp; <strong>Currency Period (EPF Year):</strong> March {{ start_year }} to February {{ end_year }}
+            &nbsp;|&nbsp; <strong>Members:</strong> {{ rows|length }}</div>
+    </div>
+
+    <table class="t">
+        <thead>
+            <tr>
+                <th>Sl.</th><th>Account No. (UAN)</th><th>Name of the Member</th>
+                <th>Wages (₹)</th><th>Worker's Share EPF (₹)</th>
+                <th>Employer EPF A/c 1 (₹)</th><th>Pension A/c 10 (₹)</th>
+                <th>Total (₹)</th><th>Remarks</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% set ns = namespace(w=0, ee=0, ac=0, eps=0, tot=0) %}
+            {% for b in rows %}
+            {% set total = b.t_ee + b.t_ac01 + b.t_eps %}
+            <tr>
+                <td class="c">{{ loop.index }}</td>
+                <td class="c"><small class="font-monospace">{{ b.employee.uan_number or b.employee.esic_ip_number or '—' }}</small></td>
+                <td class="l"><strong>{{ b.employee.name }}</strong></td>
+                <td class="r">{{ "{:,.0f}".format(b.t_wages) }}</td>
+                <td class="r">{{ "{:,.0f}".format(b.t_ee) }}</td>
+                <td class="r">{{ "{:,.0f}".format(b.t_ac01) }}</td>
+                <td class="r">{{ "{:,.0f}".format(b.t_eps) }}</td>
+                <td class="r"><strong>{{ "{:,.0f}".format(total) }}</strong></td>
+                <td></td>
+            </tr>
+            {% set ns.w = ns.w + b.t_wages %}{% set ns.ee = ns.ee + b.t_ee %}
+            {% set ns.ac = ns.ac + b.t_ac01 %}{% set ns.eps = ns.eps + b.t_eps %}{% set ns.tot = ns.tot + total %}
+            {% endfor %}
+            <tr class="tot">
+                <td colspan="3" class="c">TOTAL ({{ rows|length }} members)</td>
+                <td class="r">{{ "{:,.0f}".format(ns.w) }}</td>
+                <td class="r">{{ "{:,.0f}".format(ns.ee) }}</td>
+                <td class="r">{{ "{:,.0f}".format(ns.ac) }}</td>
+                <td class="r">{{ "{:,.0f}".format(ns.eps) }}</td>
+                <td class="r">{{ "{:,.0f}".format(ns.tot) }}</td>
+                <td></td>
+            </tr>
+            {% if not rows %}
+            <tr><td colspan="9" class="c" style="padding:14px; color:#94a3b8; font-style:italic;">No finalized EPF data for this year. Make sure the monthly payrolls (Mar–Feb) are finalized.</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <div class="sign">
+        <div><div class="line">Signature of the Employer</div></div>
+        <div style="text-align:right;"><div>Date: ______________</div><div style="margin-top:6px;">Place: _____________</div></div>
+    </div>
+    <div class="ft">Generated: {{ generated_on }} &nbsp;|&nbsp; Vaishnavi Consultant</div>
+</div>
+{% endblock %}
