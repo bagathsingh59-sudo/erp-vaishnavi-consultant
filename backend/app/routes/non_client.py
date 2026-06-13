@@ -1140,54 +1140,90 @@ def _statement_summary(rec):
     }
 
 
+def _statement_employee_rows(rec):
+    """Per-employee contribution rows for the detailed statement.
+    EPF employer (per employee) = A/c 01 (er_diff) + A/c 10 (eps);
+    admin (A/c 02) + EDLI (A/c 21) are establishment-level, shown in the
+    summary footer only."""
+    rows = []
+    for e in rec.get_employees():
+        epf_ee = round(e.get('epf_ee', 0))
+        epf_er = round(e.get('er_diff', 0) + e.get('eps', 0))
+        esic_ee = round(e.get('esic_ee', 0))
+        esic_er = round(e.get('esic_er', 0))
+        rows.append({
+            'name':       e.get('name', ''),
+            'uan':        e.get('uan', ''),
+            'ip_no':      e.get('ip_no', ''),
+            'days':       e.get('days', 0),
+            'gross':      round(e.get('gross', 0)),
+            'epf_wages':  round(e.get('epf_wages', 0)),
+            'epf_ee':     epf_ee,
+            'epf_er':     epf_er,
+            'esic_wages': round(e.get('esic_wages', 0)),
+            'esic_ee':    esic_ee,
+            'esic_er':    esic_er,
+            'total':      epf_ee + epf_er + esic_ee + esic_er,
+            'has_epf':    e.get('has_epf', bool(e.get('uan'))),
+            'has_esic':   e.get('has_esic', bool(e.get('ip_no'))),
+        })
+    return rows
+
+
 @non_client_bp.route('/non-client-returns/<int:record_id>/statement')
 @login_required
 def nc_statement(record_id):
-    """Client-facing EPF + ESIC payable statement. HTML preview by default;
-    ?format=excel for the downloadable workbook."""
+    """Client-facing EPF + ESIC statement — employee-wise detail with
+    employee/employer contribution split, plus a summary footer.
+    HTML preview by default; ?format=excel for the workbook."""
     rec = _user_query().filter(NonClientReturn.id == record_id).first_or_404()
     if rec.status != 'processed':
         flash('Process an Excel file first to generate the statement.', 'warning')
         return redirect(url_for('non_client.nc_detail', record_id=record_id))
 
     s = _statement_summary(rec)
+    emp_rows = _statement_employee_rows(rec)
     if request.args.get('format') == 'excel':
-        return _nc_statement_excel(rec, s)
+        return _nc_statement_excel(rec, s, emp_rows)
 
     generated_on = datetime.now().strftime('%d %b %Y, %I:%M %p')
     return render_template('non_client_statement.html', rec=rec, s=s,
-                           generated_on=generated_on)
+                           emp_rows=emp_rows, generated_on=generated_on)
 
 
-def _nc_statement_excel(rec, s):
+def _nc_statement_excel(rec, s, emp_rows):
+    """Detailed employee-wise EPF + ESIC statement (Legal landscape):
+    one row per employee with EPF EE/ER and ESIC EE/ER, a TOTAL row, then
+    a compact payable summary band."""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
 
     wb = Workbook(); ws = wb.active; ws.title = "EPF-ESIC Statement"
-    title_f = Font(bold=True, size=14, name='Calibri')
+    title_f = Font(bold=True, size=13, name='Calibri')
     sub_f   = Font(size=9, italic=True, color='475569', name='Calibri')
-    sec_f   = Font(bold=True, size=11, color='FFFFFF', name='Calibri')
-    lab_f   = Font(size=10, name='Calibri')
-    lab_b   = Font(bold=True, size=10, name='Calibri')
-    val_f   = Font(size=10, name='Calibri')
-    val_b   = Font(bold=True, size=11, name='Calibri')
+    grp_f   = Font(bold=True, size=9, color='FFFFFF', name='Calibri')
+    hdr_f   = Font(bold=True, size=8.5, color='FFFFFF', name='Calibri')
+    body    = Font(size=8.5, name='Calibri')
+    name_f  = Font(bold=True, size=8.5, name='Calibri')
+    bold    = Font(bold=True, size=9, name='Calibri')
     info_b  = Font(bold=True, size=9, name='Calibri')
     info_v  = Font(size=9, name='Calibri')
     thin = Side(border_style='thin', color='94A3B8')
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
-    center = Alignment(horizontal='center', vertical='center')
+    center = Alignment(horizontal='center', vertical='center', wrap_text=True)
     rightA = Alignment(horizontal='right', vertical='center')
-    leftA  = Alignment(horizontal='left', vertical='center', wrap_text=True)
-    epf_fill  = PatternFill('solid', start_color='1E40AF', end_color='1E40AF')
-    esic_fill = PatternFill('solid', start_color='9333EA', end_color='9333EA')
-    band      = PatternFill('solid', start_color='F1F5F9', end_color='F1F5F9')
-    green     = PatternFill('solid', start_color='D9EAD3', end_color='D9EAD3')
-    ee_fill   = PatternFill('solid', start_color='DBEAFE', end_color='DBEAFE')
-    er_fill   = PatternFill('solid', start_color='FEF3C7', end_color='FEF3C7')
+    leftA  = Alignment(horizontal='left', vertical='center')
+    slate  = PatternFill('solid', start_color='1E293B', end_color='1E293B')
+    epf_h  = PatternFill('solid', start_color='1E40AF', end_color='1E40AF')
+    esic_h = PatternFill('solid', start_color='9333EA', end_color='9333EA')
+    band   = PatternFill('solid', start_color='F1F5F9', end_color='F1F5F9')
+    green  = PatternFill('solid', start_color='D9EAD3', end_color='D9EAD3')
 
-    LAST = 4
-    ws.cell(row=1, column=1, value="EPF & ESIC PAYABLE STATEMENT").font = title_f
+    # 12 columns: # | Name | UAN | ESIC IP | Days | Gross | EPF Wages |
+    #             EPF-EE | EPF-ER | ESIC-EE | ESIC-ER | Total
+    LAST = 12
+    ws.cell(row=1, column=1, value="EPF & ESIC MONTHLY STATEMENT").font = title_f
     ws.cell(row=1, column=1).alignment = center
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=LAST)
     ws.cell(row=2, column=1,
@@ -1196,99 +1232,115 @@ def _nc_statement_excel(rec, s):
     ws.cell(row=2, column=1).alignment = center
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=LAST)
 
-    r = 4
-    # Employee count band
-    for lab, val in [
-        ('Total Employees Processed:', s['count_total']),
-        ('EPF-applicable Employees:',  s['count_epf']),
-        ('ESIC-applicable Employees:', s['count_esic']),
-        ('Total Gross Wages (₹):',     s['gross_total']),
-    ]:
-        ws.cell(row=r, column=1, value=lab).font = info_b
-        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=2)
-        c = ws.cell(row=r, column=3, value=val); c.font = info_v; c.alignment = rightA
-        ws.merge_cells(start_row=r, start_column=3, end_row=r, end_column=4)
-        if 'Gross' in lab:
-            c.number_format = '#,##0'
-        r += 1
-    r += 1
+    # Group header row (row 4): blank over 1-7, EPF over 8-9, ESIC over 10-11, blank 12
+    gr = 4
+    ws.merge_cells(start_row=gr, start_column=8, end_row=gr, end_column=9)
+    gc = ws.cell(row=gr, column=8, value="EPF (₹)"); gc.font = grp_f; gc.fill = epf_h
+    gc.alignment = center; gc.border = border
+    ws.cell(row=gr, column=9).fill = epf_h; ws.cell(row=gr, column=9).border = border
+    ws.merge_cells(start_row=gr, start_column=10, end_row=gr, end_column=11)
+    gc2 = ws.cell(row=gr, column=10, value="ESIC (₹)"); gc2.font = grp_f; gc2.fill = esic_h
+    gc2.alignment = center; gc2.border = border
+    ws.cell(row=gr, column=11).fill = esic_h; ws.cell(row=gr, column=11).border = border
 
-    def section(title, fill, lines, total_lab, total_val):
-        nonlocal r
-        c = ws.cell(row=r, column=1, value=title); c.font = sec_f; c.fill = fill
-        c.alignment = leftA
-        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=LAST)
-        for cc in range(1, LAST + 1):
-            ws.cell(row=r, column=cc).fill = fill
-        r += 1
-        # header
-        for col, txt in [(1, 'Particulars'), (3, 'Share'), (4, 'Amount (₹)')]:
-            cell = ws.cell(row=r, column=col, value=txt); cell.font = lab_b
-            cell.fill = band; cell.alignment = center if col != 1 else leftA; cell.border = border
-        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=2)
-        ws.cell(row=r, column=2).fill = band; ws.cell(row=r, column=2).border = border
-        r += 1
-        for lab, share, amt in lines:
-            ws.cell(row=r, column=1, value=lab).font = lab_f
-            ws.cell(row=r, column=1).alignment = leftA
-            ws.cell(row=r, column=1).border = border
-            ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=2)
-            ws.cell(row=r, column=2).border = border
-            sc = ws.cell(row=r, column=3, value=share); sc.font = lab_f; sc.alignment = center; sc.border = border
-            sc.fill = ee_fill if share == 'Employee' else (er_fill if share == 'Employer' else band)
-            ac = ws.cell(row=r, column=4, value=amt); ac.font = val_f; ac.alignment = rightA
-            ac.border = border; ac.number_format = '#,##0'
-            r += 1
-        # total
-        tc = ws.cell(row=r, column=1, value=total_lab); tc.font = val_b; tc.fill = green
-        tc.alignment = leftA; tc.border = border
-        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=3)
-        for cc in (2, 3):
-            ws.cell(row=r, column=cc).fill = green; ws.cell(row=r, column=cc).border = border
-        vc = ws.cell(row=r, column=4, value=total_val); vc.font = val_b; vc.fill = green
-        vc.alignment = rightA; vc.border = border; vc.number_format = '#,##0'
-        r += 2
+    # Column header (row 5)
+    hr = 5
+    headers = ['#', 'Employee Name', 'UAN', 'ESIC IP', 'Days', 'Gross\nWages',
+               'EPF\nWages', 'EE\n(12%)', 'ER\n(13%)', 'EE\n(0.75%)', 'ER\n(3.25%)', 'Total\n(₹)']
+    for c, h in enumerate(headers, 1):
+        cell = ws.cell(row=hr, column=c, value=h)
+        cell.font = hdr_f; cell.alignment = center; cell.border = border
+        cell.fill = epf_h if c in (8, 9) else (esic_h if c in (10, 11) else slate)
+    ws.row_dimensions[hr].height = 30
 
-    section("EPF — PROVIDENT FUND PAYABLE", epf_fill, [
-        ('Employee Contribution (12%) — A/c 01', 'Employee', s['epf_ee']),
-        ("Employer EPF (3.67%) — A/c 01",        'Employer', s['epf_ac01']),
-        ('Employer EPS Pension (8.33%) — A/c 10','Employer', s['epf_eps']),
-        ('EPF Admin Charges (0.5%) — A/c 02',    'Employer', s['epf_admin']),
-        ('EDLI (0.5%) — A/c 21',                 'Employer', s['epf_edli']),
-    ], "TOTAL EPF PAYABLE", s['epf_total'])
+    t = {'gross': 0, 'epfw': 0, 'epf_ee': 0, 'epf_er': 0, 'esic_ee': 0, 'esic_er': 0, 'tot': 0}
+    rr = hr + 1
+    for i, e in enumerate(emp_rows, 1):
+        vals = [
+            (1, i, center), (2, e['name'], leftA),
+            (3, e['uan'] or '—', center), (4, e['ip_no'] or '—', center),
+            (5, e['days'], center), (6, e['gross'], rightA),
+            (7, e['epf_wages'] if e['has_epf'] else 0, rightA),
+            (8, e['epf_ee'] if e['has_epf'] else 0, rightA),
+            (9, e['epf_er'] if e['has_epf'] else 0, rightA),
+            (10, e['esic_ee'] if e['has_esic'] else 0, rightA),
+            (11, e['esic_er'] if e['has_esic'] else 0, rightA),
+            (12, e['total'], rightA),
+        ]
+        for c, v, al in vals:
+            cell = ws.cell(row=rr, column=c, value=v)
+            cell.font = name_f if c == 2 else body
+            cell.alignment = al; cell.border = border
+            if c in (6, 7, 8, 9, 10, 11, 12):
+                cell.number_format = '#,##0'
+        t['gross'] += e['gross']; t['epfw'] += (e['epf_wages'] if e['has_epf'] else 0)
+        t['epf_ee'] += (e['epf_ee'] if e['has_epf'] else 0); t['epf_er'] += (e['epf_er'] if e['has_epf'] else 0)
+        t['esic_ee'] += (e['esic_ee'] if e['has_esic'] else 0); t['esic_er'] += (e['esic_er'] if e['has_esic'] else 0)
+        t['tot'] += e['total']
+        rr += 1
 
-    section("ESIC — STATE INSURANCE PAYABLE", esic_fill, [
-        ('Employee Contribution (0.75%)', 'Employee', s['esic_ee']),
-        ('Employer Contribution (3.25%)', 'Employer', s['esic_er']),
-    ], "TOTAL ESIC PAYABLE", s['esic_total'])
+    # TOTAL row
+    tc = ws.cell(row=rr, column=1, value=f"TOTAL ({len(emp_rows)})")
+    tc.font = bold; tc.fill = green; tc.alignment = center; tc.border = border
+    ws.merge_cells(start_row=rr, start_column=1, end_row=rr, end_column=5)
+    for c in range(2, 6):
+        ws.cell(row=rr, column=c).fill = green; ws.cell(row=rr, column=c).border = border
+    for c, v in [(6, t['gross']), (7, t['epfw']), (8, t['epf_ee']), (9, t['epf_er']),
+                 (10, t['esic_ee']), (11, t['esic_er']), (12, t['tot'])]:
+        cell = ws.cell(row=rr, column=c, value=v)
+        cell.font = bold; cell.fill = green; cell.alignment = rightA; cell.border = border
+        cell.number_format = '#,##0'
+    rr += 2
 
-    # Grand total strip
-    gc = ws.cell(row=r, column=1, value="GRAND TOTAL PAYABLE (EPF + ESIC)")
-    gc.font = Font(bold=True, size=12, color='FFFFFF', name='Calibri')
-    gc.fill = PatternFill('solid', start_color='0F172A', end_color='0F172A')
-    gc.alignment = leftA
-    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=3)
-    for cc in (2, 3):
-        ws.cell(row=r, column=cc).fill = PatternFill('solid', start_color='0F172A', end_color='0F172A')
-    gv = ws.cell(row=r, column=4, value=s['grand_total'])
-    gv.font = Font(bold=True, size=12, color='FFFFFF', name='Calibri')
-    gv.fill = PatternFill('solid', start_color='0F172A', end_color='0F172A')
-    gv.alignment = rightA; gv.number_format = '#,##0'
-    r += 3
+    # ── Payable summary band ───────────────────────────────────────────
+    def sum_line(label, val, fill=None, bold_row=False):
+        nonlocal rr
+        lc = ws.cell(row=rr, column=2, value=label)
+        lc.font = bold if bold_row else info_v
+        lc.alignment = leftA
+        ws.merge_cells(start_row=rr, start_column=2, end_row=rr, end_column=9)
+        vc = ws.cell(row=rr, column=10, value=val)
+        vc.font = bold if bold_row else info_v; vc.alignment = rightA; vc.number_format = '#,##0'
+        ws.merge_cells(start_row=rr, start_column=10, end_row=rr, end_column=12)
+        if fill:
+            for cc in range(2, 13):
+                ws.cell(row=rr, column=cc).fill = fill
+        rr += 1
 
-    ws.cell(row=r, column=1, value='Prepared by Vaishnavi Consultant').font = info_b
-    ws.cell(row=r, column=3, value='Date:').font = info_b
-    ws.cell(row=r, column=4, value=datetime.now().strftime('%d-%m-%Y')).font = info_v
-    ws.cell(row=r, column=4).alignment = rightA
-    r += 2
-    ws.cell(row=r, column=1,
-            value=f"Generated: {datetime.now().strftime('%d %b %Y, %I:%M %p')}   |   Vaishnavi Consultant").font = Font(size=8, italic=True, color='64748B', name='Calibri')
-    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=LAST)
+    hb = ws.cell(row=rr, column=2, value="PAYABLE SUMMARY")
+    hb.font = Font(bold=True, size=10, color='FFFFFF', name='Calibri')
+    hb.fill = slate; hb.alignment = leftA
+    ws.merge_cells(start_row=rr, start_column=2, end_row=rr, end_column=12)
+    for cc in range(2, 13):
+        ws.cell(row=rr, column=cc).fill = slate
+    rr += 1
+    sum_line("EPF — Employee Share (12%)", s['epf_ee'])
+    sum_line("EPF — Employer Share (A/c 01 3.67% + EPS 8.33%)", s['epf_ac01'] + s['epf_eps'])
+    sum_line("EPF — Admin Charges (A/c 02, 0.5% min ₹500)", s['epf_admin'])
+    sum_line("EPF — EDLI (A/c 21, 0.5%)", s['epf_edli'])
+    sum_line("TOTAL EPF PAYABLE", s['epf_total'], green, True)
+    sum_line("ESIC — Employee Share (0.75%)", s['esic_ee'])
+    sum_line("ESIC — Employer Share (3.25%)", s['esic_er'])
+    sum_line("TOTAL ESIC PAYABLE", s['esic_total'], green, True)
+    sum_line("GRAND TOTAL PAYABLE (EPF + ESIC)", s['grand_total'],
+             PatternFill('solid', start_color='0F172A', end_color='0F172A'), True)
+    # white text on the grand-total row
+    ws.cell(row=rr - 1, column=2).font = Font(bold=True, size=10, color='FFFFFF', name='Calibri')
+    ws.cell(row=rr - 1, column=10).font = Font(bold=True, size=10, color='FFFFFF', name='Calibri')
 
-    for i, w in enumerate([42, 6, 14, 16], 1):
+    rr += 1
+    ws.cell(row=rr, column=2, value='Prepared by Vaishnavi Consultant').font = info_b
+    ws.cell(row=rr, column=10, value='Date: ' + datetime.now().strftime('%d-%m-%Y')).font = info_v
+    ws.cell(row=rr, column=10).alignment = rightA
+
+    widths = [4, 24, 15, 14, 6, 11, 11, 10, 10, 10, 10, 12]
+    for i, w in enumerate(widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
-    ws.page_setup.orientation = 'portrait'; ws.page_setup.paperSize = 9
+    ws.page_setup.orientation = 'landscape'; ws.page_setup.paperSize = 5  # Legal
+    ws.page_setup.fitToWidth = 1; ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.print_options.horizontalCentered = True
+    ws.print_title_rows = f'{gr}:{hr}'
 
     out = io.BytesIO(); wb.save(out); out.seek(0)
     safe = ''.join(c if c.isalnum() or c in ('_', '-') else '_' for c in rec.est_name)[:50]

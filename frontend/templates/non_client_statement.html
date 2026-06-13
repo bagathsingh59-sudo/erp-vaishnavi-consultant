@@ -1,38 +1,40 @@
 {% extends "base.html" %}
 {% block title %}EPF & ESIC Statement — {{ rec.est_name }}{% endblock %}
-{% block page_header %}EPF & ESIC Payable Statement{% endblock %}
+{% block page_header %}EPF & ESIC Monthly Statement{% endblock %}
 
 {% block content %}
-{% set print_size = 'a4-portrait' %}
+{% set print_size = 'legal-landscape' %}
 {% include '_print_common.html' %}
 <style>
     @media print {
         .page-content { padding: 0 !important; }
         .pg { box-shadow:none !important; border:none !important; padding:8px !important; }
+        .t th, .t td { font-size:7.5px !important; padding:2px 3px !important; }
+        .t thead { display: table-header-group; }
     }
-    .pg { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:28px 32px; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.1); max-width:760px; margin-left:auto; margin-right:auto; }
-    .ttl { text-align:center; margin-bottom:6px; }
-    .ttl h2 { font-size:1.4rem; font-weight:800; letter-spacing:0.5px; margin:0; color:#0f172a; }
-    .meta { text-align:center; font-size:0.82rem; color:#475569; margin-bottom:18px; }
+    .pg { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:24px 28px; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+    .ttl { text-align:center; margin-bottom:4px; }
+    .ttl h2 { font-size:1.35rem; font-weight:800; letter-spacing:0.5px; margin:0; color:#0f172a; }
+    .meta { text-align:center; font-size:0.8rem; color:#475569; margin-bottom:14px; }
     .meta strong { color:#1e293b; }
-    .kpis { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
-    .kpi { flex:1; min-width:130px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; text-align:center; }
-    .kpi .n { font-size:1.3rem; font-weight:800; color:#0f172a; }
-    .kpi .l { font-size:0.66rem; color:#64748b; text-transform:uppercase; letter-spacing:0.04em; margin-top:2px; }
-    .sec { border-radius:8px; overflow:hidden; border:1px solid #e2e8f0; margin-bottom:16px; }
-    .sec-h { padding:8px 14px; color:#fff; font-weight:700; font-size:0.92rem; }
-    .sec-h.epf { background:#1e40af; } .sec-h.esic { background:#9333ea; }
-    table.s { width:100%; border-collapse:collapse; font-size:0.85rem; }
-    table.s td { padding:7px 14px; border-top:1px solid #f1f5f9; }
-    table.s td.amt { text-align:right; font-variant-numeric:tabular-nums; font-weight:600; }
-    table.s td.share { text-align:center; width:90px; }
-    .badge-ee { background:#dbeafe; color:#1e40af; padding:1px 8px; border-radius:6px; font-size:0.68rem; font-weight:700; }
-    .badge-er { background:#fef3c7; color:#92400e; padding:1px 8px; border-radius:6px; font-size:0.68rem; font-weight:700; }
-    table.s tr.tot td { background:#d9ead3; font-weight:800; border-top:2px solid #1e293b; }
-    .grand { background:#0f172a; color:#fff; border-radius:8px; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; font-weight:800; font-size:1.05rem; margin-bottom:16px; }
-    .sign { margin-top:26px; display:flex; justify-content:space-between; font-size:0.82rem; }
-    .sign .line { border-top:1px solid #333; padding-top:4px; min-width:200px; }
-    .ft { margin-top:14px; font-size:0.7rem; color:#94a3b8; text-align:center; }
+    .t { width:100%; border-collapse:collapse; font-size:0.72rem; }
+    .t th { color:#fff; padding:6px 4px; border:1px solid #475569; text-align:center; font-size:0.66rem; vertical-align:middle; }
+    .t th.slate { background:#1e293b; } .t th.epf { background:#1e40af; } .t th.esic { background:#9333ea; }
+    .t td { padding:4px 5px; border:1px solid #cbd5e1; vertical-align:middle; }
+    .t td.r { text-align:right; } .t td.c { text-align:center; } .t td.l { text-align:left; font-weight:600; }
+    .t tr.tot td { background:#d9ead3; font-weight:800; border-top:2px solid #1e293b; }
+    .sumwrap { display:flex; gap:16px; flex-wrap:wrap; margin-top:18px; }
+    .sumbox { flex:1; min-width:280px; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; }
+    .sumbox .h { padding:7px 12px; color:#fff; font-weight:700; font-size:0.85rem; }
+    .sumbox .h.epf { background:#1e40af; } .sumbox .h.esic { background:#9333ea; }
+    .sumbox table { width:100%; border-collapse:collapse; font-size:0.8rem; }
+    .sumbox td { padding:5px 12px; border-top:1px solid #f1f5f9; }
+    .sumbox td.amt { text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }
+    .sumbox tr.tt td { background:#d9ead3; font-weight:800; }
+    .grand { background:#0f172a; color:#fff; border-radius:8px; padding:12px 18px; display:flex; justify-content:space-between; align-items:center; font-weight:800; font-size:1.05rem; margin-top:16px; }
+    .sign { margin-top:24px; display:flex; justify-content:space-between; font-size:0.82rem; }
+    .sign .line { border-top:1px solid #333; padding-top:4px; min-width:210px; }
+    .ft { margin-top:12px; font-size:0.7rem; color:#94a3b8; text-align:center; }
 </style>
 
 <div class="no-print mb-3 d-flex justify-content-between align-items-center">
@@ -44,40 +46,100 @@
 </div>
 
 <div class="pg">
-    <div class="ttl"><h2>EPF &amp; ESIC PAYABLE STATEMENT</h2></div>
+    <div class="ttl"><h2>EPF &amp; ESIC MONTHLY STATEMENT</h2></div>
     <div class="meta">
-        <strong>{{ (rec.est_name or '')|upper }}</strong><br>
+        <strong>{{ (rec.est_name or '')|upper }}</strong> &nbsp;|&nbsp;
         {{ rec.period_label }} &nbsp;|&nbsp; PF: {{ rec.pf_code or '—' }} &nbsp;|&nbsp; ESIC: {{ rec.esic_code or '—' }}
+        &nbsp;|&nbsp; Employees: {{ emp_rows|length }}
     </div>
 
-    <div class="kpis">
-        <div class="kpi"><div class="n">{{ s.count_total }}</div><div class="l">Total Employees</div></div>
-        <div class="kpi"><div class="n">{{ s.count_epf }}</div><div class="l">EPF Members</div></div>
-        <div class="kpi"><div class="n">{{ s.count_esic }}</div><div class="l">ESIC Members</div></div>
-        <div class="kpi"><div class="n">₹{{ "{:,.0f}".format(s.gross_total) }}</div><div class="l">Gross Wages</div></div>
-    </div>
+    <!-- Employee-wise detail -->
+    <table class="t">
+        <thead>
+            <tr>
+                <th class="slate" rowspan="2">#</th>
+                <th class="slate" rowspan="2">Employee Name</th>
+                <th class="slate" rowspan="2">UAN</th>
+                <th class="slate" rowspan="2">ESIC IP</th>
+                <th class="slate" rowspan="2">Days</th>
+                <th class="slate" rowspan="2">Gross<br>Wages</th>
+                <th class="slate" rowspan="2">EPF<br>Wages</th>
+                <th class="epf" colspan="2">EPF (₹)</th>
+                <th class="esic" colspan="2">ESIC (₹)</th>
+                <th class="slate" rowspan="2">Total<br>(₹)</th>
+            </tr>
+            <tr>
+                <th class="epf">EE (12%)</th>
+                <th class="epf">ER (13%)</th>
+                <th class="esic">EE (0.75%)</th>
+                <th class="esic">ER (3.25%)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% set ns = namespace(g=0, w=0, ee=0, er=0, see=0, ser=0, tot=0) %}
+            {% for e in emp_rows %}
+            <tr>
+                <td class="c">{{ loop.index }}</td>
+                <td class="l">{{ e.name }}</td>
+                <td class="c"><small class="font-monospace">{{ e.uan or '—' }}</small></td>
+                <td class="c"><small class="font-monospace">{{ e.ip_no or '—' }}</small></td>
+                <td class="c">{{ e.days }}</td>
+                <td class="r">{{ "{:,.0f}".format(e.gross) }}</td>
+                <td class="r">{{ "{:,.0f}".format(e.epf_wages) if e.has_epf else '—' }}</td>
+                <td class="r">{{ "{:,.0f}".format(e.epf_ee) if e.has_epf else '—' }}</td>
+                <td class="r">{{ "{:,.0f}".format(e.epf_er) if e.has_epf else '—' }}</td>
+                <td class="r">{{ "{:,.0f}".format(e.esic_ee) if e.has_esic else '—' }}</td>
+                <td class="r">{{ "{:,.0f}".format(e.esic_er) if e.has_esic else '—' }}</td>
+                <td class="r"><strong>{{ "{:,.0f}".format(e.total) }}</strong></td>
+            </tr>
+            {% set ns.g = ns.g + e.gross %}
+            {% set ns.w = ns.w + (e.epf_wages if e.has_epf else 0) %}
+            {% set ns.ee = ns.ee + (e.epf_ee if e.has_epf else 0) %}
+            {% set ns.er = ns.er + (e.epf_er if e.has_epf else 0) %}
+            {% set ns.see = ns.see + (e.esic_ee if e.has_esic else 0) %}
+            {% set ns.ser = ns.ser + (e.esic_er if e.has_esic else 0) %}
+            {% set ns.tot = ns.tot + e.total %}
+            {% endfor %}
+            <tr class="tot">
+                <td colspan="5" class="c">TOTAL ({{ emp_rows|length }})</td>
+                <td class="r">{{ "{:,.0f}".format(ns.g) }}</td>
+                <td class="r">{{ "{:,.0f}".format(ns.w) }}</td>
+                <td class="r">{{ "{:,.0f}".format(ns.ee) }}</td>
+                <td class="r">{{ "{:,.0f}".format(ns.er) }}</td>
+                <td class="r">{{ "{:,.0f}".format(ns.see) }}</td>
+                <td class="r">{{ "{:,.0f}".format(ns.ser) }}</td>
+                <td class="r">{{ "{:,.0f}".format(ns.tot) }}</td>
+            </tr>
+            {% if not emp_rows %}
+            <tr><td colspan="12" class="c" style="padding:14px; color:#94a3b8; font-style:italic;">No processed employee data.</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
 
-    <!-- EPF -->
-    <div class="sec">
-        <div class="sec-h epf">EPF — Provident Fund Payable</div>
-        <table class="s">
-            <tr><td>Employee Contribution (12%) — A/c 01</td><td class="share"><span class="badge-ee">Employee</span></td><td class="amt">₹{{ "{:,.0f}".format(s.epf_ee) }}</td></tr>
-            <tr><td>Employer EPF (3.67%) — A/c 01</td><td class="share"><span class="badge-er">Employer</span></td><td class="amt">₹{{ "{:,.0f}".format(s.epf_ac01) }}</td></tr>
-            <tr><td>Employer EPS Pension (8.33%) — A/c 10</td><td class="share"><span class="badge-er">Employer</span></td><td class="amt">₹{{ "{:,.0f}".format(s.epf_eps) }}</td></tr>
-            <tr><td>EPF Admin Charges (0.5%) — A/c 02</td><td class="share"><span class="badge-er">Employer</span></td><td class="amt">₹{{ "{:,.0f}".format(s.epf_admin) }}</td></tr>
-            <tr><td>EDLI (0.5%) — A/c 21</td><td class="share"><span class="badge-er">Employer</span></td><td class="amt">₹{{ "{:,.0f}".format(s.epf_edli) }}</td></tr>
-            <tr class="tot"><td>TOTAL EPF PAYABLE &nbsp;<small style="font-weight:600;">(EE ₹{{ "{:,.0f}".format(s.epf_ee) }} + ER ₹{{ "{:,.0f}".format(s.epf_er) }})</small></td><td></td><td class="amt">₹{{ "{:,.0f}".format(s.epf_total) }}</td></tr>
-        </table>
-    </div>
-
-    <!-- ESIC -->
-    <div class="sec">
-        <div class="sec-h esic">ESIC — State Insurance Payable</div>
-        <table class="s">
-            <tr><td>Employee Contribution (0.75%)</td><td class="share"><span class="badge-ee">Employee</span></td><td class="amt">₹{{ "{:,.0f}".format(s.esic_ee) }}</td></tr>
-            <tr><td>Employer Contribution (3.25%)</td><td class="share"><span class="badge-er">Employer</span></td><td class="amt">₹{{ "{:,.0f}".format(s.esic_er) }}</td></tr>
-            <tr class="tot"><td>TOTAL ESIC PAYABLE &nbsp;<small style="font-weight:600;">(EE ₹{{ "{:,.0f}".format(s.esic_ee) }} + ER ₹{{ "{:,.0f}".format(s.esic_er) }})</small></td><td></td><td class="amt">₹{{ "{:,.0f}".format(s.esic_total) }}</td></tr>
-        </table>
+    <!-- Payable summary -->
+    <div class="sumwrap">
+        <div class="sumbox">
+            <div class="h epf">EPF Payable Summary</div>
+            <table>
+                <tr><td>Employee Share (12%) — A/c 01</td><td class="amt">₹{{ "{:,.0f}".format(s.epf_ee) }}</td></tr>
+                <tr><td>Employer EPF 3.67% — A/c 01</td><td class="amt">₹{{ "{:,.0f}".format(s.epf_ac01) }}</td></tr>
+                <tr><td>Employer EPS 8.33% — A/c 10</td><td class="amt">₹{{ "{:,.0f}".format(s.epf_eps) }}</td></tr>
+                <tr><td>Admin 0.5% — A/c 02</td><td class="amt">₹{{ "{:,.0f}".format(s.epf_admin) }}</td></tr>
+                <tr><td>EDLI 0.5% — A/c 21</td><td class="amt">₹{{ "{:,.0f}".format(s.epf_edli) }}</td></tr>
+                <tr class="tt"><td>TOTAL EPF PAYABLE</td><td class="amt">₹{{ "{:,.0f}".format(s.epf_total) }}</td></tr>
+            </table>
+        </div>
+        <div class="sumbox">
+            <div class="h esic">ESIC Payable Summary</div>
+            <table>
+                <tr><td>Employee Share (0.75%)</td><td class="amt">₹{{ "{:,.0f}".format(s.esic_ee) }}</td></tr>
+                <tr><td>Employer Share (3.25%)</td><td class="amt">₹{{ "{:,.0f}".format(s.esic_er) }}</td></tr>
+                <tr class="tt"><td>TOTAL ESIC PAYABLE</td><td class="amt">₹{{ "{:,.0f}".format(s.esic_total) }}</td></tr>
+                <tr><td colspan="2" style="color:#64748b; font-size:0.74rem;">
+                    ESIC members: {{ s.count_esic }} &nbsp;·&nbsp; EPF members: {{ s.count_epf }}
+                </td></tr>
+            </table>
+        </div>
     </div>
 
     <div class="grand">
