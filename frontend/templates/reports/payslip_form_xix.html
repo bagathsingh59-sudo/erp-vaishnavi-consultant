@@ -222,6 +222,12 @@
                 <td class="label-cell">Wages of Overtime</td>
                 <td class="value-cell">{{ "₹{:,.0f}".format(slip.entry.ot_amount) if slip.entry.ot_amount else '—' }}</td>
             </tr>
+            {% if slip.entry.bonus_amount %}
+            <tr>
+                <td class="label-cell">Monthly Bonus</td>
+                <td class="value-cell">{{ "₹{:,.0f}".format(slip.entry.bonus_amount) }}</td>
+            </tr>
+            {% endif %}
             <tr class="highlight-row">
                 <td class="label-cell">Gross Wages / Earning Payable Rs.</td>
                 <td class="value-cell">{{ "₹{:,.0f}".format(slip.entry.total_earnings) }}</td>

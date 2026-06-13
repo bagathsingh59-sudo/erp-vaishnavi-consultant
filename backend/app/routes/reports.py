@@ -2202,7 +2202,12 @@ def _build_form_b_rows(entries, heads, head_map, config, payroll):
             'da': da_amt,
             'ot_amount': entry.ot_amount,
             'hra': hra_amt,
-            'others': others_amt,
+            # Monthly bonus (when establishment pays bonus every month) folds
+            # into the "Others" column so the Form B row stays balanced:
+            # heads + Others(incl. bonus) + OT + NPH = Gross. Establishments
+            # without monthly bonus are unaffected (bonus_amount = 0).
+            'others': others_amt + (getattr(entry, 'bonus_amount', 0) or 0),
+            'bonus': getattr(entry, 'bonus_amount', 0) or 0,
             'nph': nph_amt,
             'gross': entry.total_earnings,
             'pf': entry.epf_employee,

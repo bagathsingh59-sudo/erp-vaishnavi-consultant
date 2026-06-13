@@ -111,6 +111,9 @@
                     <th rowspan="2" class="hdr-earn">{{ head.short_code }}</th>
                     {% endfor %}
                     <th rowspan="2" class="hdr-earn">NPH<br>Amt</th>
+                    {% if config.monthly_bonus_applicable %}
+                    <th rowspan="2" class="hdr-earn" style="background:#f3e8ff; color:#7e22ce;">Bonus</th>
+                    {% endif %}
                     <th rowspan="2" class="hdr-earn" style="font-weight:800;">Gross<br>Earned</th>
                     {% if config.ot_applicable %}
                     <th rowspan="2" class="hdr-att">OT<br>Hrs</th>
@@ -144,7 +147,7 @@
                     t_present=0, t_absent=0, t_ph=0, t_payable=0,
                     t_nph_amt=0, t_earned=0, t_ot_hrs=0, t_ot=0,
                     t_epf_ee=0, t_epf_er=0, t_esic_ee=0, t_esic_er=0,
-                    t_pt=0, t_other_ded=0, t_total_ded=0, t_net=0
+                    t_pt=0, t_other_ded=0, t_total_ded=0, t_net=0, t_bonus=0
                 ) %}
                 {% set head_totals = {} %}
 
@@ -179,6 +182,9 @@
                     {% endfor %}
 
                     <td class="text-right">{{ "{:,.0f}".format(entry._nph_amount) if entry._nph_amount else "-" }}</td>
+                    {% if config.monthly_bonus_applicable %}
+                    <td class="text-right" style="background:#faf5ff; color:#7e22ce; font-weight:600;">{{ "{:,.0f}".format(entry.bonus_amount) if entry.bonus_amount else "-" }}</td>
+                    {% endif %}
                     <td class="text-right" style="font-weight:700; background:#f0fdf4;">{{ "{:,.0f}".format(entry.earned_gross) }}</td>
                     {% if config.ot_applicable %}
                     <td class="text-center">{{ (entry.ot_hours|int if entry.ot_hours == entry.ot_hours|int else "%.2f"|format(entry.ot_hours)) if entry.ot_hours else "-" }}</td>
@@ -216,6 +222,7 @@
                 {% set ns.t_other_ded = ns.t_other_ded + entry.other_deduction %}
                 {% set ns.t_total_ded = ns.t_total_ded + entry.total_deductions %}
                 {% set ns.t_net = ns.t_net + entry.net_pay %}
+                {% set ns.t_bonus = ns.t_bonus + (entry.bonus_amount or 0) %}
                 {% endfor %}
 
                 <!-- TOTAL ROW -->
@@ -232,6 +239,9 @@
                     <td class="text-right amt">{{ "{:,.0f}".format(head_totals.get(head.id, 0)) }}</td>
                     {% endfor %}
                     <td class="text-right amt">{{ "{:,.0f}".format(ns.t_nph_amt) }}</td>
+                    {% if config.monthly_bonus_applicable %}
+                    <td class="text-right amt" style="color:#7e22ce;">{{ "{:,.0f}".format(ns.t_bonus) }}</td>
+                    {% endif %}
                     <td class="text-right amt">{{ "{:,.0f}".format(ns.t_earned) }}</td>
                     {% if config.ot_applicable %}
                     <td class="text-center amt">{{ ns.t_ot_hrs|int }}</td>
