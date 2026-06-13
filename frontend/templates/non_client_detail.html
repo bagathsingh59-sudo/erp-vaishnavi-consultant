@@ -233,6 +233,10 @@
                            class="btn btn-sm btn-info download-btn" style="font-size:0.72rem; color:#fff;">
                             <i class="bi bi-file-earmark-excel me-1"></i>Download ESIC Template (.xls)
                         </a>
+                        <a href="{{ url_for('non_client.nc_statement', record_id=rec.id) }}"
+                           class="btn btn-sm download-btn" style="font-size:0.72rem; background:#0f172a; color:#fff;">
+                            <i class="bi bi-file-earmark-text me-1"></i>Client Statement (EPF + ESIC)
+                        </a>
                     </div>
                     {% else %}
                     <p style="font-size:0.7rem; color:#94a3b8; margin:0;">
