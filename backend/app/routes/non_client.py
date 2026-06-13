@@ -779,15 +779,33 @@ def _parse_uploaded_excel(file_obj) -> tuple:
         ws = wb.active
 
     # ── 3. Find header row ────────────────────────────────────
+    # The official template has TWO header-like rows:
+    #   Row 3 = group sub-headers ("EMPLOYEE INFO", "ATTENDANCE & SETUP"…)
+    #   Row 4 = real column headers ("Employee Name *", "Days Present *"…)
+    # The old scan matched any cell containing "employee" and so latched
+    # onto "EMPLOYEE INFO" in the group row, building a column map from the
+    # group labels → "Employee Name column not found". We now require the
+    # real header row to carry BOTH an employee/name column AND a days
+    # column, which the group row never does.
+    def _row_texts(ri):
+        return [str(ws.cell(row=ri, column=ci).value or '').lower().replace('\n', ' ').strip()
+                for ci in range(1, 30)]
+
     header_row = None
-    for ri in range(1, 12):
-        for ci in range(1, 6):
-            v = ws.cell(row=ri, column=ci).value
-            if v and 'employee' in str(v).lower():
+    for ri in range(1, 16):
+        texts = _row_texts(ri)
+        has_name = any(('employee name' in t) or ('emp name' in t) or (t == 'name')
+                       for t in texts)
+        has_days = any('days present' in t for t in texts)
+        if has_name and has_days:
+            header_row = ri
+            break
+    # Fallback — any row that has an explicit "employee name" cell
+    if header_row is None:
+        for ri in range(1, 16):
+            if any('employee name' in t for t in _row_texts(ri)):
                 header_row = ri
                 break
-        if header_row:
-            break
 
     if header_row is None:
         raise ValueError(
@@ -796,15 +814,24 @@ def _parse_uploaded_excel(file_obj) -> tuple:
         )
 
     # ── 4. Build column map ───────────────────────────────────
+    # Normalise newlines → spaces so multi-line headers like
+    # "Gross Wages\n(Direct)" match cleanly.
     col_map = {}
     for ci in range(1, 30):
         v = ws.cell(row=header_row, column=ci).value
         if v:
-            col_map[str(v).lower().strip()] = ci
+            col_map[str(v).lower().replace('\n', ' ').strip()] = ci
 
     def _fc(*kws):
-        """Find column index by first matching keyword."""
-        for kw in kws:
+        """Find a column by keyword. Tries an EXACT (asterisk-stripped)
+        match first so short keys like 'da' don't latch onto 'days
+        present' / 'working days' via substring, then falls back to a
+        substring match."""
+        norm = {k.replace('*', '').strip(): v for k, v in col_map.items()}
+        for kw in kws:                       # exact, normalised
+            if kw in norm:
+                return norm[kw]
+        for kw in kws:                       # substring fallback
             for k, v in col_map.items():
                 if kw in k:
                     return v
