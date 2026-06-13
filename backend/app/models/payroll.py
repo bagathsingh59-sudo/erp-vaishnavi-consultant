@@ -137,6 +137,29 @@ class PayrollConfig(db.Model):
     # ESIC wage ceiling (default 21000)
     esic_wage_ceiling = db.Column(db.Float, default=21000.0)
 
+    # --- Monthly Bonus Configuration ---
+    # Some establishments pay statutory bonus EVERY MONTH (folded into salary
+    # like HRA/Conveyance) instead of the annual lump sum. When this is ON,
+    # the establishment is excluded from the annual Bonus run and a monthly
+    # bonus is added to each payroll. When OFF (default), behaviour is
+    # unchanged and the annual Bonus module applies.
+    monthly_bonus_applicable = db.Column(db.Boolean, default=False)
+    # 'slab'   = auto compute (monthly_bonus_percent % of base)
+    # 'custom' = no formula; amount entered per employee via Universal Template
+    monthly_bonus_mode = db.Column(db.String(10), nullable=False, default='slab')
+    # Slab percentage (default 8.33% — statutory minimum)
+    monthly_bonus_percent = db.Column(db.Float, default=8.33)
+    # Base the slab % applies to: 'basic_da' (Basic+DA) or 'gross'
+    monthly_bonus_base = db.Column(db.String(10), nullable=False, default='basic_da')
+    # Optional per-month wage ceiling on the bonus base (e.g. 7000 = Sec.12
+    # statutory cap). NULL = no ceiling, slab applies to the full base.
+    monthly_bonus_ceiling = db.Column(db.Float, nullable=True)
+    # Does the monthly bonus add to EPF wages? (statutorily excluded → default OFF)
+    monthly_bonus_in_epf = db.Column(db.Boolean, default=False)
+    # Does the monthly bonus add to ESIC wages? (monthly payment ≤ 2-month
+    # interval IS ESIC wages → default ON)
+    monthly_bonus_in_esic = db.Column(db.Boolean, default=True)
+
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -457,6 +480,9 @@ class PayrollEntry(db.Model):
     esic_employee = db.Column(db.Float, default=0)
     esic_employer = db.Column(db.Float, default=0)
     professional_tax = db.Column(db.Float, default=0)
+
+    # Monthly Bonus (when establishment pays bonus every month)
+    bonus_amount = db.Column(db.Float, default=0)
 
     # Arrear Salary
     arrear_amount = db.Column(db.Float, default=0)

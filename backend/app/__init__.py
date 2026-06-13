@@ -693,6 +693,24 @@ def _auto_migrate_columns(db):
         db.session.rollback()
         print(f"  [MIGRATE] paid_leave tables: {e}")
 
+    # ── Monthly Bonus config + per-entry bonus amount ────────────────────
+    for ddl in [
+        "ALTER TABLE payroll_configs ADD COLUMN IF NOT EXISTS monthly_bonus_applicable BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE payroll_configs ADD COLUMN IF NOT EXISTS monthly_bonus_mode VARCHAR(10) NOT NULL DEFAULT 'slab'",
+        "ALTER TABLE payroll_configs ADD COLUMN IF NOT EXISTS monthly_bonus_percent DOUBLE PRECISION DEFAULT 8.33",
+        "ALTER TABLE payroll_configs ADD COLUMN IF NOT EXISTS monthly_bonus_base VARCHAR(10) NOT NULL DEFAULT 'basic_da'",
+        "ALTER TABLE payroll_configs ADD COLUMN IF NOT EXISTS monthly_bonus_ceiling DOUBLE PRECISION",
+        "ALTER TABLE payroll_configs ADD COLUMN IF NOT EXISTS monthly_bonus_in_epf BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE payroll_configs ADD COLUMN IF NOT EXISTS monthly_bonus_in_esic BOOLEAN DEFAULT TRUE",
+        "ALTER TABLE payroll_entries ADD COLUMN IF NOT EXISTS bonus_amount DOUBLE PRECISION DEFAULT 0",
+    ]:
+        try:
+            db.session.execute(db.text(ddl))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"  [MIGRATE] {ddl.split(' ADD ')[0]}: {e}")
+
     # ── Bonus run: comprehensive composition toggles ─────────────────────
     # Three sections — Attendance, Wage, Ceiling/Cap — driving the
     # Vaishnavi simple-basis engine. All idempotent ADD IF NOT EXISTS.

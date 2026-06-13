@@ -513,6 +513,77 @@
             </div>
         </div>
 
+        <!-- ── Monthly Bonus ───────────────────────────────────────────── -->
+        <div class="form-section">
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" name="monthly_bonus_applicable" id="monthlyBonusChk"
+                       {% if config and config.monthly_bonus_applicable %}checked{% endif %} onchange="toggleMonthlyBonus()">
+                <label class="form-check-label fw-bold" for="monthlyBonusChk">
+                    <i class="bi bi-cash-coin me-1" style="color:#9333ea;"></i> Pay Bonus Every Month
+                </label>
+            </div>
+            <p class="text-muted mb-3" style="font-size:0.8rem;">
+                Turn this ON if the establishment pays bonus monthly (folded into salary like HRA).
+                When ON, this establishment is excluded from the <strong>annual</strong> Bonus run.
+                When OFF, the annual Bonus module applies as usual.
+            </p>
+
+            <div id="monthlyBonusSettings" style="display:{% if config and config.monthly_bonus_applicable %}block{% else %}none{% endif %}; background:#faf5ff; padding:16px; border-radius:8px; border:1px solid #e9d5ff;">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold" style="font-size:0.82rem;">Mode</label>
+                        <select name="monthly_bonus_mode" class="form-select form-select-sm" onchange="toggleBonusMode()" id="bonusMode">
+                            <option value="slab"   {% if config and config.monthly_bonus_mode == 'slab' %}selected{% endif %}>Slab % (auto)</option>
+                            <option value="custom" {% if config and config.monthly_bonus_mode == 'custom' %}selected{% endif %}>Custom (enter in template)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 bonus-slab-only">
+                        <label class="form-label fw-semibold" style="font-size:0.82rem;">Slab %</label>
+                        <input type="number" step="0.01" name="monthly_bonus_percent" class="form-control form-control-sm"
+                               value="{{ config.monthly_bonus_percent if config and config.monthly_bonus_percent else 8.33 }}">
+                        <small class="text-muted" style="font-size:0.7rem;">Statutory minimum 8.33%</small>
+                    </div>
+                    <div class="col-md-4 bonus-slab-only">
+                        <label class="form-label fw-semibold" style="font-size:0.82rem;">Slab applies on</label>
+                        <select name="monthly_bonus_base" class="form-select form-select-sm">
+                            <option value="basic_da" {% if config and config.monthly_bonus_base == 'basic_da' %}selected{% endif %}>Basic + DA</option>
+                            <option value="gross"    {% if config and config.monthly_bonus_base == 'gross' %}selected{% endif %}>Gross</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 bonus-slab-only">
+                        <label class="form-label fw-semibold" style="font-size:0.82rem;">Wage Ceiling on base (optional)</label>
+                        <input type="number" step="1" name="monthly_bonus_ceiling" class="form-control form-control-sm"
+                               value="{{ config.monthly_bonus_ceiling|int if config and config.monthly_bonus_ceiling else '' }}"
+                               placeholder="e.g. 7000 — blank for none">
+                        <small class="text-muted" style="font-size:0.7rem;">₹7,000 = Sec.12 statutory cap</small>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label fw-semibold" style="font-size:0.82rem;">Compliance treatment</label>
+                        <div class="d-flex gap-4 mt-1">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="monthly_bonus_in_epf" id="bonusInEpf"
+                                       {% if config and config.monthly_bonus_in_epf %}checked{% endif %}>
+                                <label class="form-check-label" for="bonusInEpf" style="font-size:0.82rem;">Add to EPF wages
+                                    <small class="text-muted d-block" style="font-size:0.68rem;">(statutorily usually NO)</small>
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="monthly_bonus_in_esic" id="bonusInEsic"
+                                       {% if not config or config.monthly_bonus_in_esic %}checked{% endif %}>
+                                <label class="form-check-label" for="bonusInEsic" style="font-size:0.82rem;">Add to ESIC wages
+                                    <small class="text-muted d-block" style="font-size:0.68rem;">(monthly bonus IS ESIC wages — recommended YES)</small>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <p class="text-muted mt-2 mb-0" style="font-size:0.74rem;">
+                    <i class="bi bi-info-circle"></i> In any mode, the <strong>Bonus</strong> column in the Universal Template overrides the
+                    calculated amount per employee — leave it blank to auto-compute (slab), or type a value to set it manually.
+                </p>
+            </div>
+        </div>
+
         <!-- Submit -->
         <div class="form-section" style="border-bottom:none; background:#f8fafc;">
             <div class="d-flex gap-3 justify-content-between align-items-center">
@@ -561,6 +632,20 @@
         document.getElementById('esicSettings').style.display =
             document.getElementById('esicApplicable').checked ? 'block' : 'none';
     }
+
+    // Monthly Bonus
+    function toggleMonthlyBonus() {
+        document.getElementById('monthlyBonusSettings').style.display =
+            document.getElementById('monthlyBonusChk').checked ? 'block' : 'none';
+    }
+    function toggleBonusMode() {
+        var slab = document.getElementById('bonusMode').value === 'slab';
+        document.querySelectorAll('.bonus-slab-only').forEach(function(el) {
+            el.style.display = slab ? '' : 'none';
+        });
+    }
+    toggleBonusMode();
+
     toggleCustomDays();
     function toggleRestDay() {
         var type = document.getElementById('restDayType').value;

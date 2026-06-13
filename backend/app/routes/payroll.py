@@ -145,6 +145,23 @@ def payroll_config(est_id):
             except ValueError:
                 pass
 
+        # Monthly Bonus configuration
+        config.monthly_bonus_applicable = 'monthly_bonus_applicable' in request.form
+        if config.monthly_bonus_applicable:
+            config.monthly_bonus_mode = request.form.get('monthly_bonus_mode', 'slab')
+            config.monthly_bonus_base = request.form.get('monthly_bonus_base', 'basic_da')
+            try:
+                config.monthly_bonus_percent = float(request.form.get('monthly_bonus_percent', 8.33) or 8.33)
+            except ValueError:
+                config.monthly_bonus_percent = 8.33
+            _mbc = (request.form.get('monthly_bonus_ceiling') or '').strip()
+            try:
+                config.monthly_bonus_ceiling = float(_mbc) if _mbc else None
+            except ValueError:
+                config.monthly_bonus_ceiling = None
+            config.monthly_bonus_in_epf = 'monthly_bonus_in_epf' in request.form
+            config.monthly_bonus_in_esic = 'monthly_bonus_in_esic' in request.form
+
         db.session.commit()
 
         # Auto-create default salary heads if structure is with_heads and no heads exist
@@ -2086,6 +2103,40 @@ def save_attendance(payroll_id):
                 compliance_wages += entry.ot_amount
 
         # ========================================
+        # Monthly Bonus (establishment pays bonus every month, not annually)
+        # Computed here so it can fold into the EPF / ESIC wage bases below
+        # before those contributions are calculated. Fully opt-in — does
+        # nothing unless monthly_bonus_applicable is ON for this establishment.
+        # ========================================
+        entry.bonus_amount = 0
+        if getattr(config, 'monthly_bonus_applicable', False):
+            _bonus_ovr = _rate_overrides.get('bonus') if _rate_overrides else None
+            if _bonus_ovr is not None and str(_bonus_ovr).strip() != '':
+                # Universal-template override wins (custom value or manual slab)
+                try:
+                    entry.bonus_amount = round(float(_bonus_ovr))
+                except (ValueError, TypeError):
+                    entry.bonus_amount = 0
+            elif getattr(config, 'monthly_bonus_mode', 'slab') == 'slab':
+                # Slab: percentage of base (Basic+DA via compliance_wages, or gross)
+                if getattr(config, 'monthly_bonus_base', 'basic_da') == 'gross':
+                    _bonus_base = entry.earned_gross
+                else:
+                    _bonus_base = compliance_wages          # ≈ Basic + DA
+                _bonus_ceil = getattr(config, 'monthly_bonus_ceiling', None)
+                if _bonus_ceil and _bonus_base > _bonus_ceil:
+                    _bonus_base = _bonus_ceil
+                _bonus_pct = getattr(config, 'monthly_bonus_percent', 8.33) or 8.33
+                entry.bonus_amount = round(_bonus_base * _bonus_pct / 100.0)
+            # custom mode with no override → bonus stays 0 (must be entered)
+
+            # Bonus is part of gross / net pay
+            entry.total_earnings += entry.bonus_amount
+            # Optionally fold into the EPF wage base (statutorily usually NOT)
+            if getattr(config, 'monthly_bonus_in_epf', False):
+                compliance_wages += entry.bonus_amount
+
+        # ========================================
         # EPF Calculation (correct Indian EPF structure)
         # Employee: 12% of EPF wages (goes to A/c 01)
         # Employer:
@@ -2169,6 +2220,13 @@ def save_attendance(payroll_id):
             # Include OT in ESIC wages if enabled in config
             if getattr(config, 'include_ot_in_esic', False) and entry.ot_amount > 0:
                 esic_gross += entry.ot_amount
+
+            # Monthly bonus is ESIC wages when paid at ≤ 2-month intervals
+            # (configurable — defaults ON for monthly bonus establishments).
+            if (getattr(config, 'monthly_bonus_applicable', False)
+                    and getattr(config, 'monthly_bonus_in_esic', True)
+                    and entry.bonus_amount):
+                esic_gross += entry.bonus_amount
 
             # Higher deduction = ESIC on full wages (no ceiling check — deduct even above ₹21,000)
             esic_type = getattr(config, 'esic_contribution_type', 'ceiling')
@@ -3163,6 +3221,7 @@ def upload_attendance(payroll_id):
         other_ded_col = col_map_from_file.get('other_ded')
         remark_col = col_map_from_file.get('remark')
         rate_col = col_map_from_file.get('rate')  # For daily_wages / gross_only
+        bonus_col = col_map_from_file.get('bonus')  # Monthly bonus override (optional)
         data_start_row = 6  # Row 4=group, Row 5=header, Row 6=data
     else:
         # Monthly template: Col 1=Sr, 2=EmpID, 3=Name, 4=Gross, 5=Present
@@ -3174,6 +3233,7 @@ def upload_attendance(payroll_id):
         ph_col = None
         ot_col = None
         rate_col = None
+        bonus_col = None
         if has_ph:
             ph_col = next_col
             next_col += 1
@@ -3406,6 +3466,17 @@ def upload_attendance(payroll_id):
                         overrides['gross'] = new_gross
                         if salary and salary.gross_salary and abs(new_gross - salary.gross_salary) > 1:
                             rate_changes.append(f'{emp.name}: Gross {round(salary.gross_salary)} → {round(new_gross)}')
+
+            # ── Read Monthly Bonus override column (if present) ──
+            # A filled value overrides the slab auto-calculation for this
+            # employee; blank → engine auto-computes from config.
+            if bonus_col:
+                try:
+                    bval = row[bonus_col - 1].value
+                    if bval is not None and str(bval).strip() != '':
+                        overrides['bonus'] = float(bval)
+                except (ValueError, TypeError, IndexError):
+                    pass
 
             # Store rate overrides as JSON on the payroll entry
             entry.rate_overrides = json.dumps(overrides) if overrides else None
@@ -3703,6 +3774,12 @@ def download_universal_template(payroll_id):
     if has_ot:
         col_map['ot_hours'] = (col_idx, 'OT (Hrs/Days)', 'attend', 13); col_idx += 1
 
+    # ── Monthly Bonus column (only when establishment pays bonus monthly) ──
+    # Blank cell → auto-compute from config (slab %). Filled → override.
+    has_monthly_bonus = bool(getattr(config, 'monthly_bonus_applicable', False))
+    if has_monthly_bonus:
+        col_map['bonus'] = (col_idx, 'Bonus', 'earn', 12); col_idx += 1
+
     # ── Deduction Columns ──
     col_map['other_ded'] = (col_idx, 'Other Ded.', 'deduct', 12); col_idx += 1
     col_map['remark'] = (col_idx, 'Remark', 'deduct', 22); col_idx += 1
@@ -3738,8 +3815,10 @@ def download_universal_template(payroll_id):
 
     # ── Group Header Row (Row 4) — color-coded section labels ──
     group_header_row = 4
-    group_fills = {'kyc': kyc_fill, 'rate': rate_fill, 'attend': attend_fill, 'deduct': ded_fill}
-    group_labels = {'kyc': 'KYC INFORMATION', 'rate': 'EARNING / RATE', 'attend': 'ATTENDANCE', 'deduct': 'DEDUCTIONS'}
+    group_fills = {'kyc': kyc_fill, 'rate': rate_fill, 'attend': attend_fill,
+                   'earn': rate_fill, 'deduct': ded_fill}
+    group_labels = {'kyc': 'KYC INFORMATION', 'rate': 'EARNING / RATE', 'attend': 'ATTENDANCE',
+                    'earn': 'BONUS', 'deduct': 'DEDUCTIONS'}
 
     # Find column ranges for each group
     group_ranges = {}
@@ -3842,6 +3921,12 @@ def download_universal_template(payroll_id):
             ot_cell = ws.cell(row=row, column=col_map['ot_hours'][0], value='')
             ot_cell.font = data_font; ot_cell.fill = input_fill; ot_cell.border = thin_border
             ot_cell.alignment = Alignment(horizontal='center')
+
+        # Monthly Bonus column (blank → auto-compute from config; filled → override)
+        if 'bonus' in col_map:
+            bonus_cell = ws.cell(row=row, column=col_map['bonus'][0], value='')
+            bonus_cell.font = data_font; bonus_cell.fill = input_fill; bonus_cell.border = thin_border
+            bonus_cell.alignment = Alignment(horizontal='right')
 
         # Deduction columns (yellow — optional)
         ded_cell = ws.cell(row=row, column=col_map['other_ded'][0], value='')
