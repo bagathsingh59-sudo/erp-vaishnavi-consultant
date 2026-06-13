@@ -318,6 +318,17 @@ def bonus_new():
         est = Establishment.query.get_or_404(est_id)
         verify_est_ownership(est)
 
+        # Block annual bonus for establishments that pay bonus MONTHLY —
+        # their bonus is already disbursed each month in payroll, so an
+        # annual run would double-pay.
+        from app.models.payroll import PayrollConfig as _PC
+        _cfg = _PC.query.filter_by(establishment_id=est_id).first()
+        if _cfg and getattr(_cfg, 'monthly_bonus_applicable', False):
+            flash(f'{est.company_name} is set to pay bonus MONTHLY (in Payroll Config), '
+                  f'so it is excluded from the annual bonus run. Turn off '
+                  f'"Pay Bonus Every Month" in Payroll Config to run annual bonus.', 'warning')
+            return redirect(url_for('bonus.bonus_list'))
+
         # Prevent duplicate run for same est + FY
         existing = BonusRun.query.filter_by(
             establishment_id=est_id, start_year=start_year
