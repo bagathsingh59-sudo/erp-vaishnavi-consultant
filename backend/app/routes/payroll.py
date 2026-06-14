@@ -2532,7 +2532,13 @@ def payroll_statement(payroll_id):
         establishment_id=est.id, is_active=True, head_type='earning', is_in_gross=True
     ).order_by(SalaryHead.display_order).all()
 
-    # Build head-wise data for each entry + attach salary type and daily rate for Rate column
+    # Build head-wise data for each entry + attach salary type and daily rate for Rate column.
+    # IMPORTANT: the Rate column must reflect what was UPLOADED for this month
+    # (rate_overrides), not just the stored EmployeeSalary — otherwise daily-wage
+    # employees uploaded via the Universal Template show their monthly gross here
+    # while Form B (which reads rate_overrides) shows the correct daily rate.
+    # This mirrors reports._get_payroll_data so the statement and Form B agree.
+    import json as _json
     for entry in entries:
         entry.head_amounts = {}
         for peh in entry.head_breakup:
@@ -2540,7 +2546,23 @@ def payroll_statement(payroll_id):
         cur_sal = EmployeeSalary.query.filter_by(
             employee_id=entry.employee_id, is_current=True).first()
         entry._salary_type = cur_sal.salary_type if cur_sal else (config.salary_type if config else 'monthly_fixed')
-        entry._daily_rate = cur_sal.daily_rate if cur_sal and cur_sal.daily_rate else 0
+        _daily_rate = cur_sal.daily_rate if cur_sal and cur_sal.daily_rate else 0
+        _eff_gross = cur_sal.gross_salary if cur_sal else (entry.gross_salary or 0)
+        # Apply per-entry rate overrides from the uploaded Universal Template
+        if getattr(entry, 'rate_overrides', None):
+            try:
+                _ro = _json.loads(entry.rate_overrides)
+                if _ro.get('daily_rate'):
+                    _daily_rate = float(_ro['daily_rate'])
+                    # An uploaded daily_rate means this employee was paid daily
+                    # this month — reflect that in the Rate column logic.
+                    entry._salary_type = 'daily_wages'
+                if _ro.get('gross'):
+                    _eff_gross = float(_ro['gross'])
+            except (ValueError, TypeError):
+                pass
+        entry._daily_rate = _daily_rate
+        entry._effective_gross = _eff_gross
 
     generated_on = datetime.now().strftime('%d %b %Y, %I:%M %p')
 

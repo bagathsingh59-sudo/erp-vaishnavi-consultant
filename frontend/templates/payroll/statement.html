@@ -286,7 +286,7 @@
                     <td class="text-center" style="font-size:0.7rem; color:#64748b;">
                         {% if est.pf_code %}{{ entry.employee.uan_number or '—' }}{% else %}{{ entry.employee.esic_ip_number or '—' }}{% endif %}
                     </td>
-                    <td class="text-right" style="font-size:0.7rem; color:#334155; background:#f8fafc;">{% if entry._salary_type == 'daily_wages' and entry._daily_rate %}{{ "%.2f"|format(entry._daily_rate) }}{% else %}{{ "{:,.0f}".format(entry.gross_salary) }}{% endif %}</td>
+                    <td class="text-right" style="font-size:0.7rem; color:#334155; background:#f8fafc;">{% if entry._salary_type == 'daily_wages' and entry._daily_rate %}{{ "%.2f"|format(entry._daily_rate) }}{% else %}{{ "{:,.0f}".format(entry._effective_gross or entry.gross_salary) }}{% endif %}</td>
                     <td class="text-center">{{ entry.days_present|int if entry.days_present == entry.days_present|int else entry.days_present }}</td>
                     <td class="text-center">{{ entry.days_absent|int if entry.days_absent == entry.days_absent|int else entry.days_absent }}</td>
                     <td class="text-center" style="font-weight:600;">{{ entry.total_payable_days|int if entry.total_payable_days == entry.total_payable_days|int else entry.total_payable_days }}</td>
