@@ -2258,6 +2258,40 @@ def save_attendance(payroll_id):
                                   entry.professional_tax + entry.other_deduction)
         entry.net_pay = round(entry.total_earnings - entry.total_deductions)
 
+        # ════════════════════════════════════════════════════════════════
+        # Zero-attendance guard
+        # An employee who worked ZERO days for the month earns nothing —
+        # no weekly-off / paid-holiday wages, no overtime, no bonus, no
+        # EPF/ESIC, no net. Without this, the auto-applied weekly-off pay
+        # made the on-screen preview show pay days + net for a worker who
+        # never attended (e.g. BASAVARAJ: 0 present → 4 pay days → ₹91 net),
+        # while Form B (which drops zero-attendance employees) showed
+        # nothing. This final override forces every money field to 0 so the
+        # preview and the reports agree.
+        # ════════════════════════════════════════════════════════════════
+        if (entry.days_present or 0) <= 0:
+            entry.paid_holidays = 0
+            entry.total_payable_days = 0
+            entry.earned_gross = 0
+            entry.ot_hours = 0
+            entry.ot_amount = 0
+            entry.bonus_amount = 0
+            entry.total_earnings = 0
+            entry.epf_wages = 0
+            entry.epf_employee = 0
+            entry.epf_ac01 = 0
+            entry.epf_eps = 0
+            entry.epf_admin = 0
+            entry.epf_edli = 0
+            entry.epf_employer = 0
+            entry.esic_wages = 0
+            entry.esic_employee = 0
+            entry.esic_employer = 0
+            entry.professional_tax = 0
+            entry.other_deduction = 0
+            entry.total_deductions = 0
+            entry.net_pay = 0
+
         # Accumulate totals
         totals['gross'] += entry.total_earnings
         totals['epf_ee'] += entry.epf_employee
