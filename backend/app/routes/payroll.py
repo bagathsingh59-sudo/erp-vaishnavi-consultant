@@ -1652,6 +1652,58 @@ def payroll_process(payroll_id):
         doc_packs = []
     # [/TRIAL: doc-pack]
 
+    # ══════════════════════════════════════════════════════════════════
+    # Display-time zero-attendance correction
+    # An employee who worked 0 days earns nothing — no weekly-off pay, no
+    # contributions, no net. Payrolls calculated BEFORE the zero-attendance
+    # guard (in save_attendance) may have stored phantom weekly-off pay,
+    # making the on-screen preview disagree with Form B (which drops
+    # zero-attendance employees). Correct it here IN-MEMORY so the preview
+    # and its summary cards always match the reports — for old and new
+    # payrolls alike. Nothing is committed (this is a GET view): the
+    # underlying stored data is corrected the next time Save & Calculate
+    # runs. Placed just before render so no later query can flush it.
+    _d_gross = _d_epf_ee = _d_epf_er = _d_esic_ee = _d_esic_er = _d_net = _d_pt = 0
+    for _e in entries:
+        if (_e.days_present or 0) <= 0:
+            _e.paid_holidays = 0
+            _e.total_payable_days = 0
+            _e.earned_gross = 0
+            _e.ot_hours = 0
+            _e.ot_amount = 0
+            if hasattr(_e, 'bonus_amount'):
+                _e.bonus_amount = 0
+            _e.total_earnings = 0
+            _e.epf_wages = 0
+            _e.epf_employee = 0
+            _e.epf_ac01 = 0
+            _e.epf_eps = 0
+            _e.epf_admin = 0
+            _e.epf_edli = 0
+            _e.epf_employer = 0
+            _e.esic_wages = 0
+            _e.esic_employee = 0
+            _e.esic_employer = 0
+            _e.professional_tax = 0
+            _e.other_deduction = 0
+            _e.total_deductions = 0
+            _e.net_pay = 0
+        _d_gross   += _e.total_earnings or 0
+        _d_epf_ee  += _e.epf_employee or 0
+        _d_epf_er  += _e.epf_employer or 0
+        _d_esic_ee += _e.esic_employee or 0
+        _d_esic_er += _e.esic_employer or 0
+        _d_pt      += _e.professional_tax or 0
+        _d_net     += _e.net_pay or 0
+    # Override the summary-card fields in-memory (not persisted without commit)
+    payroll.total_gross         = round(_d_gross)
+    payroll.total_epf_employee  = round(_d_epf_ee)
+    payroll.total_epf_employer  = round(_d_epf_er)
+    payroll.total_esic_employee = round(_d_esic_ee)
+    payroll.total_esic_employer = round(_d_esic_er)
+    payroll.total_pt            = round(_d_pt)
+    payroll.total_net_pay       = round(_d_net)
+
     return render_template('payroll/process.html',
                            payroll=payroll, est=est, config=config,
                            entries=entries, heads=heads,
