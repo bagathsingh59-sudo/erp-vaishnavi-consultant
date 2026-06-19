@@ -1407,10 +1407,21 @@ def payroll_create():
             # Default to WAGE MONTH (previous calendar month) — you can't
             # process contributions for a running month in advance.
             wage_year, wage_month = current_wage_month()
+            # Earliest selectable year for the payroll period — read from the
+            # establishment's date of registration / commencement so older
+            # establishments (e.g. since 1980) can have historical returns
+            # entered, not just from a hard-coded 2019. Falls back to 1980 when
+            # the registration date isn't recorded.
+            if est.date_of_registration:
+                min_year = est.date_of_registration.year
+            else:
+                min_year = 1980
+            min_year = min(min_year, wage_year)   # never above the default period
             return render_template('payroll/create.html',
                                    establishment=est,
                                    current_month=wage_month,
                                    current_year=wage_year,
+                                   min_year=min_year,
                                    previous_payrolls=previous_payrolls)
 
     # No establishment selected — redirect to establishment list

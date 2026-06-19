@@ -95,7 +95,10 @@
                 <div class="col-md-4">
                     <label class="form-label">Year <span class="text-danger">*</span></label>
                     <select name="year" class="form-select" required>
-                        {% for y in range(2019, current_year + 2) %}
+                        {# Year range starts at the establishment's registration /
+                           commencement year (min_year), so historical returns can be
+                           entered for old establishments — not capped at 2019. #}
+                        {% for y in range(current_year + 1, (min_year|default(2019)) - 1, -1) %}
                             <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
                         {% endfor %}
                     </select>
