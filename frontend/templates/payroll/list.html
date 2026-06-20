@@ -30,14 +30,16 @@
             <div class="col-md-7">
                 <div class="d-flex gap-2 align-items-center justify-content-md-end mt-2 mt-md-0 flex-wrap">
                     <!-- Financial Year Filter -->
-                    <div class="btn-group btn-group-sm">
-                        {% for fy in [selected_fy - 1, selected_fy, selected_fy + 1] %}
-                        <a href="{{ url_for('payroll.payroll_list', fy=fy, tab=active_tab) }}"
-                           class="btn {% if fy == selected_fy %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="font-size: 0.72rem; white-space: nowrap;">
-                            FY {{ fy }}-{{ (fy + 1)|string }}
-                        </a>
+                    <select class="form-select form-select-sm" style="width:auto; font-size:0.75rem;"
+                            title="Select Financial Year"
+                            onchange="window.location.href=this.value">
+                        {% for opt in fy_options %}
+                        <option value="{{ url_for('payroll.payroll_list', fy=opt.value, establishment=selected_est_filter, tab=active_tab) }}"
+                                {% if opt.value == selected_fy %}selected{% endif %}>
+                            {{ opt.label }}
+                        </option>
                         {% endfor %}
-                    </div>
+                    </select>
 
                     <span class="badge badge-primary-soft" style="font-size: 0.75rem; padding: 5px 10px;">
                         {{ fy_display }} <span style="opacity: 0.7;">(Apr {{ selected_fy }} — Mar {{ selected_fy + 1 }})</span>

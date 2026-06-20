@@ -311,10 +311,19 @@ def client_dashboard():
     fy_label = f"FY {fy_start_year}-{(fy_start_year + 1) % 100:02d}"
     current_fy = f"{fy_start_year}-{fy_start_year + 1}"
 
-    # Build FY options — current + 4 previous years
+    # Build FY options from the establishment's commencement (date of
+    # registration) up to the current FY, so old clients (e.g. since 1988)
+    # can pick any of their historical financial years. Falls back to the
+    # last 10 FYs when no registration date is recorded.
+    if est.date_of_registration:
+        earliest_fy = (est.date_of_registration.year
+                       if est.date_of_registration.month >= 4
+                       else est.date_of_registration.year - 1)
+    else:
+        earliest_fy = default_fy_start - 9
+    earliest_fy = min(earliest_fy, default_fy_start)   # never above current FY
     fy_options = []
-    for i in range(5):
-        y = default_fy_start - i
+    for y in range(default_fy_start, earliest_fy - 1, -1):   # newest first
         fy_options.append({'value': f'{y}-{y+1}', 'label': f'FY {y}-{(y+1) % 100:02d}'})
 
     # Employee stats

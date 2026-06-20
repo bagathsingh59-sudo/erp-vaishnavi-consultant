@@ -1239,12 +1239,40 @@ def payroll_list():
     # FY display string
     fy_display = f"FY {selected_fy}-{str(selected_fy + 1)[-2:]}"
 
+    # Build the full FY dropdown range. Some establishments date back to the
+    # 1980s, so the list must reach from the earliest commencement (date of
+    # registration) up to the current FY. When a single establishment is in
+    # scope we use its own commencement; otherwise we use the earliest among
+    # all visible establishments. Falls back to the last 10 FYs.
+    target_est_id = scoped_est_id or (int(est_id) if est_id else None)
+    earliest_fy = None
+    if target_est_id:
+        tgt = Establishment.query.get(target_est_id)
+        if tgt and tgt.date_of_registration:
+            r = tgt.date_of_registration
+            earliest_fy = r.year if r.month >= 4 else r.year - 1
+    else:
+        reg_dates = [e.date_of_registration for e in establishments if e.date_of_registration]
+        if reg_dates:
+            r = min(reg_dates)
+            earliest_fy = r.year if r.month >= 4 else r.year - 1
+    if earliest_fy is None:
+        earliest_fy = default_fy - 9
+    # Never start above the current FY, and always include the selected FY.
+    earliest_fy = min(earliest_fy, default_fy, selected_fy)
+    newest_fy = max(default_fy, selected_fy)
+    fy_options = [
+        {'value': y, 'label': f"FY {y}-{str(y + 1)[-2:]}"}
+        for y in range(newest_fy, earliest_fy - 1, -1)
+    ]
+
     return render_template('payroll/list.html',
                            payrolls=payrolls,
                            establishments=establishments,
                            selected_est_filter=str(scoped_est_id) if scoped_est_id else est_id,
                            selected_fy=selected_fy,
                            fy_display=fy_display,
+                           fy_options=fy_options,
                            active_tab=tab)
 
 
