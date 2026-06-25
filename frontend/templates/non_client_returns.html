@@ -349,7 +349,10 @@
                         <div class="col-md-4">
                             <label class="form-label fw-600" style="font-size:0.78rem;">Year <span class="text-danger">*</span></label>
                             <select name="year" class="form-select form-select-sm" required style="font-size:0.82rem;">
-                                {% for y in range(now.year, now.year - 4, -1) %}
+                                {# Reach back to 1980 so historical non-client
+                                   returns (oldest records are FY 1980-81) can
+                                   be entered, not just the last few years. #}
+                                {% for y in range(now.year, 1979, -1) %}
                                 <option value="{{ y }}" {% if loop.first %}selected{% endif %}>{{ y }}</option>
                                 {% endfor %}
                             </select>

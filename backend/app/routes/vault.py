@@ -261,7 +261,13 @@ def vault_upload():
 
     # GET
     current_year = datetime.now().year
-    years = list(range(current_year - 5, current_year + 2))
+    # FY tags reach back to the earliest establishment commencement (date of
+    # registration) so old documents (e.g. since 1980) can be filed under
+    # their correct year. Falls back to the last 6 years; keeps one future FY.
+    reg = [e.date_of_registration for e in ests if e.date_of_registration]
+    earliest_year = min(reg).year if reg else current_year - 5
+    earliest_year = min(earliest_year, current_year)
+    years = list(range(earliest_year, current_year + 2))
     preselect_est = request.args.get('est_id', type=int)
     preselect_cat = request.args.get('category')
     preselect_fy = request.args.get('fy', type=int)

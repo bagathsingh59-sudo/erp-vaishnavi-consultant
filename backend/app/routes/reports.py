@@ -15,6 +15,24 @@ import math
 reports_bp = Blueprint('reports', __name__)
 
 
+def _fy_year_choices(est, fy_start_year):
+    """Descending list of financial-year start years for a report's FY
+    dropdown. Reaches from the current FY (plus one future year) all the way
+    back to the establishment's commencement (date of registration), so old
+    clients (e.g. since 1980) can pick any historical FY. Always includes the
+    currently-selected FY. Falls back to 6 years when no registration date."""
+    now = datetime.now()
+    current_fy = now.year if now.month >= 4 else now.year - 1
+    if est and getattr(est, 'date_of_registration', None):
+        r = est.date_of_registration
+        earliest = r.year if r.month >= 4 else r.year - 1
+    else:
+        earliest = current_fy - 5
+    earliest = min(earliest, fy_start_year, current_fy)
+    newest = max(current_fy + 1, fy_start_year)   # allow one future FY
+    return list(range(newest, earliest - 1, -1))
+
+
 # Role-agnostic hook: let ?establishment=X in URL restore session when lost.
 # Works identically for admin and user — no role branches.
 @reports_bp.before_request
@@ -114,12 +132,19 @@ def quick_reports():
     now = datetime.now()
     current_year = now.year
 
-    # Available years: from earliest payroll (or 2019) up to current year
+    # Available years: from the establishment's commencement (date of
+    # registration) — or earliest payroll, whichever is older — up to the
+    # current year, so historical reports for old clients (e.g. since 1980)
+    # can be selected. Falls back to 2019 when nothing earlier is known.
+    candidates = [current_year]
     if payrolls:
-        earliest_year = min(p.year for p in payrolls)
-    else:
-        earliest_year = 2019
-    year_range = list(range(current_year, min(earliest_year, 2019) - 1, -1))
+        candidates.append(min(p.year for p in payrolls))
+    if est.date_of_registration:
+        candidates.append(est.date_of_registration.year)
+    if len(candidates) == 1:          # no payrolls and no registration date
+        candidates.append(2019)
+    earliest_year = min(candidates)
+    year_range = list(range(current_year, earliest_year - 1, -1))
 
     if request.method == 'POST':
         try:
@@ -3744,10 +3769,12 @@ def compliance_annual(est_id):
 
     generated_on = datetime.now().strftime('%d %b %Y, %I:%M %p')
 
+    fy_years = _fy_year_choices(est, fy_start_year)
     return render_template('reports/compliance_annual.html',
                            est=est, config=config,
                            fy_label=fy_label,
                            fy_start_year=fy_start_year,
+                           fy_years=fy_years,
                            monthly_data=monthly_data,
                            grand=grand,
                            generated_on=generated_on)
@@ -3850,10 +3877,12 @@ def ca_audit_report(est_id):
 
     generated_on = datetime.now().strftime('%d %b %Y, %I:%M %p')
 
+    fy_years = _fy_year_choices(est, fy_start_year)
     return render_template('reports/ca_audit.html',
                            est=est, config=config,
                            fy_label=fy_label,
                            fy_start_year=fy_start_year,
+                           fy_years=fy_years,
                            monthly_data=monthly_data,
                            grand=grand,
                            generated_on=generated_on)

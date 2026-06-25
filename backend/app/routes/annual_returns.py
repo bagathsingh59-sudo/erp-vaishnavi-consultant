@@ -180,13 +180,30 @@ def _latest_basic_da(est_id):
 def annual_returns_home():
     ests = user_establishments().order_by(Establishment.company_name).all()
     current_year = datetime.now().year
-    # EPF year choices: last 6 March-starting years
-    years = list(range(current_year - 5, current_year + 1))
     sel_est = request.args.get('establishment_id', type=int)
     sel_year = request.args.get('year', type=int) or (current_year - 1)
     est = Establishment.query.get(sel_est) if sel_est else None
     if est:
         verify_est_ownership(est)
+
+    # EPF contribution year choices (each a March-Feb year). The list must
+    # reach back to the establishment's commencement (date of registration),
+    # since some clients have records from FY 1980-81. When a single
+    # establishment is selected we use its own commencement; otherwise we use
+    # the earliest commencement among all visible establishments. Falls back
+    # to the last 6 years when no registration date is recorded.
+    earliest_year = None
+    if est and est.date_of_registration:
+        earliest_year = est.date_of_registration.year
+    elif not est:
+        reg = [e.date_of_registration for e in ests if e.date_of_registration]
+        if reg:
+            earliest_year = min(reg).year
+    if earliest_year is None:
+        earliest_year = current_year - 5
+    earliest_year = min(earliest_year, current_year, sel_year)
+    years = list(range(earliest_year, current_year + 1))
+
     return render_template('annual_returns/home.html',
                            establishments=ests, years=years,
                            sel_est=est, sel_year=sel_year,

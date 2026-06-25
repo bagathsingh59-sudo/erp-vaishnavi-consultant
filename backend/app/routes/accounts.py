@@ -151,7 +151,15 @@ def accounts_home():
     fy_options = []
     today = date.today()
     current_fy_start = today.year if today.month >= 4 else today.year - 1
-    for y in range(2025, current_fy_start + 2):
+    # Reach back to the earliest voucher's FY (in case any are backdated to
+    # old years) instead of a hardcoded floor, up to one future FY.
+    min_vdate = all_fy_years[0] if all_fy_years else None
+    if min_vdate:
+        earliest_fy = min_vdate.year if min_vdate.month >= 4 else min_vdate.year - 1
+    else:
+        earliest_fy = 2025
+    earliest_fy = min(earliest_fy, 2025, current_fy_start)
+    for y in range(earliest_fy, current_fy_start + 2):
         fy_options.append(f'{y}-{y+1}')
 
     # Summary calculations

@@ -362,7 +362,13 @@ def bonus_new():
         return redirect(url_for('bonus.bonus_view', run_id=run.id))
 
     current_year = datetime.now().year
-    years = list(range(current_year - 5, current_year + 1))
+    # Year choices reach back to the earliest establishment commencement
+    # (date of registration) so bonus runs for old clients (e.g. since 1980)
+    # can be created. Falls back to the last 6 years.
+    reg = [e.date_of_registration for e in ests if e.date_of_registration]
+    earliest_year = min(reg).year if reg else current_year - 5
+    earliest_year = min(earliest_year, current_year)
+    years = list(range(earliest_year, current_year + 1))
     return render_template('bonus/create.html', establishments=ests, years=years,
                            current_year=current_year)
 

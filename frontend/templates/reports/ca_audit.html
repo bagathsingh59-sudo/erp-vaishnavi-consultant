@@ -200,7 +200,7 @@
         </div>
         <div style="display:flex; gap:8px; align-items:center;">
             <select onchange="changeFY(this.value)">
-                {% for y in range(fy_start_year - 3, fy_start_year + 2) %}
+                {% for y in fy_years %}
                 <option value="{{ y }}" {{ 'selected' if y == fy_start_year else '' }}>
                     FY {{ y }}-{{ (y+1)|string }}
                 </option>
