@@ -368,6 +368,7 @@ def _epf_3a_excel(est, start_year, months, rows):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
+    from openpyxl.worksheet.pagebreak import Break
 
     wb = Workbook(); ws = wb.active; ws.title = "Form 3A"
     title_f = Font(bold=True, size=13, name='Calibri')
@@ -386,8 +387,9 @@ def _epf_3a_excel(est, start_year, months, rows):
     green  = PatternFill('solid', start_color='D9EAD3', end_color='D9EAD3')
 
     LAST = 6
+    n_members = len(rows)
     row = 1
-    for b in rows:
+    for idx, b in enumerate(rows):
         emp = b['employee']
         # Header per member
         ws.cell(row=row, column=1, value="FORM 3A").font = title_f
@@ -449,13 +451,28 @@ def _epf_3a_excel(est, start_year, months, rows):
             cell.font = bold; cell.fill = green; cell.alignment = right; cell.border = border
             cell.number_format = '#,##0'
         ws.cell(row=row, column=6, value='').fill = green; ws.cell(row=row, column=6).border = border
-        row += 3   # gap before next member's card
+        # `row` is now the TOTAL row of this member's card. Two member cards
+        # print per page: the 1st of each pair gets a small in-page gap, the
+        # 2nd ends the page with a manual page break so the next member always
+        # starts at the top of a fresh page (cards never split across pages).
+        is_last = (idx == n_members - 1)
+        second_of_pair = (idx % 2 == 1)
+        if not is_last:
+            if second_of_pair:
+                ws.row_breaks.append(Break(id=row))   # page break after this card
+                row += 1                              # next card → top of new page
+            else:
+                row += 3                              # gap, partner card same page
 
     widths = [14, 13, 15, 16, 14, 9]
     for i, w in enumerate(widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
     ws.page_setup.orientation = 'portrait'; ws.page_setup.paperSize = 9  # A4
+    # Fixed scale (no fit-to-page) so the two-cards-per-page manual breaks are
+    # always honoured; 92% leaves a safe margin for long names that wrap.
+    ws.page_setup.scale = 92
     ws.print_options.horizontalCentered = True
+    ws.print_area = f'A1:{get_column_letter(LAST)}{row}'
 
     out = io.BytesIO(); wb.save(out); out.seek(0)
     safe = (est.company_name or 'Est').replace(' ', '_').replace('/', '_')[:50]
