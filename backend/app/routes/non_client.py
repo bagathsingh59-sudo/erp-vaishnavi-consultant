@@ -43,6 +43,7 @@ from app import db
 from app.models.non_client import NonClientReturn
 from app.auth import login_required
 from app.user_context import current_user_id, is_admin
+from app.utils.naming import short_est_code
 
 non_client_bp = Blueprint('non_client', __name__)
 
@@ -1017,8 +1018,8 @@ def nc_download_template(record_id):
         flash(f'Could not generate template: {e}', 'danger')
         return redirect(url_for('non_client.nc_detail', record_id=record_id))
 
-    safe  = ''.join(c if c.isalnum() or c in ('_', '-') else '_' for c in rec.est_name)
-    fname = f'NCReturn_Template_{safe}_{rec.month:02d}{rec.year}.xlsx'
+    safe  = short_est_code(rec.est_name)
+    fname = f'NCReturn_{safe}_{rec.month:02d}{rec.year}.xlsx'
     return send_file(buf, as_attachment=True, download_name=fname,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
@@ -1100,8 +1101,8 @@ def nc_download_esic(record_id):
         flash(str(e), 'danger')
         return redirect(url_for('non_client.nc_detail', record_id=record_id))
 
-    safe  = ''.join(c if c.isalnum() or c in ('_', '-') else '_' for c in rec.est_name)
-    fname = f'MC_Template_{safe}_{rec.month:02d}{rec.year}.xls'
+    safe  = short_est_code(rec.est_name)
+    fname = f'MC_{safe}_{rec.month:02d}{rec.year}.xls'
     return send_file(buf, as_attachment=True, download_name=fname,
                      mimetype='application/vnd.ms-excel')
 
@@ -1343,10 +1344,10 @@ def _nc_statement_excel(rec, s, emp_rows):
     ws.print_title_rows = f'{gr}:{hr}'
 
     out = io.BytesIO(); wb.save(out); out.seek(0)
-    safe = ''.join(c if c.isalnum() or c in ('_', '-') else '_' for c in rec.est_name)[:50]
+    safe = short_est_code(rec.est_name)
     return send_file(out, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                      as_attachment=True,
-                     download_name=f"EPF_ESIC_Statement_{safe}_{rec.month:02d}{rec.year}.xlsx")
+                     download_name=f"EPF_ESIC_{safe}_{rec.month:02d}{rec.year}.xlsx")
 
 
 @non_client_bp.route('/non-client-returns/<int:record_id>/delete', methods=['POST'])

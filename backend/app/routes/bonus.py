@@ -10,6 +10,7 @@ from app.models.payroll import (MonthlyPayroll, PayrollEntry, PayrollEntryHead,
                                  SalaryHead, PayrollConfig)
 from app.user_context import (user_establishments, verify_est_ownership, current_user_id,
                                capture_est_from_url)
+from app.utils.naming import short_est_code
 from datetime import datetime, date
 import json
 import io
@@ -757,7 +758,7 @@ def bonus_form_c_excel(run_id):
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
-    safe_name = (run.establishment.company_name or 'Establishment').replace(' ', '_').replace('/', '_')[:60]
+    safe_name = short_est_code(run.establishment.company_name)
     filename = f"Form_C_{safe_name}_{run.fy_label.replace(' ', '_')}.xlsx"
     return send_file(output,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -898,7 +899,7 @@ def bonus_statement_excel(run_id):
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
-    filename = f"Bonus_Statement_{run.establishment.company_name}_{run.fy_label}.xlsx"
+    filename = f"BonusStmt_{short_est_code(run.establishment.company_name)}_{run.fy_label.replace(' ', '_')}.xlsx"
     return send_file(output,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                      as_attachment=True, download_name=filename)
@@ -1229,7 +1230,7 @@ def _build_vaishnavi_excel(run_id):
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
-    safe_name = (run.establishment.company_name or 'Establishment').replace(' ', '_').replace('/', '_')[:60]
+    safe_name = short_est_code(run.establishment.company_name)
     filename = f"Bonus_{safe_name}_{run.fy_label.replace(' ', '_')}.xlsx"
     return send_file(output,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

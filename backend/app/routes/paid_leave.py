@@ -28,6 +28,7 @@ from app.models.employee import Employee
 from app.models.payroll import MonthlyPayroll, PayrollEntry
 from app.user_context import (user_establishments, verify_est_ownership,
                               capture_est_from_url)
+from app.utils.naming import short_est_code
 
 paid_leave_bp = Blueprint('paid_leave', __name__)
 
@@ -569,8 +570,8 @@ def _build_pl_workbook(run, entries):
     out = io.BytesIO()
     wb.save(out)
     out.seek(0)
-    safe = (run.establishment.company_name or 'Establishment').replace(' ', '_').replace('/', '_')[:60]
-    filename = f"Paid_Leave_Statement_{safe}_{run.year}.xlsx"
+    safe = short_est_code(run.establishment.company_name)
+    filename = f"PaidLeave_{safe}_{run.year}.xlsx"
     return out, filename
 
 
@@ -784,8 +785,8 @@ def paid_leave_form15(run_id):
     out = io.BytesIO()
     wb.save(out)
     out.seek(0)
-    safe = (est.company_name or 'Establishment').replace(' ', '_').replace('/', '_')[:60]
-    filename = f"Form_15_Leave_Register_{safe}_{run.year}.xlsx"
+    safe = short_est_code(est.company_name)
+    filename = f"Form_15_{safe}_{run.year}.xlsx"
     return send_file(out,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                      as_attachment=True, download_name=filename)

@@ -24,6 +24,7 @@ from app.models.payroll import (MonthlyPayroll, PayrollEntry, PayrollEntryHead,
                                  PayrollConfig, SalaryHead)
 from app.user_context import (user_establishments, verify_est_ownership,
                               capture_est_from_url)
+from app.utils.naming import short_est_code
 
 annual_bp = Blueprint('annual_returns', __name__)
 
@@ -347,7 +348,7 @@ def _epf_6a_excel(est, start_year, months, rows):
     ws.print_title_rows = f'{hr}:{hr}'
 
     out = io.BytesIO(); wb.save(out); out.seek(0)
-    safe = (est.company_name or 'Est').replace(' ', '_').replace('/', '_')[:50]
+    safe = short_est_code(est.company_name)
     return send_file(out, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                      as_attachment=True, download_name=f"Form_6A_{safe}_{start_year}-{start_year+1}.xlsx")
 
@@ -475,7 +476,7 @@ def _epf_3a_excel(est, start_year, months, rows):
     ws.print_area = f'A1:{get_column_letter(LAST)}{row}'
 
     out = io.BytesIO(); wb.save(out); out.seek(0)
-    safe = (est.company_name or 'Est').replace(' ', '_').replace('/', '_')[:50]
+    safe = short_est_code(est.company_name)
     return send_file(out, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                      as_attachment=True, download_name=f"Form_3A_{safe}_{start_year}-{start_year+1}.xlsx")
 
@@ -635,9 +636,9 @@ def _gratuity_excel(est, rows, divisor, as_on):
     ws.print_title_rows = f'{hr}:{hr}'
 
     out = io.BytesIO(); wb.save(out); out.seek(0)
-    safe = (est.company_name or 'Est').replace(' ', '_').replace('/', '_')[:50]
+    safe = short_est_code(est.company_name)
     return send_file(out, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                     as_attachment=True, download_name=f"Gratuity_Liability_{safe}_{as_on.strftime('%Y%m%d')}.xlsx")
+                     as_attachment=True, download_name=f"Gratuity_{safe}_{as_on.strftime('%Y%m%d')}.xlsx")
 
 
 @annual_bp.route('/establishment/<int:est_id>/gratuity-form-f')
@@ -718,9 +719,9 @@ def gratuity_form_f(est_id):
     ws.page_setup.orientation = 'portrait'; ws.page_setup.paperSize = 9
 
     out = io.BytesIO(); wb.save(out); out.seek(0)
-    safe = (est.company_name or 'Est').replace(' ', '_').replace('/', '_')[:50]
+    safe = short_est_code(est.company_name)
     return send_file(out, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                     as_attachment=True, download_name=f"Gratuity_Form_F_{safe}.xlsx")
+                     as_attachment=True, download_name=f"Form_F_{safe}.xlsx")
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -846,6 +847,6 @@ def _lwf_excel(est, employees, year):
     ws.print_title_rows = f'{hr}:{hr}'
 
     out = io.BytesIO(); wb.save(out); out.seek(0)
-    safe = (est.company_name or 'Est').replace(' ', '_').replace('/', '_')[:50]
+    safe = short_est_code(est.company_name)
     return send_file(out, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                     as_attachment=True, download_name=f"LWF_Return_{safe}_{year}.xlsx")
+                     as_attachment=True, download_name=f"LWF_{safe}_{year}.xlsx")

@@ -7,6 +7,7 @@ from app.models.establishment import Establishment
 from app.models.employee import Employee
 from app.user_context import verify_est_ownership, capture_est_from_url
 from app.utils.date_helpers import current_wage_month
+from app.utils.naming import short_est_code
 from datetime import datetime
 import calendar
 import io
@@ -322,7 +323,7 @@ def form_b_excel(payroll_id):
     # Generate Excel
     output = _generate_form_b_excel(payroll, est, config, entries, rows, head_map)
 
-    filename = f"Form_B_{est.company_name}_{payroll.month_name}_{payroll.year}.xlsx"
+    filename = f"Form_B_{short_est_code(est.company_name)}_{calendar.month_abbr[payroll.month]}{payroll.year}.xlsx"
     return send_file(
         output,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -481,7 +482,7 @@ def form_d_excel(payroll_id):
 
     output = _generate_form_d_excel(payroll, est, config, attendance, num_days, rest_days, holiday_days)
 
-    filename = f"Form_D_{est.company_name}_{payroll.month_name}_{payroll.year}.xlsx"
+    filename = f"Form_D_{short_est_code(est.company_name)}_{calendar.month_abbr[payroll.month]}{payroll.year}.xlsx"
     return send_file(
         output,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -662,7 +663,7 @@ def form_d_2625_excel(payroll_id):
     else:
         prev_m_name = calendar.month_abbr[payroll.month - 1]
 
-    filename = f"Form_D_26-25_{est.company_name}_{prev_m_name}-{payroll.month_name}_{payroll.year}.xlsx"
+    filename = f"Form_D_{short_est_code(est.company_name)}_{prev_m_name}-{calendar.month_abbr[payroll.month]}{payroll.year}.xlsx"
     return send_file(
         output,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -762,7 +763,7 @@ def attendance_excel(payroll_id):
 
     output = _generate_attendance_excel(payroll, est, config, attendance, num_days, rest_days, holiday_days)
 
-    filename = f"Attendance_Register_{est.company_name}_{payroll.month_name}_{payroll.year}.xlsx"
+    filename = f"AttReg_{short_est_code(est.company_name)}_{calendar.month_abbr[payroll.month]}{payroll.year}.xlsx"
     return send_file(
         output,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -1074,8 +1075,8 @@ def form_a_excel(payroll_id):
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
-    safe_name = (est.company_name or 'Establishment').replace(' ', '_').replace('/', '_')[:60]
-    filename = f"Form_A_Employee_Register_{safe_name}_{payroll.month_name}_{payroll.year}.xlsx"
+    safe_name = short_est_code(est.company_name)
+    filename = f"Form_A_{safe_name}_{calendar.month_abbr[payroll.month]}{payroll.year}.xlsx"
     return send_file(
         output,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -1328,8 +1329,8 @@ def form_c_fines_excel(payroll_id):
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
-    safe_name = (est.company_name or 'Establishment').replace(' ', '_').replace('/', '_')[:60]
-    filename = f"Form_C_Fines_Register_{safe_name}_{payroll.month_name}_{payroll.year}.xlsx"
+    safe_name = short_est_code(est.company_name)
+    filename = f"Form_C_{safe_name}_{calendar.month_abbr[payroll.month]}{payroll.year}.xlsx"
     return send_file(
         output,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -2932,9 +2933,8 @@ def esic_excel(payroll_id):
         # (_generate_esic_xls) is kept as a fallback if ESIC rejects .xlsx.
         output = _generate_esic_xlsx(payroll, est, config, rows)
 
-        # Clean filename — remove special characters that may cause issues
-        safe_name = ''.join(c if c.isalnum() or c in ('_', '-') else '_' for c in est.company_name)
-        filename = f"MC_Template_{safe_name}_{payroll.month_name}_{payroll.year}.xlsx"
+        safe_name = short_est_code(est.company_name)
+        filename = f"MC_{safe_name}_{calendar.month_abbr[payroll.month]}{payroll.year}.xlsx"
         return send_file(output, as_attachment=True, download_name=filename,
                          mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     except Exception as e:

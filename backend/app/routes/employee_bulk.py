@@ -7,6 +7,7 @@ from app.models.payroll import (SalaryTemplate, SalaryTemplateHead, SalaryHead,
                                  PayrollEntry)
 from app.user_context import (get_user_est_ids, user_establishments, verify_est_ownership,
                                current_user_id, log_activity, is_admin)
+from app.utils.naming import short_est_code
 from datetime import datetime, date
 import io
 import csv
@@ -1704,7 +1705,7 @@ def active_member_sheet(est_id):
     wb.save(output)
     output.seek(0)
 
-    filename = f'ActiveMembers_{est.company_name.replace(" ", "_")}_{datetime.now().strftime("%d%m%Y")}.xlsx'
+    filename = f'ActiveMembers_{short_est_code(est.company_name)}_{datetime.now().strftime("%d%m%Y")}.xlsx'
     return send_file(output, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                      as_attachment=True, download_name=filename)
 

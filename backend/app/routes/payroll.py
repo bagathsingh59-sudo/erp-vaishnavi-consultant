@@ -15,6 +15,7 @@ from app.user_context import (current_user_id, is_admin, user_establishments,
                                verify_est_ownership, get_user_est_ids, log_activity,
                                capture_est_from_url)
 from app.utils.date_helpers import current_wage_month
+from app.utils.naming import short_est_code
 
 payroll_bp = Blueprint('payroll', __name__)
 
@@ -3137,7 +3138,7 @@ def download_attendance_template(payroll_id):
     wb.save(output)
     output.seek(0)
 
-    filename = f'Attendance_{est.company_name.replace(" ", "_")}_{payroll.period_display.replace(" ", "_")}.xlsx'
+    filename = f'Attendance_{short_est_code(est.company_name)}_{payroll.period_display.replace(" ", "_")}.xlsx'
     return send_file(
         output,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -4176,7 +4177,7 @@ def download_universal_template(payroll_id):
     wb.save(output)
     output.seek(0)
 
-    filename = f'Universal_Template_{est.company_name.replace(" ", "_")}.xlsx'
+    filename = f'UnivTemplate_{short_est_code(est.company_name)}.xlsx'
     return send_file(
         output,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
