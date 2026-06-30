@@ -91,15 +91,6 @@
     })();
     </script>
 
-    <!-- Clerk JS (for session management on all pages) -->
-    {% if config.CLERK_PUBLISHABLE_KEY and not config.CLERK_PUBLISHABLE_KEY.startswith('pk_test_XXXX') %}
-    <script
-        async
-        crossorigin="anonymous"
-        data-clerk-publishable-key="{{ config.CLERK_PUBLISHABLE_KEY }}"
-        src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js">
-    </script>
-    {% endif %}
 </head>
 <body>
 
@@ -705,7 +696,11 @@
                     </div><!-- /panel -->
                 </div><!-- /themeSwitcherWrap -->
 
-                <a href="{{ url_for('auth.logout_page') }}" class="btn btn-sm btn-outline-secondary ms-2 no-print"
+                <a href="{{ url_for('auth.change_password') }}" class="btn btn-sm btn-outline-secondary ms-2 no-print"
+                   style="font-size:0.65rem; padding:2px 10px; border-radius:12px;" title="Change password">
+                    <i class="bi bi-key"></i>
+                </a>
+                <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-secondary ms-2 no-print"
                    style="font-size:0.65rem; padding:2px 10px; border-radius:12px;" title="Logout"
                    onclick="return confirm('Are you sure you want to logout?');">
                     <i class="bi bi-box-arrow-right"></i>
@@ -1319,22 +1314,19 @@
         });
     </script>
 
-    <!-- Clerk Session Monitor & Form Protection -->
-    {% if config.CLERK_PUBLISHABLE_KEY and not config.CLERK_PUBLISHABLE_KEY.startswith('pk_test_XXXX') %}
+    <!-- Unsaved-changes guard -->
     <script>
     (function(){
-        // Track if user has modified any form (so we don't wipe their data)
+        // Warn before navigating away if the user has edited an unsaved form.
+        // (Auth/token refresh is handled transparently server-side via the
+        //  access + refresh cookies — no client-side session monitor needed.)
         var _formDirty = false;
         document.addEventListener('input', function(e){
-            // Only mark dirty if the input is inside an actual <form> with a submit button
-            // (skip search boxes, filters, and other non-form inputs)
             if(e.target && e.target.form && e.target.form.querySelector('button[type="submit"], input[type="submit"]')){
                 _formDirty = true;
             }
         }, true);
-        // Reset dirty flag when form is submitted (so no popup after saving)
         document.addEventListener('submit', function(){ _formDirty = false; }, true);
-        // Warn before navigating away if form is dirty
         window.addEventListener('beforeunload', function(e){
             if(_formDirty){
                 e.preventDefault();
@@ -1342,83 +1334,8 @@
                 return e.returnValue;
             }
         });
-
-        // Give up waiting for Clerk after 30 attempts (30 seconds)
-        var attempts = 0;
-        var checkInterval = setInterval(function(){
-            attempts++;
-            if(attempts > 30){
-                clearInterval(checkInterval);
-                console.warn('Clerk JS did not load within 30s — continuing without session monitor');
-                return;
-            }
-            if(window.Clerk && window.Clerk.loaded){
-                clearInterval(checkInterval);
-
-                // Monitor session state — but DO NOT redirect on transient token refreshes.
-                // Only redirect if user is clearly signed out AND not editing a form.
-                // The server-side grace period (8h) will handle auth; we just keep the
-                // browser on the current page so form data isn't wiped.
-                var _signOutCheckTimer = null;
-                window.Clerk.addListener(function(){
-                    // Debounce: wait 5s to confirm sign-out is real, not a transient refresh
-                    if(_signOutCheckTimer) clearTimeout(_signOutCheckTimer);
-                    if(!window.Clerk.user){
-                        _signOutCheckTimer = setTimeout(function(){
-                            // Re-check after 5s. If still signed out AND form is clean, redirect.
-                            if(!window.Clerk.user && !_formDirty){
-                                window.location.href = '/login';
-                            } else if(!window.Clerk.user && _formDirty){
-                                // Form dirty — show warning banner instead of wiping data
-                                if(!document.getElementById('_clerkWarnBanner')){
-                                    var b = document.createElement('div');
-                                    b.id = '_clerkWarnBanner';
-                                    b.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#fbbf24;color:#78350f;padding:10px 16px;text-align:center;font-weight:600;font-size:0.85rem;z-index:99999;box-shadow:0 2px 8px rgba(0,0,0,0.15);';
-                                    b.innerHTML = '⚠ Your session expired. Please <a href="/login" style="color:#1e3a8a;text-decoration:underline;">re-login in a new tab</a> and then come back and submit your form. Your data is safe.';
-                                    document.body.appendChild(b);
-                                }
-                            }
-                        }, 5000);
-                    }
-                });
-
-                // ── FORM PROTECTION: Refresh Clerk token before any form submit ──
-                // Clerk JWTs expire every ~60 seconds. If a user spends more time
-                // filling a form, the JWT may be expired when they click Submit.
-                // This intercepts all form submissions, refreshes the token first,
-                // then submits the form with a fresh JWT cookie.
-                document.addEventListener('submit', function(e){
-                    var form = e.target;
-                    // Skip if already refreshed (prevent infinite loop)
-                    if(form.dataset.clerkRefreshed === 'true') return;
-                    // Only intercept POST forms (not GET search forms)
-                    if(form.method && form.method.toUpperCase() !== 'POST') return;
-
-                    e.preventDefault();
-
-                    // Try to get a fresh session token from Clerk
-                    if(window.Clerk.session && window.Clerk.session.getToken){
-                        window.Clerk.session.getToken().then(function(token){
-                            // Token refreshed — cookie updated automatically by Clerk
-                            form.dataset.clerkRefreshed = 'true';
-                            form.submit();
-                        }).catch(function(err){
-                            console.warn('Clerk token refresh failed:', err);
-                            // Submit anyway — server-side session fallback will handle it
-                            form.dataset.clerkRefreshed = 'true';
-                            form.submit();
-                        });
-                    } else {
-                        // No session — submit anyway (server handles redirect)
-                        form.dataset.clerkRefreshed = 'true';
-                        form.submit();
-                    }
-                }, true); // Use capture phase to intercept before other handlers
-            }
-        }, 1000);
     })();
     </script>
-    {% endif %}
 
     <!-- Global EPF Delay Calculator Script -->
     <script>

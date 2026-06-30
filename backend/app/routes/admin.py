@@ -2,20 +2,34 @@
 Admin User Management Routes
 ==============================
 Allows admins to:
-- View all registered users (synced from Clerk)
+- View all staff/users with their roles, admin linkage, and status
+- Create new user/staff accounts (email + temporary password)
+- Reset a user's password
 - Link users to their admin (assign admin_id)
 - Promote user → admin or demote admin → user
 - Activate / deactivate users
 - Unlink users (remove admin_id)
-- Force sync users from Clerk
 """
 
+import secrets
 from flask import Blueprint, render_template, request, redirect, url_for, flash, g, jsonify
 from app import db
 from app.models.app_user import AppUser
-from app.auth import admin_required, fetch_all_clerk_users, sync_all_users_from_clerk
+from app.auth import admin_required
+from app.jwt_auth import revoke_all_for_user
 from app.user_context import current_user_id, is_admin, log_activity
 from datetime import datetime
+
+
+def _new_user_uid():
+    """Generate a fresh canonical user uid for a brand-new account."""
+    return f"usr_{secrets.token_hex(12)}"
+
+
+def _generate_temp_password():
+    """Human-typable temporary password (no ambiguous chars)."""
+    alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+    return 'Vp' + ''.join(secrets.choice(alphabet) for _ in range(8))
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -30,33 +44,9 @@ def require_admin():
 
 @admin_bp.route('/users')
 def user_list():
-    """
-    List all users with their roles, admin linkage, and status.
-    Auto-syncs from Clerk on every page load (cached 10 min).
-    """
-    # ── Sync from Clerk (cached — won't hit API if called within 10 min) ──
-    updated, created, total_clerk = sync_all_users_from_clerk()
-    if created > 0:
-        flash(f'{created} new user(s) synced from Clerk.', 'info')
-
-    # ── Fetch Clerk data for extra info (image, last sign-in) ──
-    clerk_users = fetch_all_clerk_users()
-    clerk_map = {cu['user_id']: cu for cu in clerk_users}
-
+    """List all users with their roles, admin linkage, and status."""
     users = AppUser.query.order_by(AppUser.role.desc(), AppUser.created_at).all()
     admins = AppUser.query.filter_by(role='admin', is_active=True).all()
-
-    # Enrich users with Clerk data
-    for user in users:
-        cu = clerk_map.get(user.clerk_user_id, {})
-        user._clerk_image = cu.get('image_url', '')
-        user._clerk_last_sign_in = None
-        if cu.get('last_sign_in_at'):
-            try:
-                # Clerk sends milliseconds timestamp
-                user._clerk_last_sign_in = datetime.fromtimestamp(cu['last_sign_in_at'] / 1000)
-            except (ValueError, TypeError, OSError):
-                pass
 
     # Stats
     total_users = len(users)
@@ -72,19 +62,72 @@ def user_list():
                            admin_count=admin_count,
                            user_count=user_count,
                            active_count=active_count,
-                           unlinked_count=unlinked_count,
-                           total_clerk=total_clerk)
+                           unlinked_count=unlinked_count)
 
 
-@admin_bp.route('/users/sync', methods=['POST'])
-def force_sync():
-    """Force re-sync all users from Clerk (clears cache)"""
-    # Clear cache to force fresh API call
-    fetch_all_clerk_users._cache = None
-    fetch_all_clerk_users._cached_at = 0
+@admin_bp.route('/users/create', methods=['POST'])
+def create_user():
+    """Create a new staff/user account with a temporary password.
+    The new user must change their password on first login."""
+    name = (request.form.get('name') or '').strip()
+    email = (request.form.get('email') or '').strip().lower()
+    role = (request.form.get('role') or 'user').strip()
+    password = (request.form.get('password') or '').strip()
 
-    updated, created, total = sync_all_users_from_clerk()
-    flash(f'Clerk sync complete: {total} Clerk users found, {updated} updated, {created} new.', 'success')
+    if role not in ('admin', 'user'):
+        role = 'user'
+    if not email or '@' not in email:
+        flash('A valid email is required to create a user.', 'danger')
+        return redirect(url_for('admin.user_list'))
+
+    existing = AppUser.query.filter(db.func.lower(AppUser.email) == email).first()
+    if existing:
+        flash(f'A user with email {email} already exists.', 'warning')
+        return redirect(url_for('admin.user_list'))
+
+    temp_password = password or _generate_temp_password()
+    user = AppUser(
+        clerk_user_id=_new_user_uid(),
+        role=role,
+        name=name or email.split('@')[0],
+        email=email,
+        must_change_password=True,
+        is_active=True,
+    )
+    user.set_password(temp_password)
+    user.temp_password = temp_password   # visible to admin until first change
+    db.session.add(user)
+    db.session.commit()
+
+    log_activity('create_user', 'AppUser', entity_id=user.id,
+                 entity_name=user.name, details=f'Created {role} account')
+    db.session.commit()
+    flash(f'User "{user.name}" created. Login: {email} — Temporary password: '
+          f'{temp_password} (they must change it on first login).', 'success')
+    return redirect(url_for('admin.user_list'))
+
+
+@admin_bp.route('/users/<int:user_id>/reset-password', methods=['POST'])
+def reset_password(user_id):
+    """Reset a user's password to a new temporary one (forces change on login)
+    and revoke all their active sessions."""
+    user = AppUser.query.get_or_404(user_id)
+    new_password = (request.form.get('new_password') or '').strip() or _generate_temp_password()
+    if len(new_password) < 8:
+        flash('Password must be at least 8 characters.', 'danger')
+        return redirect(url_for('admin.user_list'))
+
+    user.set_password(new_password)
+    user.must_change_password = True
+    user.temp_password = new_password   # visible to admin until first change
+    db.session.commit()
+    revoke_all_for_user(user.clerk_user_id)   # log them out everywhere
+
+    log_activity('reset_password', 'AppUser', entity_id=user.id,
+                 entity_name=user.name, details='Password reset by admin')
+    db.session.commit()
+    flash(f'Password for "{user.name}" reset to: {new_password} '
+          f'(they must change it on next login).', 'success')
     return redirect(url_for('admin.user_list'))
 
 
@@ -208,18 +251,10 @@ def toggle_active(user_id):
 
 @admin_bp.route('/users/<int:user_id>/details')
 def user_details(user_id):
-    """Get user details as JSON (for modals/AJAX) — enriched with Clerk data."""
+    """Get user details as JSON (for modals/AJAX)."""
     user = AppUser.query.get_or_404(user_id)
 
-    # Get Clerk data for this user
-    clerk_users = fetch_all_clerk_users()
-    clerk_data = {}
-    for cu in clerk_users:
-        if cu['user_id'] == user.clerk_user_id:
-            clerk_data = cu
-            break
-
-    # Count establishments and employees
+    # Count establishments and employees owned by this user
     from app.models.establishment import Establishment
     est_count = Establishment.query.filter_by(owner_id=user.clerk_user_id).count()
 
@@ -227,14 +262,9 @@ def user_details(user_id):
     est_ids = [e.id for e in Establishment.query.filter_by(owner_id=user.clerk_user_id).with_entities(Establishment.id).all()]
     emp_count = Employee.query.filter(Employee.establishment_id.in_(est_ids)).count() if est_ids else 0
 
-    # Last sign-in from Clerk
     last_sign_in = ''
-    if clerk_data.get('last_sign_in_at'):
-        try:
-            dt = datetime.fromtimestamp(clerk_data['last_sign_in_at'] / 1000)
-            last_sign_in = dt.strftime('%d %b %Y, %I:%M %p')
-        except (ValueError, TypeError, OSError):
-            pass
+    if user.last_login_at:
+        last_sign_in = user.last_login_at.strftime('%d %b %Y, %I:%M %p')
 
     return jsonify({
         'id': user.id,
@@ -245,7 +275,8 @@ def user_details(user_id):
         'admin_id': user.admin_id,
         'admin_name': user.admin.name if user.admin else None,
         'clerk_user_id': user.clerk_user_id,
-        'image_url': clerk_data.get('image_url', ''),
+        'image_url': '',
+        'temp_password': user.temp_password or '',
         'last_sign_in': last_sign_in,
         'created_at': user.created_at.strftime('%d %b %Y, %I:%M %p') if user.created_at else '',
         'updated_at': user.updated_at.strftime('%d %b %Y, %I:%M %p') if user.updated_at else '',

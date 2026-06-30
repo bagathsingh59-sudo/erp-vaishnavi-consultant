@@ -67,9 +67,11 @@ def create_app():
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
-    # Clerk Authentication Config (Clerk manages all token/session handling)
-    app.config['CLERK_PUBLISHABLE_KEY'] = os.getenv('CLERK_PUBLISHABLE_KEY', '')
-    app.config['CLERK_SECRET_KEY'] = os.getenv('CLERK_SECRET_KEY', '')
+    # Self-hosted JWT auth config (replaces Clerk). All token behaviour is
+    # driven by env vars read at runtime in app/jwt_auth.py — these entries are
+    # surfaced on app.config only for visibility/diagnostics.
+    app.config['JWT_ACCESS_TTL_MIN'] = os.getenv('JWT_ACCESS_TTL_MIN', '30')
+    app.config['JWT_REFRESH_TTL_DAYS'] = os.getenv('JWT_REFRESH_TTL_DAYS', '14')
 
     # Initialize extensions
     db.init_app(app)
@@ -145,13 +147,12 @@ def create_app():
             db.session.rollback()
         db.session.remove()
 
-    # Initialize Clerk Authentication.
+    # Initialize self-hosted JWT authentication (email + password).
     # NOTE: there is intentionally NO automated `/` → landing redirect any more.
     # The bare `/` is owned by the `marketing.home` route which serves the
     # public landing template directly to every visitor (anonymous AND staff).
-    # Staff click the "Staff Sign In" button in the landing nav to hit
-    # `/login` and go through Clerk; the existing post-login redirect
-    # then lands them on `/dashboard` (moved from `/`).
+    # Staff click the "Staff Sign In" button in the landing nav to hit `/login`;
+    # the post-login redirect then lands them on `/dashboard`.
     from app.auth import init_auth
     init_auth(app)
 
@@ -432,6 +433,7 @@ def create_app():
         from app.models.accounts import AccountGroup, AccountHead, Voucher, VoucherEntry
         from app.models.activity_log import ActivityLog
         from app.models.app_user import AppUser
+        from app.models.auth_token import RefreshToken   # self-hosted JWT refresh tokens
         from app.models.daily_mis import DailyMISEntry
         from app.models.bonus import BonusRun, BonusEntry
         from app.models.vault import VaultFile
@@ -451,6 +453,17 @@ def create_app():
 
         # Seed any newly added account heads for existing DBs
         _seed_missing_account_heads()
+
+        # Password Generator (env-gated, like a seeder): one-shot Clerk → JWT
+        # credential migration. Runs only when PASSWORD_GENERATOR is truthy.
+        # Idempotent — only touches users that have no password yet.
+        try:
+            from app.password_generator import password_generator_enabled, run_password_generator
+            if password_generator_enabled():
+                print('[PWGEN] PASSWORD_GENERATOR enabled — running credential migration…')
+                run_password_generator(db)
+        except Exception as _pwgen_err:
+            app.logger.warning(f'[PWGEN] skipped due to error: {_pwgen_err}')
 
     # ── Scheduled auto-backup every 15 days ───────────────────────────
     _start_backup_scheduler(app)
@@ -816,6 +829,45 @@ def _auto_migrate_columns(db):
         db.session.commit()
     except Exception:
         db.session.rollback()
+
+    # ── Self-hosted JWT auth: credential columns + refresh-token table ───────
+    # Adds the password fields to the existing app_users table and creates the
+    # refresh-token store. Idempotent (ADD COLUMN IF NOT EXISTS / CREATE IF NOT
+    # EXISTS), so safe to run on every boot.
+    for ddl in [
+        "ALTER TABLE app_users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)",
+        "ALTER TABLE app_users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE app_users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP",
+        "ALTER TABLE app_users ADD COLUMN IF NOT EXISTS temp_password VARCHAR(100)",
+    ]:
+        try:
+            db.session.execute(db.text(ddl))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"  [MIGRATE] {ddl.split(' ADD ')[0]}: {e}")
+    try:
+        db.session.execute(db.text("""
+            CREATE TABLE IF NOT EXISTS auth_refresh_tokens (
+                id          SERIAL PRIMARY KEY,
+                user_uid    VARCHAR(100) NOT NULL,
+                token_hash  VARCHAR(64)  NOT NULL UNIQUE,
+                issued_at   TIMESTAMP    NOT NULL DEFAULT NOW(),
+                expires_at  TIMESTAMP    NOT NULL,
+                revoked     BOOLEAN      NOT NULL DEFAULT FALSE,
+                replaced_by VARCHAR(64),
+                user_agent  VARCHAR(255),
+                ip          VARCHAR(64)
+            )
+        """))
+        db.session.execute(db.text(
+            "CREATE INDEX IF NOT EXISTS ix_auth_refresh_tokens_user_uid "
+            "ON auth_refresh_tokens (user_uid)"
+        ))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"  [MIGRATE] auth_refresh_tokens: {e}")
 
 
 def _seed_default_accounts():

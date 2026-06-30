@@ -63,12 +63,10 @@
         <div class="d-flex gap-2 align-items-center">
             <input type="text" id="userSearch" class="form-control form-control-sm" placeholder="Search users..."
                    style="width:200px; font-size:0.78rem; border-radius:8px;" onkeyup="filterUsers()">
-            <form method="POST" action="{{ url_for('admin.force_sync') }}" class="d-inline">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-sm btn-outline-info" style="font-size:0.72rem; border-radius:8px;" title="Force refresh from Clerk">
-                    <i class="bi bi-arrow-repeat me-1"></i>Sync Clerk
-                </button>
-            </form>
+            <button type="button" class="btn btn-sm btn-primary" style="font-size:0.72rem; border-radius:8px;"
+                    data-bs-toggle="modal" data-bs-target="#createUserModal" title="Create a new staff/user account">
+                <i class="bi bi-person-plus me-1"></i>New User
+            </button>
         </div>
     </div>
 
@@ -93,10 +91,6 @@
                     <td style="padding:12px 16px; font-size:0.78rem; color:#94a3b8;">{{ loop.index }}</td>
                     <td style="padding:12px 16px;">
                         <div class="d-flex align-items-center gap-2">
-                            {% if user._clerk_image %}
-                            <img src="{{ user._clerk_image }}" alt="{{ user.name }}"
-                                 style="width:36px; height:36px; border-radius:50%; object-fit:cover; border:2px solid {% if user.role == 'admin' %}#dc2626{% else %}#4f46e5{% endif %};">
-                            {% else %}
                             <div style="width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:0.8rem; color:white;
                                 {% if user.role == 'admin' %}
                                 background:linear-gradient(135deg,#dc2626,#ef4444);
@@ -106,7 +100,6 @@
                             ">
                                 {{ user.name[0]|upper if user.name else 'U' }}
                             </div>
-                            {% endif %}
                             <div>
                                 <div style="font-size:0.82rem; font-weight:600; color:#1e293b;">
                                     {{ user.name or 'Unnamed' }}
@@ -115,6 +108,11 @@
                                     {% endif %}
                                 </div>
                                 <div style="font-size:0.7rem; color:#94a3b8;">{{ user.email or 'No email' }}</div>
+                                {% if user.temp_password %}
+                                <div style="font-size:0.66rem; color:#b45309; margin-top:2px;" title="Temporary password — give this to the user; it disappears once they change it.">
+                                    <i class="bi bi-key-fill"></i> Temp: <code style="background:#fffbeb; padding:1px 5px; border-radius:4px; border:1px solid #fde68a; color:#92400e;">{{ user.temp_password }}</code>
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
                     </td>
@@ -169,9 +167,9 @@
                         {% endif %}
                     </td>
                     <td style="padding:12px 16px; font-size:0.73rem; color:#64748b;">
-                        {% if user._clerk_last_sign_in %}
-                        {{ user._clerk_last_sign_in.strftime('%d %b %Y') }}
-                        <br><span style="font-size:0.65rem; color:#94a3b8;">{{ user._clerk_last_sign_in.strftime('%I:%M %p') }}</span>
+                        {% if user.last_login_at %}
+                        {{ user.last_login_at.strftime('%d %b %Y') }}
+                        <br><span style="font-size:0.65rem; color:#94a3b8;">{{ user.last_login_at.strftime('%I:%M %p') }}</span>
                         {% else %}
                         <span style="color:#94a3b8;">Never</span>
                         {% endif %}
@@ -226,6 +224,15 @@
                             </form>
                             {% endif %}
 
+                            <!-- Reset Password -->
+                            <form method="POST" action="{{ url_for('admin.reset_password', user_id=user.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-info" style="font-size:0.65rem; padding:2px 8px; border-radius:6px;"
+                                        title="Reset password" onclick="return confirm('Reset password for {{ user.name }}? A new temporary password will be shown and they must change it on next login.')">
+                                    <i class="bi bi-key"></i>
+                                </button>
+                            </form>
+
                             <!-- Toggle Active/Inactive -->
                             {% if user.clerk_user_id != clerk_user.user_id %}
                             <form method="POST" action="{{ url_for('admin.toggle_active', user_id=user.id) }}" class="d-inline">
@@ -252,13 +259,62 @@
                 <tr>
                     <td colspan="9" class="text-center" style="padding:40px; color:#94a3b8;">
                         <i class="bi bi-people" style="font-size:2rem; display:block; margin-bottom:8px;"></i>
-                        No users registered yet.<br>
-                        <small>Users appear here after they log in via Clerk for the first time.</small>
+                        No users yet.<br>
+                        <small>Click <strong>New User</strong> to create the first staff/admin account.</small>
                     </td>
                 </tr>
                 {% endif %}
             </tbody>
         </table>
+    </div>
+</div>
+
+<!-- Create User Modal -->
+<div class="modal fade" id="createUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border:none; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,0.15);">
+            <div class="modal-header" style="border-bottom:1px solid #f1f5f9; padding:16px 20px;">
+                <h6 class="modal-title" style="font-weight:600; font-size:0.9rem;">
+                    <i class="bi bi-person-plus text-primary me-1"></i>Create New User
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" style="font-size:0.7rem;"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin.create_user') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body" style="padding:20px;">
+                    <p style="font-size:0.78rem; color:#64748b; margin-bottom:16px;">
+                        The new user signs in with their email. Leave the password blank to
+                        auto-generate a temporary one — it will be shown to you once. They must
+                        set their own password on first login.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:0.78rem; font-weight:600;">Full Name</label>
+                        <input type="text" name="name" class="form-control" style="font-size:0.85rem; border-radius:8px;" placeholder="e.g. Ramesh Kumar">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:0.78rem; font-weight:600;">Email (login) <span class="text-danger">*</span></label>
+                        <input type="email" name="email" class="form-control" required style="font-size:0.85rem; border-radius:8px;" placeholder="user@example.com">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:0.78rem; font-weight:600;">Role</label>
+                        <select name="role" class="form-select" style="font-size:0.85rem; border-radius:8px;">
+                            <option value="user" selected>User (staff)</option>
+                            <option value="admin">Admin (full access)</option>
+                        </select>
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label" style="font-size:0.78rem; font-weight:600;">Temporary Password <span class="text-muted" style="font-weight:400;">(optional)</span></label>
+                        <input type="text" name="password" class="form-control" style="font-size:0.85rem; border-radius:8px;" placeholder="Leave blank to auto-generate">
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top:1px solid #f1f5f9; padding:12px 20px;">
+                    <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal" style="font-size:0.78rem; border-radius:8px;">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-primary" style="font-size:0.78rem; border-radius:8px;">
+                        <i class="bi bi-person-plus me-1"></i>Create User
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
@@ -382,7 +438,7 @@ function viewUserDetails(userId) {
                 <div style="background:#f8fafc; border-radius:10px; padding:14px 16px; font-size:0.78rem;">
                     <div class="row g-2">
                         <div class="col-6">
-                            <div style="color:#94a3b8; font-size:0.68rem; text-transform:uppercase;">Clerk ID</div>
+                            <div style="color:#94a3b8; font-size:0.68rem; text-transform:uppercase;">User ID</div>
                             <div style="font-weight:500; word-break:break-all; font-size:0.72rem;">${d.clerk_user_id}</div>
                         </div>
                         <div class="col-6">

@@ -7,48 +7,15 @@
 
     <!-- SEO meta tags -->
     <meta name="description" content="Vaishnavi Consultant ERP — secure login for payroll consultancy staff. EPF & ESIC compliance, monthly returns, wage register (Form B), pay slips, statutory audits for Karnataka establishments.">
-    <meta name="keywords" content="Vaishnavi Consultant, payroll consultant Karnataka, EPF compliance, ESIC compliance, Form B wage register, payroll ERP, statutory returns">
     <meta name="author" content="Vaishnavi Consultant">
     <link rel="canonical" href="https://erp.srivenkateshwara.in/auth/login">
-
-    <!-- Open Graph -->
-    <meta property="og:type" content="website">
-    <meta property="og:site_name" content="Vaishnavi Consultant ERP">
-    <meta property="og:title" content="Vaishnavi Consultant ERP — Payroll & Compliance">
-    <meta property="og:description" content="Internal payroll-compliance ERP for Vaishnavi Consultant staff. EPF/ESIC, wage registers, pay slips, statutory returns.">
-    <meta property="og:url" content="https://erp.srivenkateshwara.in/">
-    <meta property="og:locale" content="en_IN">
-
-    <!-- Twitter card -->
-    <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Vaishnavi Consultant ERP">
-    <meta name="twitter:description" content="Payroll & compliance ERP — login required.">
-
-    <!-- Crawler hints — let Google index this login page; everything else is robots.txt-blocked -->
     <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">
-
-    <!-- Google Search Console: paste the HTML-tag verification code below if you
-         didn't verify via DNS.  Safe to leave commented out. -->
-    {# <meta name="google-site-verification" content="YOUR-CODE-HERE"> #}
 
     <link rel="icon" type="image/svg+xml" href="/static/img/namam.svg">
     <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">
 
-    <!-- JSON-LD: Organization schema -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "Organization",
-      "name": "Vaishnavi Consultant",
-      "url": "https://erp.srivenkateshwara.in/",
-      "description": "Payroll-compliance consultancy in Karnataka — EPF, ESIC, statutory returns, wage register (Form B), pay-slip generation, audits.",
-      "areaServed": { "@type": "AdministrativeArea", "name": "Karnataka, India" }
-    }
-    </script>
-
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-
     <!-- Bootstrap Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 
@@ -64,137 +31,77 @@
             position: relative;
             overflow: hidden;
         }
-
-        /* Background decoration */
         body::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -30%;
-            width: 800px;
-            height: 800px;
-            border-radius: 50%;
+            content: ''; position: absolute; top: -50%; right: -30%;
+            width: 800px; height: 800px; border-radius: 50%;
             background: radial-gradient(circle, rgba(79,70,229,0.15) 0%, transparent 70%);
         }
         body::after {
-            content: '';
-            position: absolute;
-            bottom: -40%;
-            left: -20%;
-            width: 600px;
-            height: 600px;
-            border-radius: 50%;
+            content: ''; position: absolute; bottom: -40%; left: -20%;
+            width: 600px; height: 600px; border-radius: 50%;
             background: radial-gradient(circle, rgba(124,58,237,0.1) 0%, transparent 70%);
         }
-
-        .login-container {
-            position: relative;
-            z-index: 10;
-            width: 100%;
-            max-width: 440px;
-            padding: 20px;
-        }
-
-        /* Branding */
-        .brand-section {
-            text-align: center;
-            margin-bottom: 32px;
-        }
+        .login-container { position: relative; z-index: 10; width: 100%; max-width: 420px; padding: 20px; }
+        .brand-section { text-align: center; margin-bottom: 28px; }
         .brand-icon {
-            width: 72px;
-            height: 72px;
-            border-radius: 18px;
-            background: linear-gradient(135deg, #4f46e5, #7c3aed);
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 16px;
-            box-shadow: 0 8px 32px rgba(79,70,229,0.4);
+            width: 72px; height: 72px; border-radius: 18px;
+            display: inline-flex; align-items: center; justify-content: center; margin-bottom: 14px;
         }
-        .brand-icon i {
-            font-size: 2rem;
-            color: #fff;
-        }
-        .brand-name {
-            font-size: 1.5rem;
-            font-weight: 800;
-            color: #fff;
-            letter-spacing: -0.5px;
-        }
-        .brand-subtitle {
-            font-size: 0.78rem;
-            color: #94a3b8;
-            margin-top: 4px;
-        }
+        .brand-name { font-size: 1.5rem; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
+        .brand-subtitle { font-size: 0.78rem; color: #94a3b8; margin-top: 4px; }
 
-        /* Clerk widget container */
-        .clerk-container {
-            background: #fff;
-            border-radius: 16px;
-            padding: 32px 28px;
+        .login-card {
+            background: #fff; border-radius: 16px; padding: 30px 28px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            min-height: 200px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
+        .login-card h2 { font-size: 1.05rem; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+        .login-card .sub { font-size: 0.78rem; color: #64748b; margin-bottom: 20px; }
 
-        /* Loading state */
-        .clerk-loading {
-            text-align: center;
-            color: #64748b;
+        .field { margin-bottom: 16px; }
+        .field label { display:block; font-size: 0.74rem; font-weight: 600; color: #334155; margin-bottom: 6px; }
+        .input-wrap { position: relative; }
+        .input-wrap i {
+            position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+            color: #94a3b8; font-size: 0.95rem;
         }
-        .clerk-loading .spinner {
-            width: 36px;
-            height: 36px;
-            border: 3px solid #e2e8f0;
-            border-top-color: #4f46e5;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            margin: 0 auto 12px;
+        .field input {
+            width: 100%; padding: 11px 12px 11px 38px; font-size: 0.9rem;
+            border: 1.5px solid #e2e8f0; border-radius: 10px; font-family: inherit;
+            transition: border-color 0.15s, box-shadow 0.15s;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        .field input:focus {
+            outline: none; border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,0.12);
+        }
+        .toggle-pw {
+            position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+            background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 0.95rem; padding: 4px;
+        }
+        .btn-login {
+            width: 100%; padding: 12px; border: none; border-radius: 10px;
+            background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff;
+            font-size: 0.92rem; font-weight: 700; cursor: pointer; margin-top: 4px;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .btn-login:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(79,70,229,0.35); }
 
-        /* Dev mode notice */
-        .dev-notice {
-            background: rgba(250,204,21,0.1);
-            border: 1px solid rgba(250,204,21,0.3);
-            border-radius: 10px;
-            padding: 14px 18px;
-            margin-top: 20px;
-            text-align: center;
+        .flash {
+            border-radius: 10px; padding: 10px 14px; font-size: 0.78rem; margin-bottom: 16px;
+            display: flex; align-items: center; gap: 8px;
         }
-        .dev-notice i { color: #fbbf24; font-size: 1.1rem; }
-        .dev-notice p { color: #fbbf24; font-size: 0.72rem; margin: 6px 0 0; }
-        .dev-notice a {
-            display: inline-block;
-            margin-top: 8px;
-            background: linear-gradient(135deg, #4f46e5, #7c3aed);
-            color: #fff;
-            padding: 8px 24px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-size: 0.82rem;
-            font-weight: 600;
-            transition: transform 0.2s;
-        }
-        .dev-notice a:hover { transform: translateY(-1px); }
+        .flash-danger  { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+        .flash-warning { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+        .flash-info    { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+        .flash-success { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
 
-        /* Footer */
-        .login-footer {
-            text-align: center;
-            margin-top: 24px;
-            color: #475569;
-            font-size: 0.68rem;
-        }
+        .login-footer { text-align: center; margin-top: 22px; color: #475569; font-size: 0.68rem; }
+        .help { text-align:center; font-size: 0.7rem; color:#94a3b8; margin-top: 14px; }
     </style>
 </head>
 <body>
     <div class="login-container">
 
-        <!-- Branding -->
         <div class="brand-section">
-            <div class="brand-icon" style="background:none; box-shadow:none;">
+            <div class="brand-icon">
                 <img src="/static/img/logo.svg" alt="Vaishnavi Namam"
                      style="width:52px; height:52px; filter:drop-shadow(0 3px 8px rgba(255,69,0,0.4));">
             </div>
@@ -202,88 +109,65 @@
             <div class="brand-subtitle">Jai Shriman Narayana</div>
         </div>
 
-        {% if clerk_pub_key and not clerk_pub_key.startswith('pk_test_XXXX') %}
-        <!-- Clerk Sign-In Widget -->
-        <div class="clerk-container" id="clerk-box">
-            <div class="clerk-loading" id="clerk-loading">
-                <div class="spinner"></div>
-                <div style="font-size:0.78rem;">Loading secure login...</div>
-            </div>
-            <div id="sign-in"></div>
+        <div class="login-card">
+            <h2>Staff Sign In</h2>
+            <div class="sub">Enter your email and password to continue.</div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">
+                  <i class="bi bi-info-circle"></i><span>{{ message }}</span>
+                </div>
+              {% endfor %}
+            {% endwith %}
+
+            <form method="POST" action="{{ url_for('auth.login_page') }}" autocomplete="on">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if request.args.get('next') %}
+                <input type="hidden" name="next" value="{{ request.args.get('next') }}">
+                {% endif %}
+
+                <div class="field">
+                    <label for="email">Email</label>
+                    <div class="input-wrap">
+                        <i class="bi bi-envelope"></i>
+                        <input type="email" id="email" name="email" required
+                               value="{{ email or '' }}" placeholder="you@example.com" autofocus>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="password">Password</label>
+                    <div class="input-wrap">
+                        <i class="bi bi-lock"></i>
+                        <input type="password" id="password" name="password" required
+                               placeholder="Your password">
+                        <button type="button" class="toggle-pw" onclick="togglePw()" tabindex="-1" aria-label="Show password">
+                            <i class="bi bi-eye" id="pwEye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-login">
+                    <i class="bi bi-box-arrow-in-right me-1"></i> Sign In
+                </button>
+            </form>
+
+            <div class="help">Forgot your password? Ask your administrator to reset it.</div>
         </div>
 
-        <!-- Clerk JS -->
-        <script
-            async
-            crossorigin="anonymous"
-            data-clerk-publishable-key="{{ clerk_pub_key }}"
-            src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
-            onload="initClerk()"
-            onerror="clerkError()">
-        </script>
-
-        <script>
-        function initClerk() {
-            window.Clerk.load().then(function() {
-                // Hide loading spinner
-                document.getElementById('clerk-loading').style.display = 'none';
-
-                if (window.Clerk.user) {
-                    // Already signed in — straight to staff dashboard.
-                    // `/` is the public marketing landing now; the actual
-                    // dashboard lives at `/dashboard`.
-                    window.location.href = '/dashboard';
-                } else {
-                    // Mount the sign-in component
-                    window.Clerk.mountSignIn(document.getElementById('sign-in'), {
-                        // Send the user to the staff dashboard after Clerk
-                        // hands the JWT cookie back.  Was `/` previously,
-                        // which is now the public marketing landing — that's
-                        // why signed-in staff were landing back on marketing.
-                        afterSignInUrl: '/dashboard',
-                        appearance: {
-                            elements: {
-                                rootBox: { width: '100%' },
-                                card: { boxShadow: 'none', border: 'none' },
-                                headerTitle: { display: 'none' },
-                                headerSubtitle: { display: 'none' },
-                                socialButtonsBlockButton: { borderRadius: '8px' },
-                                formButtonPrimary: {
-                                    background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-                                    borderRadius: '8px',
-                                    fontWeight: '600',
-                                },
-                            }
-                        }
-                    });
-                }
-            });
-        }
-
-        function clerkError() {
-            document.getElementById('clerk-loading').innerHTML =
-                '<i class="bi bi-exclamation-triangle" style="font-size:1.5rem; color:#ef4444;"></i>' +
-                '<div style="font-size:0.78rem; color:#ef4444; margin-top:8px;">Failed to load login. Check your internet connection.</div>' +
-                '<div style="margin-top:12px;"><a href="javascript:location.reload()" style="color:#4f46e5; font-size:0.75rem;">Retry</a></div>';
-        }
-        </script>
-
-        {% else %}
-        <!-- Dev Mode — Clerk Not Configured -->
-        <div class="dev-notice">
-            <i class="bi bi-exclamation-triangle-fill"></i>
-            <p>Clerk authentication is not configured yet.<br>
-               System is running in <strong>open development mode</strong>.<br>
-               Add your Clerk API keys in the <code>.env</code> file to enable login.</p>
-            <a href="/dashboard">Enter ERP (Dev Mode)</a>
-        </div>
-        {% endif %}
-
-        <!-- Footer -->
         <div class="login-footer">
             &copy; 2026 Vaishnavi Consultant. All rights reserved.
         </div>
-
     </div>
+
+    <script>
+        function togglePw() {
+            var inp = document.getElementById('password');
+            var eye = document.getElementById('pwEye');
+            if (inp.type === 'password') { inp.type = 'text'; eye.className = 'bi bi-eye-slash'; }
+            else { inp.type = 'password'; eye.className = 'bi bi-eye'; }
+        }
+    </script>
 </body>
 </html>

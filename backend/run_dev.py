@@ -1,24 +1,16 @@
-"""Dev mode runner — skips Clerk auth for local preview"""
+"""Dev mode runner — skips login for local preview (AUTH_DEV_OPEN)."""
 import os
-os.environ['CLERK_SECRET_KEY'] = ''
-os.environ['CLERK_PUBLISHABLE_KEY'] = ''
-os.environ['SECRET_KEY'] = 'dev-secret-key'
+os.environ['AUTH_DEV_OPEN'] = '1'          # bypass auth locally
+os.environ.setdefault('SECRET_KEY', 'dev-secret-key')
+os.environ.setdefault('JWT_SECRET', 'dev-jwt-secret')
 
 from app import create_app
 
-# Force clear again after dotenv may have loaded
-os.environ['CLERK_SECRET_KEY'] = ''
-os.environ['CLERK_PUBLISHABLE_KEY'] = ''
+# Ensure it stays on even if dotenv loaded other values.
+os.environ['AUTH_DEV_OPEN'] = '1'
 
 app = create_app()
 
-# Override app config too
-app.config['CLERK_SECRET_KEY'] = ''
-app.config['CLERK_PUBLISHABLE_KEY'] = ''
-
-print(f"[CHECK] CLERK_SECRET_KEY = '{os.environ.get('CLERK_SECRET_KEY')}'")
-print(f"[CHECK] app.config CLERK = '{app.config.get('CLERK_SECRET_KEY')}'")
-
 if __name__ == '__main__':
-    print("\n[DEV MODE] Running WITHOUT Clerk auth")
+    print("\n[DEV MODE] Running with AUTH_DEV_OPEN=1 (no login required)")
     app.run(debug=False, port=5000)
