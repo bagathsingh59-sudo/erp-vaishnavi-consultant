@@ -23,8 +23,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy all source files
 COPY . .
 
-# Expose port (Railway injects $PORT at runtime)
+# Port binding (Railway + Dokploy compatible):
+#   • Railway injects $PORT at runtime → we bind it.
+#   • Dokploy does NOT set $PORT (it leaves it empty) → ${PORT:-8080} falls back
+#     to 8080 so gunicorn doesn't crash with "'' is not a valid port number".
+# In Dokploy, set the application's container port to 8080 (matching EXPOSE).
 EXPOSE 8080
 
 # Same command as Procfile
-CMD gunicorn --chdir backend run:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+CMD gunicorn --chdir backend run:app --bind 0.0.0.0:${PORT:-8080} --workers 2 --timeout 120
