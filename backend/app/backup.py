@@ -30,6 +30,15 @@ from datetime import datetime
 BACKUP_EXT = '.zip'
 LEGACY_EXT = '.sql'
 
+# Tables whose DATA must NOT be included in a backup.
+#   • app_backup_files  — stores every backup's ZIP bytes. Dumping it would make
+#     each new backup embed ALL previous backups (recursive bloat) → the dump
+#     grows without bound and eventually times out. Its schema is still dumped
+#     (empty table is recreated on restore); only the data is skipped.
+#   • auth_refresh_tokens — ephemeral login session tokens; no value in a backup
+#     and restoring stale sessions is pointless.
+EXCLUDE_DATA_TABLES = {'app_backup_files', 'auth_refresh_tokens'}
+
 # Module-level: stores the last error detail for the route to display
 _last_backup_error = ''
 
@@ -61,10 +70,11 @@ def _format_size(size_bytes):
         return f'{size_bytes / (1024 * 1024 * 1024):.2f} GB'
 
 
-def _run_pgdump(db_url, section_flag, output_path, timeout=600):
+def _run_pgdump(db_url, section_flag, output_path, timeout=600, extra_args=None):
     """
     Run pg_dump for one section into output_path.
     section_flag: '--section=pre-data' | '--section=data' | '--section=post-data'
+    extra_args: optional list of extra pg_dump flags (e.g. --exclude-table-data).
     Returns (success, stderr_text).
     """
     cmd = [
@@ -72,9 +82,10 @@ def _run_pgdump(db_url, section_flag, output_path, timeout=600):
         '--no-owner', '--no-acl',
         '--lock-wait-timeout=30000',
         section_flag,
-        '-f', output_path,
-        db_url,
     ]
+    if extra_args:
+        cmd.extend(extra_args)
+    cmd.extend(['-f', output_path, db_url])
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     return result.returncode == 0, result.stderr.strip()
 
@@ -197,21 +208,29 @@ def create_backup(user_id, label=None, is_auto=False):
         created.append((pre_fname, pre_path, os.path.getsize(pre_path)))
         print(f'[BACKUP] Done {pre_fname}')
 
-        # ── Part 2: Data — one file per table ──
+        # ── Part 2: Data — one file per table (skipping excluded tables) ──
         tables = _get_table_list(db_url)
         if not tables:
             print('[BACKUP] Table list unavailable — single data dump fallback')
             data_fname = 'part_02_data_all.sql'
             data_path  = os.path.join(tmpdir, data_fname)
-            ok, err = _run_pgdump(db_url, '--section=data', data_path)
+            # Exclude the recursive/ephemeral tables' data in the fallback path.
+            extra = []
+            for t in EXCLUDE_DATA_TABLES:
+                extra.append(f'--exclude-table-data={t}')
+            ok, err = _run_pgdump(db_url, '--section=data', data_path, extra_args=extra)
             if not ok:
                 _last_backup_error = f'pg_dump --section=data failed: {err}'
                 print(f'[BACKUP] {_last_backup_error}')
                 return None
             created.append((data_fname, data_path, os.path.getsize(data_path)))
         else:
-            print(f'[BACKUP] Dumping data for {len(tables)} table(s) …')
-            for idx, table in enumerate(tables, 1):
+            dump_tables = [t for t in tables if t not in EXCLUDE_DATA_TABLES]
+            skipped = [t for t in tables if t in EXCLUDE_DATA_TABLES]
+            if skipped:
+                print(f'[BACKUP] Skipping data for: {", ".join(skipped)}')
+            print(f'[BACKUP] Dumping data for {len(dump_tables)} table(s) …')
+            for idx, table in enumerate(dump_tables, 1):
                 safe = ''.join(c if c.isalnum() or c == '_' else '_'
                                for c in table)[:40]
                 data_fname = f'part_02_data_{idx:03d}_{safe}.sql'
@@ -435,7 +454,6 @@ def import_backup_file(user_id, uploaded_file, label=None):
             zip_buf = io.BytesIO()
             with zipfile.ZipFile(zip_buf, 'w', zipfile.ZIP_DEFLATED,
                                  compresslevel=9) as zf:
-                zf.write_str = zf.writestr   # alias for clarity
                 zf.writestr('part_01_data.sql', sql_bytes)
             file_bytes = zip_buf.getvalue()
             zip_filename = basename + '.zip'
@@ -698,16 +716,27 @@ def diagnose_backup():
     db_url = os.getenv('DATABASE_URL', '')
     checks['database_url_set'] = bool(db_url)
 
+    # Masked URL + scheme for the browser console.
+    masked = db_url
+    if '@' in masked:
+        head, tail = masked.split('@', 1)
+        if ':' in head.split('://')[-1]:
+            head = head.rsplit(':', 1)[0] + ':****'
+        masked = head + '@' + tail
+    checks['database_url_masked'] = masked or '(not set)'
+
     if db_url:
         norm = _norm_url(db_url)
+        checks['url_scheme'] = norm.split('://', 1)[0] if '://' in norm else '(none)'
         checks['url_scheme_ok'] = norm.startswith('postgresql://')
     else:
+        checks['url_scheme'] = '(none)'
         checks['url_scheme_ok'] = False
 
     pgdump_path = shutil.which('pg_dump')
     checks['pgdump_found'] = bool(pgdump_path)
     checks['pgdump_path']  = pgdump_path or 'not found'
-
+    checks['pgdump_version'] = ''
     if pgdump_path:
         try:
             v = subprocess.run([pgdump_path, '--version'],
@@ -720,15 +749,29 @@ def diagnose_backup():
     checks['psql_found'] = bool(psql_path)
     checks['psql_path']  = psql_path or 'not found'
 
-    # Check DB model is accessible
+    # Server version — catches the classic "pg_dump older than server" mismatch.
+    checks['server_version'] = ''
+    try:
+        from app import db
+        from sqlalchemy import text
+        checks['server_version'] = str(db.session.execute(
+            text('SHOW server_version')).scalar() or '')
+    except Exception as e:
+        checks['server_version'] = f'error: {e}'
+
+    # DB storage (backups live in the app_backup_files table now).
+    checks['backup_dir'] = 'PostgreSQL table: app_backup_files'
     try:
         BackupFile = _get_model()
-        count = BackupFile.query.count()
-        checks['db_storage_ok'] = True
-        checks['backup_count']  = count
+        checks['backup_count']       = BackupFile.query.count()
+        checks['db_storage_ok']      = True
+        checks['backup_dir_writable'] = True
     except Exception as e:
-        checks['db_storage_ok'] = False
-        checks['db_storage_error'] = str(e)
+        checks['db_storage_ok']       = False
+        checks['backup_dir_writable'] = False
+        checks['db_storage_error']    = str(e)
+
+    checks['last_error'] = get_last_backup_error()
 
     checks['can_backup'] = (
         checks['database_url_set'] and
