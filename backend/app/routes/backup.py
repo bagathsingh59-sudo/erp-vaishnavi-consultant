@@ -14,7 +14,7 @@ from app.user_context import current_user_id, is_admin
 from app.backup import (
     create_backup, list_backups, get_backup_bytes,
     delete_backup, cleanup_old_backups, get_db_info,
-    restore_backup, import_backup_file, get_storage_info,
+    restore_backup, merge_import_backup, get_storage_info,
     diagnose_backup, get_last_backup_error
 )
 
@@ -85,7 +85,9 @@ def backup_create():
 @backup_bp.route('/backup/import', methods=['POST'])
 @login_required
 def backup_import():
-    """Import a backup ZIP or SQL file uploaded from the user's local disk."""
+    """MERGE an uploaded backup ZIP/SQL into the live database — keeps existing
+    data, adds new rows, skips duplicates. A safety restore point is taken
+    first."""
     uid           = current_user_id()
     uploaded_file = request.files.get('backup_file')
     label         = request.form.get('label', '').strip()
@@ -99,12 +101,20 @@ def backup_import():
         flash('Only .zip or .sql files are supported.', 'danger')
         return redirect(url_for('backup.backup_home'))
 
-    result = import_backup_file(uid, uploaded_file, label=label if label else None)
+    result = merge_import_backup(uid, uploaded_file, label=label if label else None)
     if result:
-        flash(f'Imported: {result["filename"]} ({result["size_display"]}). '
-              f'Click Restore to recover the data.', 'success')
+        rp = result.get('restore_point')
+        flash(
+            f'Import merged into the database — {result.get("rows_in_backup", 0)} '
+            f'row(s) processed from the backup (existing/duplicate rows were kept '
+            f'and skipped). ' +
+            (f'Safety restore point saved as "{rp}".' if rp else
+             'Note: a safety restore point could NOT be created beforehand.'),
+            'success')
     else:
-        flash('Failed to import backup. File may be corrupted or invalid.', 'danger')
+        err = get_last_backup_error()
+        flash(f'Import failed: {err}' if err else
+              'Failed to import backup. File may be corrupted or invalid.', 'danger')
 
     return redirect(url_for('backup.backup_home'))
 
