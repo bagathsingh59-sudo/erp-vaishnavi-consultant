@@ -101,7 +101,15 @@ def backup_import():
         flash('Only .zip or .sql files are supported.', 'danger')
         return redirect(url_for('backup.backup_home'))
 
-    result = merge_import_backup(uid, uploaded_file, label=label if label else None)
+    try:
+        result = merge_import_backup(uid, uploaded_file, label=label if label else None)
+    except Exception as e:
+        # Last-resort guard so the page never shows a raw 500.
+        import traceback
+        traceback.print_exc()
+        flash(f'Import failed unexpectedly: {e}', 'danger')
+        return redirect(url_for('backup.backup_home'))
+
     if result:
         rp = result.get('restore_point')
         flash(
@@ -165,13 +173,18 @@ def backup_restore(filename):
 
     result = restore_backup(uid, filename, admin)
     if result and result.get('success'):
-        parts      = result.get('parts_executed', [])
-        parts_info = f' ({len(parts)} part(s))' if parts else ''
-        flash(f'Database restored from "{result["restored_from"]}"{parts_info}. '
-              f'Restore point saved as "{result["restore_point"]}".',
-              'success')
+        rows = result.get('rows_in_backup', 0)
+        rp   = result.get('restore_point')
+        flash(
+            f'Database restored (full replace) from "{result["restored_from"]}" — '
+            f'{rows} row(s) loaded. ' +
+            (f'Safety restore point saved as "{rp}".' if rp else
+             'Note: a safety restore point could NOT be created beforehand.'),
+            'success')
     else:
-        flash('Failed to restore backup. Check server logs.', 'danger')
+        err = get_last_backup_error()
+        flash(f'Restore failed: {err}' if err else
+              'Failed to restore backup. Check server logs.', 'danger')
 
     return redirect(url_for('backup.backup_home'))
 
